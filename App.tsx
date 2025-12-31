@@ -40,6 +40,7 @@ const App: React.FC = () => {
 
   const [profile, setProfile] = useState<Profile | null>(null);
   const [articles, setArticles] = useState<Article[]>([]);
+  const [users, setUsers] = useState<Profile[]>([]);
   const initializationInProgress = useRef(false);
 
   const fetchArticles = useCallback(async () => {
@@ -50,11 +51,19 @@ const App: React.FC = () => {
         .order("created_at", { ascending: false });
 
       if (error) throw error;
-      if (arts) {
-        setArticles([...arts]);
-      }
+      if (arts) setArticles([...arts]);
     } catch (e: any) {
       console.error("Error fetching articles:", e);
+    }
+  }, []);
+
+  const fetchUsers = useCallback(async () => {
+    try {
+      const { data, error } = await supabase.from("profiles").select("*");
+      if (error) throw error;
+      if (data) setUsers(data);
+    } catch (e) {
+      console.error(e);
     }
   }, []);
 
@@ -90,6 +99,7 @@ const App: React.FC = () => {
       }
 
       await fetchArticles();
+      await fetchUsers();
     };
 
     initApp();
@@ -98,7 +108,7 @@ const App: React.FC = () => {
       15000
     );
     return () => clearInterval(ticker);
-  }, [fetchArticles]);
+  }, [fetchArticles, fetchUsers]);
 
   useEffect(() => {
     if (!profile?.id) return;
@@ -109,7 +119,15 @@ const App: React.FC = () => {
         setChatRequests((prev) =>
           prev.some((r) => r.id === req.id) ? prev : [...prev, req]
         );
-        toast("Incoming Transmission", { icon: "📡" });
+        toast("Incoming Transmission", {
+          icon: "📡",
+          style: {
+            background: "#1e293b",
+            color: "#fff",
+            fontSize: "10px",
+            fontWeight: "900",
+          },
+        });
       })
       .subscribe();
     return () => {
@@ -151,57 +169,9 @@ const App: React.FC = () => {
       else setProfile(prof);
       toast.success("Identity Authorized");
       await fetchArticles();
+      await fetchUsers();
     },
-    [fetchArticles]
-  );
-
-  const handlePublishArticle = useCallback(
-    async (articleData: Partial<Article>) => {
-      if (!profile) {
-        toast.error("Authentication Required");
-        return;
-      }
-
-      const toastId = toast.loading("Syncing with Global Ledger...");
-      try {
-        // Generate a UUID client-side to ensure 'id' is never null
-        // Works in modern browsers. Fallback to basic random string if needed.
-        const articleId =
-          typeof crypto.randomUUID === "function"
-            ? crypto.randomUUID()
-            : Math.random().toString(36).substring(2, 15) +
-              Math.random().toString(36).substring(2, 15);
-
-        const payload = {
-          id: articleId,
-          title: articleData.title,
-          content: articleData.content,
-          category: articleData.category,
-          image_url:
-            articleData.image_url ||
-            "https://images.unsplash.com/photo-1585829365234-781fcd04c83e?auto=format&fit=crop&q=80&w=800",
-          author_id: profile.id,
-          author_name: profile.full_name,
-          author_serial: profile.serial_id,
-          created_at: new Date().toISOString(),
-        };
-
-        const { error } = await supabase.from("articles").insert(payload);
-
-        if (error) throw error;
-
-        await fetchArticles();
-        toast.success("Report Transmitted Successfully", { id: toastId });
-        handleNavigate("home");
-      } catch (err: any) {
-        console.error("Publishing Error:", err);
-        toast.error(
-          `Transmission Failed: ${err.message || "Check database schema"}`,
-          { id: toastId }
-        );
-      }
-    },
-    [profile, fetchArticles, handleNavigate]
+    [fetchArticles, fetchUsers]
   );
 
   const handleDeleteArticle = useCallback(
@@ -219,9 +189,27 @@ const App: React.FC = () => {
     [fetchArticles]
   );
 
+  const handleDeleteUser = useCallback(
+    async (id: string) => {
+      const toastId = toast.loading("Revoking Correspondent Status...");
+      try {
+        const { error } = await supabase.from("profiles").delete().eq("id", id);
+        if (error) throw error;
+        await fetchUsers();
+        toast.success("Identity Purged", { id: toastId });
+      } catch (err) {
+        toast.error("Purge Failed", { id: toastId });
+      }
+    },
+    [fetchUsers]
+  );
+
   const handleSendChatRequest = useCallback(
     (tid: string, tname: string) => {
-      if (!profile) return;
+      if (!profile) {
+        toast.error("Login to establish link");
+        return;
+      }
       const req: ChatRequest = {
         id: Math.random().toString(36).substr(2, 9),
         fromId: profile.id,
@@ -235,6 +223,21 @@ const App: React.FC = () => {
       toast.success(`Request Sent to ${tname}`);
     },
     [profile]
+  );
+
+  const handleAcceptChat = useCallback(
+    (req: ChatRequest) => {
+      const sender = users.find((u) => u.id === req.fromId);
+      if (sender) {
+        setActiveChat(sender);
+        setChatRequests((prev) => prev.filter((r) => r.id !== req.id));
+        setChatMessages([]); // Clear previous session messages
+        toast.success("Encryption Link Established", { icon: "🔐" });
+      } else {
+        toast.error("Source node unavailable");
+      }
+    },
+    [users]
   );
 
   const displayedArticles = useMemo(() => {
@@ -285,13 +288,10 @@ const App: React.FC = () => {
         isDarkMode={isDarkMode}
         onToggleDarkMode={() => setIsDarkMode(!isDarkMode)}
         chatRequests={chatRequests}
-        onAcceptRequest={(r) => {
-          setActiveChat(r as any);
-          setChatRequests((p) => p.filter((x) => x.id !== r.id));
-        }}
+        onAcceptRequest={handleAcceptChat}
       />
 
-      <div className="pt-20">
+      <div className="pt-24 md:pt-32">
         {["home", "all-posts"].includes(currentPage) && (
           <HomePage
             articles={displayedArticles}
@@ -300,28 +300,70 @@ const App: React.FC = () => {
             userRole={profile?.role || "user"}
             onDelete={handleDeleteArticle}
             onEdit={() => {}}
-            onViewProfile={(id) => handleNavigate("profile")}
+            onViewProfile={(id) => {
+              const u = users.find((x) => x.id === id);
+              if (u) setViewingProfile(u);
+            }}
             onReadArticle={setActiveArticle}
             isArchive={currentPage === "all-posts"}
             currentUserId={profile?.id}
           />
         )}
         {currentPage === "post" && (
-          <PostPage onPublish={handlePublishArticle} />
+          <PostPage
+            onPublish={async (data) => {
+              if (!profile) return;
+              const id = crypto.randomUUID();
+              const payload = {
+                ...data,
+                id,
+                author_id: profile.id,
+                author_name: profile.full_name,
+                author_serial: profile.serial_id,
+                created_at: new Date().toISOString(),
+              };
+              const { error } = await supabase.from("articles").insert(payload);
+              if (!error) {
+                toast.success("Intel Synchronized");
+                fetchArticles();
+                handleNavigate("home");
+              } else toast.error("Sync Error");
+            }}
+          />
         )}
+
         {currentPage === "profile" && profile && (
           <ProfilePage
-            profile={profile}
+            profile={viewingProfile || profile}
             onLogout={handleLogout}
             onUpdatePrivacy={() => {}}
             isLoggedIn={isLoggedIn}
             onSendChatRequest={handleSendChatRequest}
+            isExternal={!!viewingProfile}
+            onCloseExternal={() => setViewingProfile(null)}
           />
         )}
-        {currentPage === "network" && <NetworkPage />}
+
+        {currentPage === "network" && (
+          <NetworkPage
+            users={users}
+            onViewProfile={(u) => {
+              setViewingProfile(u);
+              setCurrentPage("profile");
+            }}
+            onChat={(u) => handleSendChatRequest(u.id, u.full_name)}
+          />
+        )}
+
         {currentPage === "support" && <SupportPage />}
+
         {currentPage === "admin" && profile?.role === "admin" && (
-          <AdminPage articles={articles} onDelete={handleDeleteArticle} />
+          <AdminPage
+            articles={articles}
+            users={users}
+            onDeleteArticle={handleDeleteArticle}
+            onDeleteUser={handleDeleteUser}
+          />
         )}
       </div>
 
@@ -364,6 +406,24 @@ const App: React.FC = () => {
         <ArticleDetail
           article={activeArticle}
           onClose={() => setActiveArticle(null)}
+        />
+      )}
+
+      {activeChat && (
+        <ChatOverlay
+          recipient={activeChat}
+          currentUserId={profile?.id || ""}
+          onClose={() => setActiveChat(null)}
+          messages={chatMessages}
+          onSendMessage={(txt) => {
+            const m: LiveMessage = {
+              id: Math.random().toString(),
+              senderId: profile?.id || "",
+              text: txt,
+              timestamp: Date.now(),
+            };
+            setChatMessages((prev) => [...prev, m]);
+          }}
         />
       )}
 
