@@ -1,24 +1,35 @@
 
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="scroll-smooth">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0, viewport-fit=cover" />
     <title>ThE-ARTICLES | Global Citizen Journalism</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800;900&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script>
       window.googleTranslateElementInit = function() {
         new google.translate.TranslateElement({
           pageLanguage: 'en',
-          includedLanguages: 'hi,en,es,fr,de,bn,ta,te,mr,gu',
+          includedLanguages: 'hi,en,es,fr,bn,ta,te,mr,gu',
           layout: google.translate.TranslateElement.InlineLayout.SIMPLE,
           autoDisplay: false
         }, 'google_translate_element');
       }
+
+      const observer = new MutationObserver((mutations) => {
+        const lang = document.querySelector('.goog-te-combo')?.value;
+        if (lang && lang !== 'en') {
+          document.body.classList.add('translation-active');
+        }
+      });
+      
+      document.addEventListener('DOMContentLoaded', () => {
+        observer.observe(document.body, { childList: true, subtree: true });
+      });
     </script>
     <script src="//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
     <script>
@@ -46,31 +57,33 @@
           top: 0 !important; 
           overflow-x: hidden;
           width: 100vw;
+          -webkit-tap-highlight-color: transparent;
         }
         .dark body { @apply bg-[#020617] text-[#f1f5f9]; }
         
-        /* COMPLETELY HIDE GOOGLE OVERLAYS */
-        .goog-te-banner-frame, .goog-te-gadget-icon, .goog-te-banner, .goog-skiptranslate { display: none !important; }
-        .goog-te-gadget-simple { background-color: transparent !important; border: none !important; }
-        body { top: 0px !important; }
+        .goog-te-banner-frame, .goog-te-gadget-icon, .goog-te-banner, .goog-te-spinner-pos { display: none !important; }
+        .goog-te-gadget-simple { background-color: transparent !important; border: none !important; padding: 0 !important; }
         #google_translate_element { position: absolute; left: -9999px; top: -9999px; visibility: hidden; }
         iframe.skiptranslate { display: none !important; }
+        body { top: 0px !important; }
 
-        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar { width: 5px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
         .dark .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; }
       }
       @layer components {
-        .glass { @apply bg-white/70 backdrop-blur-[24px] border border-white/30; }
-        .dark .glass { @apply bg-slate-900/80 border-white/5; }
+        .glass { @apply bg-white/80 backdrop-blur-[20px] border border-white/40; }
+        .dark .glass { @apply bg-slate-900/85 border-white/5; }
         
         .ticker-wrap { width: 100%; overflow: hidden; }
-        .ticker-move { display: inline-block; white-space: nowrap; animation: ticker 60s linear infinite; }
+        .ticker-move { display: inline-block; white-space: nowrap; animation: ticker 40s linear infinite; }
         @keyframes ticker {
           0% { transform: translateX(0); }
           100% { transform: translateX(-50%); }
         }
+        .whatsapp-bubble-in { @apply bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-2xl rounded-tl-none shadow-sm; }
+        .whatsapp-bubble-out { @apply bg-blue-600 text-white rounded-2xl rounded-tr-none shadow-md; }
       }
     </style>
   <script type="importmap">
