@@ -38,7 +38,7 @@ const App: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [activeArticle, setActiveArticle] = useState<Article | null>(null);
-  const [nodeCount, setNodeCount] = useState(1204);
+  const [nodeCount, setNodeCount] = useState(2540); // Updated with "Reporter count" concept
 
   const [chatRequests, setChatRequests] = useState<ChatRequest[]>([]);
   const [activeChat, setActiveChat] = useState<Profile | null>(null);
@@ -159,8 +159,8 @@ const App: React.FC = () => {
         setChatRequests((prev) =>
           prev.some((r) => r.fromId === req.fromId) ? prev : [...prev, req]
         );
-        toast(`Handshake Signal from ${req.fromName}`, {
-          icon: "📡",
+        toast(`Chat Request from ${req.fromName}`, {
+          icon: "💬",
           style: {
             borderRadius: "15px",
             background: "#2563eb",
@@ -170,8 +170,8 @@ const App: React.FC = () => {
           },
         });
         sendNotification(
-          "Network Handshake",
-          `${req.fromName} is requesting a secure link.`
+          "Chat Request",
+          `${req.fromName} wants to connect privately.`
         );
       })
       .on("broadcast", { event: "handshake_accepted" }, async (p) => {
@@ -181,7 +181,7 @@ const App: React.FC = () => {
         if (acceptorProfile) {
           setActiveChat(acceptorProfile);
           setChatMessages([]);
-          toast.success(`Secure link established with ${acceptorName}`, {
+          toast.success(`Secure link connected with ${acceptorName}`, {
             icon: "⚡",
           });
         } else {
@@ -206,7 +206,7 @@ const App: React.FC = () => {
               setActiveChat(msg.senderProfile);
             },
           } as any);
-          sendNotification(`Intel from ${msg.senderName}`, msg.text);
+          sendNotification(`Message from ${msg.senderName}`, msg.text);
         }
       })
       .subscribe();
@@ -265,7 +265,7 @@ const App: React.FC = () => {
       .eq("id", profile.id);
     if (!error) {
       setProfile({ ...profile, ...updatedData });
-      toast.success("System Configuration Updated");
+      toast.success("Account Configuration Updated");
       fetchUsers();
     } else {
       toast.error("Sync failed");
@@ -289,7 +289,7 @@ const App: React.FC = () => {
       setActiveChat(sender);
       setChatRequests((prev) => prev.filter((r) => r.id !== req.id));
       setChatMessages([]);
-      toast.success(`Secure link established with ${sender.full_name}`);
+      toast.success(`Secure chat started with ${sender.full_name}`);
 
       const senderInbox = supabase.channel(`inbox_${req.fromId}`);
       senderInbox.subscribe((status) => {
@@ -305,7 +305,7 @@ const App: React.FC = () => {
         }
       });
     } else {
-      toast.error("Node identity missing from registry.");
+      toast.error("Reporter identity missing from registry.");
     }
   };
 
@@ -329,10 +329,10 @@ const App: React.FC = () => {
     const { error } = await supabase.from("articles").delete().eq("id", id);
     if (!error) {
       setArticles((prev) => prev.filter((a) => a.id !== id));
-      toast.success("Intel Expunged");
+      toast.success("Article Deleted");
     } else {
       console.error("Delete Error:", error);
-      toast.error(`Purge failed: ${error.message}`);
+      toast.error(`Failed to delete: ${error.message}`);
     }
   };
 
@@ -340,11 +340,11 @@ const App: React.FC = () => {
     const { error } = await supabase.from("profiles").delete().eq("id", id);
     if (!error) {
       setUsers((prev) => prev.filter((u) => u.id !== id));
-      toast.success("Node Terminated from Registry");
+      toast.success("User removed from platform");
       fetchUsers();
     } else {
-      console.error("Delete Node Error:", error);
-      toast.error(`Expulsion failed: ${error.message}`);
+      console.error("Delete User Error:", error);
+      toast.error(`Failed to remove: ${error.message}`);
     }
   };
 
@@ -374,13 +374,35 @@ const App: React.FC = () => {
               setNeedsOnboarding(false);
               if ("Notification" in window) Notification.requestPermission();
             } else {
-              toast.error("Identity creation failed: " + error.message);
+              toast.error("Failed to create identity: " + error.message);
             }
           }
         }}
       />
     );
   }
+
+  const handleSendChatAction = (u: Profile) => {
+    if (!profile) {
+      setShowAuth("login");
+      return;
+    }
+    const req = {
+      id: Math.random().toString(36).substr(2, 9),
+      fromId: profile.id,
+      fromName: profile.full_name,
+      toId: u.id,
+      timestamp: Date.now(),
+    };
+    supabase.channel(`inbox_${u.id}`).subscribe((status) => {
+      if (status === "SUBSCRIBED") {
+        supabase
+          .channel(`inbox_${u.id}`)
+          .send({ type: "broadcast", event: "handshake", payload: req });
+        toast.success(`Chat invite sent to ${u.full_name}`, { icon: "📩" });
+      }
+    });
+  };
 
   return (
     <div
@@ -444,13 +466,15 @@ const App: React.FC = () => {
                 onReadArticle={setActiveArticle}
                 isArchive={currentPage === "all-posts"}
                 currentUserId={profile?.id}
+                allUsers={usersWithPresence}
+                onChat={handleSendChatAction}
               />
             )}
             {currentPage === "post" && (
               <PostPage
                 onPublish={async (data) => {
                   if (!profile) {
-                    toast.error("Node identity required to publish.");
+                    toast.error("Reporter account required to publish.");
                     return;
                   }
 
@@ -477,11 +501,11 @@ const App: React.FC = () => {
                     .insert(payload);
 
                   if (!error) {
-                    toast.success("Transmission Successful");
+                    toast.success("News Published Successfully");
                     fetchArticles();
                     handleNavigate("home");
                   } else {
-                    toast.error(`Transmission Failed: ${error.message}`);
+                    toast.error(`Publishing Failed: ${error.message}`);
                   }
                 }}
               />
@@ -497,28 +521,7 @@ const App: React.FC = () => {
                 }}
                 onUpdateProfile={handleUpdateProfile}
                 isLoggedIn={isLoggedIn}
-                onSendChatRequest={(tid, tname) => {
-                  if (!profile) return;
-                  const req = {
-                    id: Math.random().toString(36).substr(2, 9),
-                    fromId: profile.id,
-                    fromName: profile.full_name,
-                    toId: tid,
-                    timestamp: Date.now(),
-                  };
-                  supabase.channel(`inbox_${tid}`).subscribe((status) => {
-                    if (status === "SUBSCRIBED") {
-                      supabase
-                        .channel(`inbox_${tid}`)
-                        .send({
-                          type: "broadcast",
-                          event: "handshake",
-                          payload: req,
-                        });
-                      toast.success(`Signal sent to ${tname}`);
-                    }
-                  });
-                }}
+                onSendChatRequest={handleSendChatAction}
                 isExternal={!!viewingProfile}
                 onCloseExternal={() => {
                   setViewingProfile(null);
@@ -535,31 +538,7 @@ const App: React.FC = () => {
                   setViewingProfile(u);
                   setCurrentPage("profile");
                 }}
-                onChat={(u) => {
-                  if (!profile) {
-                    setShowAuth("login");
-                    return;
-                  }
-                  const req = {
-                    id: Math.random().toString(36).substr(2, 9),
-                    fromId: profile.id,
-                    fromName: profile.full_name,
-                    toId: u.id,
-                    timestamp: Date.now(),
-                  };
-                  supabase.channel(`inbox_${u.id}`).subscribe((status) => {
-                    if (status === "SUBSCRIBED") {
-                      supabase
-                        .channel(`inbox_${u.id}`)
-                        .send({
-                          type: "broadcast",
-                          event: "handshake",
-                          payload: req,
-                        });
-                      toast.success(`Signal sent to ${u.full_name}`);
-                    }
-                  });
-                }}
+                onChat={handleSendChatAction}
               />
             )}
             {currentPage === "support" && <SupportPage />}

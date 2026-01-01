@@ -29,7 +29,8 @@ interface ProfilePageProps {
   onCloseExternal?: () => void;
   isLoggedIn?: boolean;
   currentUserId?: string;
-  onSendChatRequest?: (targetId: string, targetName: string) => void;
+  /* Updated onSendChatRequest to accept Profile object instead of separate strings */
+  onSendChatRequest?: (profile: Profile) => void;
 }
 
 const ProfilePage: React.FC<ProfilePageProps> = ({
@@ -96,10 +97,9 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
               Remote Access
             </span>
             {isLoggedIn && currentUserId !== profile.id && (
+              /* Call onSendChatRequest with the whole profile object */
               <button
-                onClick={() =>
-                  onSendChatRequest?.(profile.id, profile.full_name)
-                }
+                onClick={() => onSendChatRequest?.(profile)}
                 className="flex items-center gap-2 px-4 py-2 text-white bg-blue-600 rounded-full shadow-lg hover:bg-blue-500"
               >
                 <MessageSquare size={14} />
