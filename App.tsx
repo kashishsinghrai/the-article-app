@@ -428,8 +428,16 @@ const App: React.FC = () => {
                 return;
               }
 
-              // Construct strictly typed payload to prevent 400 Bad Request errors
+              // Generate a unique ID on the client to satisfy NOT NULL constraints
+              // if the database doesn't have a default generator.
+              const uniqueId =
+                typeof crypto !== "undefined" && crypto.randomUUID
+                  ? crypto.randomUUID()
+                  : Math.random().toString(36).substring(2, 15) +
+                    Math.random().toString(36).substring(2, 15);
+
               const payload = {
+                id: uniqueId, // Explicit ID generation
                 title: String(data.title || "").trim(),
                 content: String(data.content || "").trim(),
                 category: String(data.category || "Investigative"),
@@ -440,7 +448,7 @@ const App: React.FC = () => {
                 author_serial: String(profile.serial_id || ""),
               };
 
-              console.log("Transmission Payload:", payload);
+              console.log("Attempting Transmission with ID:", uniqueId);
 
               const { error } = await supabase.from("articles").insert(payload);
 
@@ -449,21 +457,20 @@ const App: React.FC = () => {
                 fetchArticles();
                 handleNavigate("home");
               } else {
-                console.error("Transmission Error Object:", error);
+                console.error("Transmission Failure Details:", error);
 
-                // Dynamic Error Handling
-                if (error.code === "42501") {
+                if (error.code === "23502") {
                   toast.error(
-                    "Access Denied: Run SQL policies in Supabase SQL Editor."
+                    `Database Error: Column '${
+                      error.details?.split('"')[1] || "id"
+                    }' cannot be null. Generating local ID...`
                   );
-                } else if (error.code === "23502") {
-                  toast.error("Sync Error: Missing required database column.");
-                } else if (error.code === "42P01") {
-                  toast.error(
-                    "Sync Error: 'articles' table not found in database."
-                  );
+                } else if (error.code === "42501") {
+                  toast.error("Access Denied: Check RLS policies in Supabase.");
                 } else {
-                  toast.error(`Sync Error [${error.code}]: ${error.message}`);
+                  toast.error(
+                    `Transmission Failed [${error.code}]: ${error.message}`
+                  );
                 }
               }
             }}
