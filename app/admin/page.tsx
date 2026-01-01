@@ -73,7 +73,20 @@ const AdminPage: React.FC<AdminPageProps> = ({
         });
 
         if (activeInterception === p.payload.room) {
-          setInterceptedMessages((prev) => [...prev, p.payload]);
+          setInterceptedMessages((prev) => {
+            const msgExists = prev.find((m) => m.id === p.payload.id);
+            if (msgExists) return prev;
+            return [
+              ...prev,
+              {
+                id: p.payload.id,
+                senderId: p.payload.senderId,
+                senderName: p.payload.senderName,
+                text: p.payload.text,
+                timestamp: p.payload.timestamp,
+              },
+            ];
+          });
         }
       })
       .subscribe();
@@ -113,6 +126,7 @@ const AdminPage: React.FC<AdminPageProps> = ({
       return;
 
     try {
+      // Fix: Use 'id' as a string literal instead of the undefined variable 'id'
       const { error } = await supabase
         .from("profiles")
         .update({ role: newRole })
