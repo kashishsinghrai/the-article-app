@@ -482,6 +482,7 @@ const App: React.FC = () => {
                     category: String(data.category || "Investigative"),
                     image_url: String(data.image_url || ""),
                     is_private: Boolean(data.is_private),
+                    hashtags: data.hashtags || [], // Persist hashtags
                     author_id: profile.id,
                     author_name: String(profile.full_name || ""),
                     author_serial: String(profile.serial_id || ""),

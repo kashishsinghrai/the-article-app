@@ -53,4 +53,5 @@ export interface Article {
   author_serial: string;
   created_at: string;
   is_private?: boolean;
+  hashtags?: string[]; // Added hashtag support
 }
