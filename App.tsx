@@ -48,7 +48,6 @@ const App: React.FC = () => {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [articles, setArticles] = useState<Article[]>([]);
   const [users, setUsers] = useState<Profile[]>([]);
-  const [onlineUsers, setOnlineUsers] = useState<Record<string, any>>({});
 
   const initializationInProgress = useRef(false);
   const activeChatIdRef = useRef<string | null>(null);
@@ -100,42 +99,6 @@ const App: React.FC = () => {
 
         if (prof) {
           setProfile(prof);
-          setNeedsOnboarding(false);
-        } else {
-          const meta = session.user.user_metadata;
-          if (meta?.full_name || meta?.name) {
-            const autoProfile: Profile = {
-              id: session.user.id,
-              full_name: meta.full_name || meta.name,
-              username: (meta.full_name || meta.name || "user")
-                .toLowerCase()
-                .replace(/\s/g, "_"),
-              gender: "Not specified",
-              serial_id: `#ART-${Math.floor(1000 + Math.random() * 9000)}-IND`,
-              budget: 150,
-              role: "user",
-              is_private: false,
-              bio: "Identity automatically established via secure link.",
-              settings: {
-                notifications_enabled: true,
-                presence_visible: true,
-                data_sharing: false,
-                ai_briefings: true,
-                secure_mode: true,
-              },
-            };
-            const { error } = await supabase
-              .from("profiles")
-              .upsert(autoProfile);
-            if (!error) {
-              setProfile(autoProfile);
-              setNeedsOnboarding(false);
-            } else {
-              setNeedsOnboarding(true);
-            }
-          } else {
-            setNeedsOnboarding(true);
-          }
         }
       }
     } catch (e: any) {
@@ -154,6 +117,7 @@ const App: React.FC = () => {
   useEffect(() => {
     if (!profile?.id) return;
 
+    // Incoming requests for this user
     const inboxChannel = supabase.channel(`inbox_${profile.id}`);
     inboxChannel
       .on("broadcast", { event: "handshake" }, (p) => {
@@ -174,6 +138,7 @@ const App: React.FC = () => {
       })
       .on("broadcast", { event: "handshake_accepted" }, async (p) => {
         const { acceptorId, acceptorName } = p.payload;
+        // Automatically open chat UI for the original requester
         const acceptorProfile = users.find((u) => u.id === acceptorId);
         if (acceptorProfile) {
           setActiveChat(acceptorProfile);
@@ -185,30 +150,29 @@ const App: React.FC = () => {
       })
       .subscribe();
 
-    // Admin Monitor Channel
+    // Admin Monitor Channel logic
     if (profile.role === "admin") {
       const adminMonitor = supabase.channel("admin_oversight");
       adminMonitor
         .on("broadcast", { event: "intercept_pulse" }, (p) => {
-          // Track unique intercepts for the navbar badge
           setAdminIntercepts((prev) => {
             const exists = prev.some((i) => i.room === p.payload.room);
             if (exists) return prev;
+
+            toast(
+              `Live Node Pulse Detected: ${p.payload.node1} <-> ${p.payload.node2}`,
+              {
+                icon: "👁️",
+                duration: 5000,
+                style: {
+                  background: "#000",
+                  color: "#fff",
+                  border: "1px solid #dc2626",
+                },
+              }
+            );
             return [...prev, p.payload];
           });
-
-          toast(
-            `Live Chat Intercepted: ${p.payload.node1} <-> ${p.payload.node2}`,
-            {
-              icon: "👁️",
-              duration: 5000,
-              style: {
-                background: "#000",
-                color: "#fff",
-                border: "1px solid #1e293b",
-              },
-            }
-          );
         })
         .subscribe();
     }
@@ -236,7 +200,6 @@ const App: React.FC = () => {
         .channel(roomName)
         .send({ type: "broadcast", event: "message", payload: message });
 
-      // Broadcast metadata to Admins
       supabase.channel("admin_oversight").send({
         type: "broadcast",
         event: "intercept_pulse",
@@ -251,26 +214,6 @@ const App: React.FC = () => {
     [profile, activeChat]
   );
 
-  const handleNavigate = (page: string) => {
-    setViewingProfile(null);
-    setSearchQuery("");
-    setCurrentPage(page);
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  };
-
-  const handleUpdateProfile = async (updatedData: Partial<Profile>) => {
-    if (!profile) return;
-    const { error } = await supabase
-      .from("profiles")
-      .update(updatedData)
-      .eq("id", profile.id);
-    if (!error) {
-      setProfile({ ...profile, ...updatedData });
-      toast.success("Identity Sync Completed");
-      fetchUsers();
-    }
-  };
-
   const handleAcceptHandshake = async (req: ChatRequest) => {
     if (!profile) return;
     let sender = users.find((u) => u.id === req.fromId);
@@ -282,13 +225,18 @@ const App: React.FC = () => {
         .maybeSingle();
       if (data) sender = data;
     }
+
     if (sender) {
+      // 1. Activate UI for acceptor
       setActiveChat(sender);
       setChatRequests((prev) => prev.filter((r) => r.id !== req.id));
       setChatMessages([]);
-      supabase.channel(`inbox_${req.fromId}`).subscribe((status) => {
+
+      // 2. Broadcast acceptance to the requester so their UI opens too
+      const confirmationChannel = supabase.channel(`inbox_${req.fromId}`);
+      confirmationChannel.subscribe((status) => {
         if (status === "SUBSCRIBED") {
-          supabase.channel(`inbox_${req.fromId}`).send({
+          confirmationChannel.send({
             type: "broadcast",
             event: "handshake_accepted",
             payload: {
@@ -298,7 +246,14 @@ const App: React.FC = () => {
           });
         }
       });
+      toast.success(`Handshake Complete with ${sender.full_name}`);
     }
+  };
+
+  const handleNavigate = (page: string) => {
+    setViewingProfile(null);
+    setCurrentPage(page);
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   return (
@@ -397,15 +352,12 @@ const App: React.FC = () => {
                   setProfile(null);
                   handleNavigate("home");
                 }}
-                onUpdateProfile={handleUpdateProfile}
                 isExternal={!!viewingProfile}
                 onCloseExternal={() => {
                   if (viewingProfile) {
                     setViewingProfile(null);
                     setCurrentPage("network");
-                  } else {
-                    handleNavigate("home");
-                  }
+                  } else handleNavigate("home");
                 }}
                 isLoggedIn={isLoggedIn}
                 currentUserId={profile?.id}
@@ -420,6 +372,7 @@ const App: React.FC = () => {
                 onBack={() => handleNavigate("home")}
                 users={users}
                 currentUserId={profile?.id}
+                currentUserProfile={profile}
                 onViewProfile={(u) => {
                   setViewingProfile(u);
                   setCurrentPage("profile");

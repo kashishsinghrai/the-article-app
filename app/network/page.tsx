@@ -11,6 +11,8 @@ import {
   ArrowLeft,
 } from "lucide-react";
 import { Profile } from "../../types";
+import { supabase } from "../../lib/supabase";
+import { toast } from "react-hot-toast";
 
 interface NetworkPageProps {
   users: Profile[];
@@ -18,6 +20,7 @@ interface NetworkPageProps {
   onViewProfile: (user: Profile) => void;
   onChat: (user: Profile) => void;
   onBack: () => void;
+  currentUserProfile?: Profile | null;
 }
 
 const NetworkPage: React.FC<NetworkPageProps> = ({
@@ -26,10 +29,10 @@ const NetworkPage: React.FC<NetworkPageProps> = ({
   onViewProfile,
   onChat,
   onBack,
+  currentUserProfile,
 }) => {
   const [searchTerm, setSearchTerm] = useState("");
 
-  // Find the current user to check their role
   const currentUser = useMemo(
     () => users.find((u) => u.id === currentUserId),
     [users, currentUserId]
@@ -37,7 +40,6 @@ const NetworkPage: React.FC<NetworkPageProps> = ({
 
   const filteredUsers = useMemo(() => {
     return users.filter((u) => {
-      // Logic: Hide Admins from regular users. Admins can see everyone.
       const canSeeAdmin = currentUser?.role === "admin";
       const isVisibleByRole = canSeeAdmin || u.role !== "admin";
 
@@ -48,6 +50,37 @@ const NetworkPage: React.FC<NetworkPageProps> = ({
       return matchesSearch && isVisibleByRole;
     });
   }, [users, searchTerm, currentUser]);
+
+  const initiateHandshake = async (targetUser: Profile) => {
+    if (!currentUserProfile) {
+      toast.error("Establish identity first.");
+      return;
+    }
+
+    toast.loading(`Requesting Link with ${targetUser.full_name}...`, {
+      id: "handshake",
+    });
+
+    const payload = {
+      id: Math.random().toString(36).substr(2, 9),
+      fromId: currentUserProfile.id,
+      fromName: currentUserProfile.full_name,
+      toId: targetUser.id,
+      timestamp: Date.now(),
+    };
+
+    const channel = supabase.channel(`inbox_${targetUser.id}`);
+    channel.subscribe((status) => {
+      if (status === "SUBSCRIBED") {
+        channel.send({
+          type: "broadcast",
+          event: "handshake",
+          payload: payload,
+        });
+        toast.success("Request Broadcasted.", { id: "handshake" });
+      }
+    });
+  };
 
   return (
     <main className="max-w-6xl px-6 py-16 mx-auto space-y-12 md:py-32">
@@ -124,8 +157,8 @@ const NetworkPage: React.FC<NetworkPageProps> = ({
                   </p>
                 </div>
 
-                <p className="h-8 text-xs font-medium leading-relaxed text-slate-500 line-clamp-2">
-                  {user.bio}
+                <p className="h-8 text-xs italic font-medium leading-relaxed text-slate-500 line-clamp-2">
+                  "{user.bio}"
                 </p>
               </div>
 
@@ -137,11 +170,11 @@ const NetworkPage: React.FC<NetworkPageProps> = ({
                   Profile
                 </button>
                 <button
-                  onClick={() => onChat(user)}
+                  onClick={() => initiateHandshake(user)}
                   disabled={user.id === currentUserId}
                   className="flex-1 py-3 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-[10px] font-black uppercase tracking-widest hover:bg-blue-600 hover:text-white disabled:opacity-20 transition-all flex items-center justify-center gap-2"
                 >
-                  Talk
+                  Request Talk
                 </button>
               </div>
             </div>
