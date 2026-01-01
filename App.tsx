@@ -122,11 +122,46 @@ const App: React.FC = () => {
           .select("*")
           .eq("id", session.user.id)
           .maybeSingle();
+
         if (prof) {
           setProfile(prof);
           setNeedsOnboarding(false);
         } else {
-          setNeedsOnboarding(true);
+          // AUTO-SETUP for Google users or users with metadata
+          const meta = session.user.user_metadata;
+          if (meta?.full_name || meta?.name) {
+            const autoProfile: Profile = {
+              id: session.user.id,
+              full_name: meta.full_name || meta.name,
+              username: (meta.full_name || meta.name || "user")
+                .toLowerCase()
+                .replace(/\s/g, "_"),
+              gender: "Not specified",
+              serial_id: `#ART-${Math.floor(1000 + Math.random() * 9000)}-IND`,
+              budget: 150,
+              role: "user",
+              is_private: false,
+              bio: "Identity automatically established via secure link.",
+              settings: {
+                notifications_enabled: true,
+                presence_visible: true,
+                data_sharing: false,
+                ai_briefings: true,
+                secure_mode: true,
+              },
+            };
+            const { error } = await supabase
+              .from("profiles")
+              .upsert(autoProfile);
+            if (!error) {
+              setProfile(autoProfile);
+              setNeedsOnboarding(false);
+            } else {
+              setNeedsOnboarding(true);
+            }
+          } else {
+            setNeedsOnboarding(true);
+          }
         }
       }
     } catch (e: any) {
