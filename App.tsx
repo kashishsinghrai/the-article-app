@@ -18,7 +18,6 @@ import SupportPage from "./app/support/page";
 import NetworkPage from "./app/network/page";
 import LoginPage from "./app/auth/login";
 import RegisterPage from "./app/auth/register";
-import SetupProfilePage from "./app/setup-profile/page";
 import {
   Profile,
   Article,
@@ -33,9 +32,7 @@ const App: React.FC = () => {
   const [currentPage, setCurrentPage] = useState("home");
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [showAuth, setShowAuth] = useState<"login" | "register" | null>(null);
-  const [needsOnboarding, setNeedsOnboarding] = useState(false);
   const [viewingProfile, setViewingProfile] = useState<Profile | null>(null);
-  const [searchQuery, setSearchQuery] = useState("");
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [activeArticle, setActiveArticle] = useState<Article | null>(null);
   const [nodeCount, setNodeCount] = useState(2540);
