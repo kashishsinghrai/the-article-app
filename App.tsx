@@ -111,11 +111,10 @@ const App: React.FC = () => {
     initApp();
   }, [initApp]);
 
-  // Admin and User Real-time Listeners
+  // Unified Real-time Listener
   useEffect(() => {
     if (!profile?.id) return;
 
-    // 1. Personal Inbox for handshakes
     const inboxChannel = supabase.channel(`inbox_${profile.id}`);
     inboxChannel
       .on("broadcast", { event: "handshake" }, (p) => {
@@ -138,7 +137,7 @@ const App: React.FC = () => {
       })
       .subscribe();
 
-    // 2. Admin Oversight Listener (Only for Admins)
+    // Admin Intercept Hub
     let adminChannel: any = null;
     if (profile.role === "admin") {
       adminChannel = supabase.channel("admin_oversight");
@@ -146,21 +145,26 @@ const App: React.FC = () => {
         .on("broadcast", { event: "intercept_pulse" }, (p: any) => {
           setAdminIntercepts((prev) => {
             const exists = prev.find((i) => i.room === p.payload.room);
-            if (exists) {
-              // Update timestamp or last message if needed
-              return prev.map((i) =>
-                i.room === p.payload.room ? { ...i, timestamp: Date.now() } : i
-              );
+            if (!exists) {
+              // Only toast if it's a BRAND NEW channel being detected
+              toast(`NEW SIGNAL: ${p.payload.node1} ↔ ${p.payload.node2}`, {
+                icon: "👁️",
+                style: {
+                  fontSize: "10px",
+                  fontWeight: "bold",
+                  background: "#000",
+                  color: "#fff",
+                },
+              });
+              return [...prev, p.payload];
             }
-            return [...prev, p.payload];
+            // Update last active time for existing channels
+            return prev.map((i) =>
+              i.room === p.payload.room
+                ? { ...i, timestamp: Date.now(), lastText: p.payload.text }
+                : i
+            );
           });
-          // Also toast for admin if not on admin page
-          if (currentPage !== "admin") {
-            toast(`INTERCEPT: ${p.payload.node1} ↔ ${p.payload.node2}`, {
-              icon: "👁️",
-              style: { fontSize: "10px", fontWeight: "bold" },
-            });
-          }
         })
         .subscribe();
     }
@@ -177,11 +181,9 @@ const App: React.FC = () => {
 
       const senderProfile = users.find((u) => u.id === req.fromId);
       if (senderProfile) {
-        // 1. Open chat for the acceptor (current user)
         setActiveChat(senderProfile);
         setChatMessages([]);
 
-        // 2. Notify the sender that the request was accepted
         const confirmChannel = supabase.channel(`inbox_${req.fromId}`);
         confirmChannel.subscribe((status) => {
           if (status === "SUBSCRIBED") {
@@ -193,12 +195,25 @@ const App: React.FC = () => {
                 acceptorName: profile.full_name,
               },
             });
-            // Cleanup
+
+            // Notify admin of the new channel immediately
+            const ids = [profile.id, senderProfile.id].sort();
+            supabase.channel("admin_oversight").send({
+              type: "broadcast",
+              event: "intercept_pulse",
+              payload: {
+                room: `room_${ids[0]}_${ids[1]}`,
+                node1: profile.full_name,
+                node2: senderProfile.full_name,
+                text: "Channel Established",
+                timestamp: Date.now(),
+              },
+            });
+
             setTimeout(() => supabase.removeChannel(confirmChannel), 2000);
           }
         });
 
-        // 3. Remove the request from local state
         setChatRequests((prev) => prev.filter((r) => r.id !== req.id));
         toast.success(`Handshake complete. Secure tunnel active.`);
       }
@@ -221,12 +236,11 @@ const App: React.FC = () => {
       const ids = [profile.id, activeChat.id].sort();
       const roomName = `room_${ids[0]}_${ids[1]}`;
 
-      // Broadcast message to the chat room
       supabase
         .channel(roomName)
         .send({ type: "broadcast", event: "message", payload: message });
 
-      // Send intercept pulse for admin live monitoring
+      // Send intercept pulse with message details
       supabase.channel("admin_oversight").send({
         type: "broadcast",
         event: "intercept_pulse",
@@ -234,6 +248,8 @@ const App: React.FC = () => {
           room: roomName,
           node1: profile.full_name,
           node2: activeChat.full_name,
+          id: message.id,
+          senderId: profile.id,
           senderName: profile.full_name,
           text: text,
           timestamp: message.timestamp,

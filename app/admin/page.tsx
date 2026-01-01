@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
   ShieldAlert,
   Search,
@@ -49,13 +49,16 @@ const AdminPage: React.FC<AdminPageProps> = ({
   const [activeInterception, setActiveInterception] = useState<string | null>(
     null
   );
-  const [interceptedMessages, setInterceptedMessages] = useState<LiveMessage[]>(
-    []
-  );
+
+  // Storage for all messages, keyed by room ID to persist history when switching
+  const [allRoomMessages, setAllRoomMessages] = useState<
+    Record<string, LiveMessage[]>
+  >({});
 
   const [localArticles, setLocalArticles] =
     useState<Article[]>(initialArticles);
   const [localUsers, setLocalUsers] = useState<Profile[]>(initialUsers);
+  const chatScrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setLocalArticles(initialArticles);
@@ -66,26 +69,32 @@ const AdminPage: React.FC<AdminPageProps> = ({
     const channel = supabase.channel("admin_oversight");
     channel
       .on("broadcast", { event: "intercept_pulse" }, (p) => {
+        // 1. Update the unique intercepts list
         setIntercepts((prev) => {
           const exists = prev.find((i) => i.room === p.payload.room);
           if (exists) return prev;
           return [...prev, p.payload];
         });
 
-        if (activeInterception === p.payload.room) {
-          setInterceptedMessages((prev) => {
-            const msgExists = prev.find((m) => m.id === p.payload.id);
-            if (msgExists) return prev;
-            return [
+        // 2. Add message to persistent room history
+        if (p.payload.text && p.payload.id) {
+          setAllRoomMessages((prev) => {
+            const roomMsgs = prev[p.payload.room] || [];
+            if (roomMsgs.find((m) => m.id === p.payload.id)) return prev;
+
+            return {
               ...prev,
-              {
-                id: p.payload.id,
-                senderId: p.payload.senderId,
-                senderName: p.payload.senderName,
-                text: p.payload.text,
-                timestamp: p.payload.timestamp,
-              },
-            ];
+              [p.payload.room]: [
+                ...roomMsgs,
+                {
+                  id: p.payload.id,
+                  senderId: p.payload.senderId,
+                  senderName: p.payload.senderName,
+                  text: p.payload.text,
+                  timestamp: p.payload.timestamp,
+                },
+              ],
+            };
           });
         }
       })
@@ -94,16 +103,22 @@ const AdminPage: React.FC<AdminPageProps> = ({
     return () => {
       channel.unsubscribe();
     };
-  }, [activeInterception]);
+  }, []);
+
+  // Auto-scroll logic for admin terminal
+  useEffect(() => {
+    if (chatScrollRef.current) {
+      chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
+    }
+  }, [allRoomMessages, activeInterception]);
 
   const joinIntercept = (room: string) => {
     setActiveInterception(room);
-    setInterceptedMessages([]);
-    toast(`INTERCEPT ACTIVE: CHANNEL ${room.substring(5, 12)}`, {
+    toast(`MONITORING: CHANNEL ${room.substring(5, 12)}`, {
       icon: "🎧",
       style: {
         background: "#000",
-        border: "1px solid #dc2626",
+        border: "1px solid #1d4ed8",
         color: "#fff",
         fontSize: "10px",
         textTransform: "uppercase",
@@ -126,7 +141,6 @@ const AdminPage: React.FC<AdminPageProps> = ({
       return;
 
     try {
-      // Fix: Use 'id' as a string literal instead of the undefined variable 'id'
       const { error } = await supabase
         .from("profiles")
         .update({ role: newRole })
@@ -182,6 +196,10 @@ const AdminPage: React.FC<AdminPageProps> = ({
         a.author_name.toLowerCase().includes(searchTerm.toLowerCase())
     );
   }, [localArticles, searchTerm]);
+
+  const currentRoomMessages = activeInterception
+    ? allRoomMessages[activeInterception] || []
+    : [];
 
   return (
     <main className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-24 md:py-32 space-y-8 md:space-y-12 animate-in fade-in duration-500">
@@ -654,8 +672,11 @@ const AdminPage: React.FC<AdminPageProps> = ({
                 </div>
               </div>
 
-              <div className="flex-grow space-y-6 overflow-y-auto max-h-[400px] custom-scrollbar px-2 relative z-10">
-                {interceptedMessages.map((m, idx) => (
+              <div
+                ref={chatScrollRef}
+                className="flex-grow space-y-6 overflow-y-auto max-h-[400px] custom-scrollbar px-2 relative z-10"
+              >
+                {currentRoomMessages.map((m, idx) => (
                   <div
                     key={idx}
                     className="p-6 duration-300 border bg-white/5 rounded-3xl border-white/5 animate-in slide-in-from-bottom-4"
@@ -684,17 +705,28 @@ const AdminPage: React.FC<AdminPageProps> = ({
                     </p>
                   </div>
                 )}
+                {activeInterception && currentRoomMessages.length === 0 && (
+                  <div className="flex flex-col items-center justify-center h-full py-24 text-center opacity-10">
+                    <Activity
+                      size={48}
+                      className="mb-4 text-white animate-pulse"
+                    />
+                    <p className="text-[10px] font-black uppercase tracking-widest text-white">
+                      Awaiting Signal Traffic...
+                    </p>
+                  </div>
+                )}
               </div>
 
               {activeInterception && (
-                <div className="mt-8 p-6 bg-red-950/20 border border-red-900/30 rounded-[2rem] flex items-center justify-between">
+                <div className="mt-8 p-6 bg-blue-900/10 border border-blue-900/20 rounded-[2rem] flex items-center justify-between">
                   <div className="flex items-center gap-4">
                     <Activity
                       size={20}
-                      className="text-red-500 animate-pulse"
+                      className="text-blue-500 animate-pulse"
                     />
-                    <p className="text-[10px] font-black uppercase tracking-widest text-red-400">
-                      Signal Integrity Secured via Root Proxy
+                    <p className="text-[10px] font-black uppercase tracking-widest text-blue-400">
+                      Signal Monitoring: SECURE
                     </p>
                   </div>
                   <div className="flex gap-1">
@@ -703,7 +735,7 @@ const AdminPage: React.FC<AdminPageProps> = ({
                       .map((_, i) => (
                         <div
                           key={i}
-                          className="w-1 h-3 rounded-full bg-red-600/40"
+                          className="w-1 h-3 rounded-full bg-blue-600/40"
                           style={{ height: `${Math.random() * 100}%` }}
                         />
                       ))}
