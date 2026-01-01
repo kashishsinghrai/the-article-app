@@ -38,7 +38,7 @@ const App: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [activeArticle, setActiveArticle] = useState<Article | null>(null);
-  const [nodeCount, setNodeCount] = useState(2540); // Updated with "Reporter count" concept
+  const [nodeCount, setNodeCount] = useState(2540);
 
   const [chatRequests, setChatRequests] = useState<ChatRequest[]>([]);
   const [activeChat, setActiveChat] = useState<Profile | null>(null);
@@ -159,7 +159,7 @@ const App: React.FC = () => {
         setChatRequests((prev) =>
           prev.some((r) => r.fromId === req.fromId) ? prev : [...prev, req]
         );
-        toast(`Chat Request from ${req.fromName}`, {
+        toast(`New Link Request from ${req.fromName}`, {
           icon: "💬",
           style: {
             borderRadius: "15px",
@@ -170,7 +170,7 @@ const App: React.FC = () => {
           },
         });
         sendNotification(
-          "Chat Request",
+          "Link Request",
           `${req.fromName} wants to connect privately.`
         );
       })
@@ -265,7 +265,7 @@ const App: React.FC = () => {
       .eq("id", profile.id);
     if (!error) {
       setProfile({ ...profile, ...updatedData });
-      toast.success("Account Configuration Updated");
+      toast.success("Identity Sync Completed");
       fetchUsers();
     } else {
       toast.error("Sync failed");
@@ -304,8 +304,6 @@ const App: React.FC = () => {
           });
         }
       });
-    } else {
-      toast.error("Reporter identity missing from registry.");
     }
   };
 
@@ -329,10 +327,7 @@ const App: React.FC = () => {
     const { error } = await supabase.from("articles").delete().eq("id", id);
     if (!error) {
       setArticles((prev) => prev.filter((a) => a.id !== id));
-      toast.success("Article Deleted");
-    } else {
-      console.error("Delete Error:", error);
-      toast.error(`Failed to delete: ${error.message}`);
+      toast.success("Record Expunged");
     }
   };
 
@@ -340,11 +335,8 @@ const App: React.FC = () => {
     const { error } = await supabase.from("profiles").delete().eq("id", id);
     if (!error) {
       setUsers((prev) => prev.filter((u) => u.id !== id));
-      toast.success("User removed from platform");
+      toast.success("Identity Removed");
       fetchUsers();
-    } else {
-      console.error("Delete User Error:", error);
-      toast.error(`Failed to remove: ${error.message}`);
     }
   };
 
@@ -374,7 +366,7 @@ const App: React.FC = () => {
               setNeedsOnboarding(false);
               if ("Notification" in window) Notification.requestPermission();
             } else {
-              toast.error("Failed to create identity: " + error.message);
+              toast.error("Profile Error: " + error.message);
             }
           }
         }}
@@ -399,10 +391,14 @@ const App: React.FC = () => {
         supabase
           .channel(`inbox_${u.id}`)
           .send({ type: "broadcast", event: "handshake", payload: req });
-        toast.success(`Chat invite sent to ${u.full_name}`, { icon: "📩" });
+        toast.success(`Connection signal sent to ${u.full_name}`, {
+          icon: "📩",
+        });
       }
     });
   };
+
+  const goHome = () => handleNavigate("home");
 
   return (
     <div
@@ -410,7 +406,7 @@ const App: React.FC = () => {
         isDarkMode ? "dark bg-slate-950" : "bg-slate-50"
       } transition-colors duration-500`}
     >
-      {/* Auth Screen Overlay - Full Screen Immersion */}
+      <Toaster position="top-center" />
       {showAuth === "login" && (
         <LoginPage
           onBack={() => setShowAuth(null)}
@@ -472,18 +468,13 @@ const App: React.FC = () => {
             )}
             {currentPage === "post" && (
               <PostPage
+                onBack={goHome}
                 onPublish={async (data) => {
-                  if (!profile) {
-                    toast.error("Reporter account required to publish.");
-                    return;
-                  }
-
+                  if (!profile) return;
                   const uniqueId =
-                    typeof crypto !== "undefined" && crypto.randomUUID
+                    typeof crypto !== "undefined"
                       ? crypto.randomUUID()
-                      : Math.random().toString(36).substring(2, 15) +
-                        Math.random().toString(36).substring(2, 15);
-
+                      : Math.random().toString(36).substring(2, 15);
                   const payload = {
                     id: uniqueId,
                     title: String(data.title || "").trim(),
@@ -495,17 +486,15 @@ const App: React.FC = () => {
                     author_name: String(profile.full_name || ""),
                     author_serial: String(profile.serial_id || ""),
                   };
-
                   const { error } = await supabase
                     .from("articles")
                     .insert(payload);
-
                   if (!error) {
-                    toast.success("News Published Successfully");
+                    toast.success("Story Published");
                     fetchArticles();
-                    handleNavigate("home");
+                    goHome();
                   } else {
-                    toast.error(`Publishing Failed: ${error.message}`);
+                    toast.error(`Error: ${error.message}`);
                   }
                 }}
               />
@@ -525,13 +514,14 @@ const App: React.FC = () => {
                 isExternal={!!viewingProfile}
                 onCloseExternal={() => {
                   setViewingProfile(null);
-                  setCurrentPage("home");
+                  handleNavigate("home");
                 }}
                 currentUserId={profile?.id}
               />
             )}
             {currentPage === "network" && (
               <NetworkPage
+                onBack={goHome}
                 users={usersWithPresence}
                 currentUserId={profile?.id}
                 onViewProfile={(u) => {
@@ -541,7 +531,7 @@ const App: React.FC = () => {
                 onChat={handleSendChatAction}
               />
             )}
-            {currentPage === "support" && <SupportPage />}
+            {currentPage === "support" && <SupportPage onBack={goHome} />}
             {currentPage === "admin" && profile?.role === "admin" && (
               <AdminPage
                 articles={articles}
@@ -573,7 +563,6 @@ const App: React.FC = () => {
           )}
         </>
       )}
-      <Toaster position="bottom-right" />
     </div>
   );
 };

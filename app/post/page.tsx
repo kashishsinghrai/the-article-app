@@ -10,6 +10,7 @@ import {
   Unlock,
   PenSquare,
   FileText,
+  ArrowLeft,
 } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { Article, Category } from "../../types";
@@ -18,9 +19,10 @@ import AiAssistant from "../../components/AiAssistant";
 interface PostPageProps {
   onPublish: (data: Partial<Article>) => void;
   editData?: Article | null;
+  onBack: () => void;
 }
 
-const PostPage: React.FC<PostPageProps> = ({ onPublish, editData }) => {
+const PostPage: React.FC<PostPageProps> = ({ onPublish, editData, onBack }) => {
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [category, setCategory] = useState<Category>("Investigative");
@@ -52,7 +54,7 @@ const PostPage: React.FC<PostPageProps> = ({ onPublish, editData }) => {
       reader.onloadend = () => {
         setImageUrl(reader.result as string);
         setIsEncoding(false);
-        toast.success("Image Uploaded Successfully");
+        toast.success("Image Ready");
       };
       reader.readAsDataURL(file);
     }
@@ -60,7 +62,7 @@ const PostPage: React.FC<PostPageProps> = ({ onPublish, editData }) => {
 
   const handleSubmit = () => {
     if (!title.trim() || !content.trim()) {
-      toast.error("Headline and Story are required.");
+      toast.error("Both Title and Story are required.");
       return;
     }
     setIsSyncing(true);
@@ -73,53 +75,56 @@ const PostPage: React.FC<PostPageProps> = ({ onPublish, editData }) => {
     });
   };
 
-  const categories: Category[] = ["Investigative", "Economic", "Regional"];
-
   return (
-    <main className="flex flex-col min-h-screen gap-16 px-6 py-24 mx-auto max-w-7xl md:py-32 lg:flex-row bg-slate-50 dark:bg-slate-950">
-      <div className="flex-1 space-y-12">
-        <div className="space-y-6">
-          <div className="flex items-center gap-3 text-blue-600">
-            <PenSquare size={24} strokeWidth={3} />
-            <span className="text-xs font-black uppercase tracking-[0.4em]">
-              Article Editor
-            </span>
+    <main className="flex flex-col min-h-screen gap-12 px-6 py-24 mx-auto max-w-7xl md:py-32 lg:flex-row bg-slate-50 dark:bg-slate-950">
+      <div className="flex-1 space-y-10">
+        <div className="flex flex-col items-start justify-between gap-6 mb-10 md:flex-row md:items-end">
+          <div className="space-y-4">
+            <button
+              onClick={onBack}
+              className="flex items-center gap-2 text-slate-400 hover:text-blue-600 font-black uppercase text-[10px] tracking-widest transition-all"
+            >
+              <ArrowLeft size={18} /> Back to Feed
+            </button>
+            <div className="flex items-center gap-3 text-blue-600">
+              <PenSquare size={24} strokeWidth={3} />
+              <span className="text-[12px] font-black uppercase tracking-[0.4em]">
+                Creator Studio
+              </span>
+            </div>
+            <h1 className="text-5xl italic font-black leading-none tracking-tighter uppercase md:text-8xl text-slate-950 dark:text-white">
+              {editData ? "Update Voice" : "Raise Voice"}
+            </h1>
           </div>
-          <h1 className="text-5xl italic font-black leading-none tracking-tighter uppercase md:text-8xl text-slate-950 dark:text-white">
-            {editData ? "Edit Story" : "Post News"}
-          </h1>
-          <p className="max-w-lg text-sm font-bold uppercase text-slate-500 dark:text-slate-400">
-            Share your verified news with the world. Your voice matters.
-          </p>
         </div>
 
-        <div className="bg-white dark:bg-slate-900 p-8 md:p-14 rounded-[3.5rem] shadow-2xl border-2 border-slate-100 dark:border-white/5 space-y-10">
-          <div className="space-y-4">
-            <label className="text-[11px] font-black text-blue-600 uppercase tracking-widest">
-              News Headline
+        <div className="bg-white dark:bg-slate-900 p-8 md:p-14 rounded-[3.5rem] shadow-2xl border border-slate-200 dark:border-white/5 space-y-12">
+          <div className="space-y-3">
+            <label className="text-[10px] font-black text-blue-600 uppercase tracking-widest">
+              Story Headline
             </label>
             <input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="w-full p-0 text-3xl italic font-black tracking-tighter uppercase bg-transparent border-none outline-none md:text-5xl placeholder:text-slate-200 dark:placeholder:text-slate-800 focus:ring-0 text-slate-950 dark:text-white"
-              placeholder="Enter headline here..."
+              className="w-full p-0 text-3xl italic font-black tracking-tighter uppercase bg-transparent border-none outline-none md:text-5xl placeholder:text-slate-100 focus:ring-0 text-slate-950 dark:text-white"
+              placeholder="What's happening?"
             />
           </div>
 
-          <div className="grid grid-cols-1 gap-10 md:grid-cols-2">
+          <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
             <div className="space-y-4">
-              <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
                 Category
               </label>
-              <div className="flex flex-wrap gap-3">
-                {categories.map((cat) => (
+              <div className="flex flex-wrap gap-2">
+                {["Investigative", "Economic", "Regional"].map((cat: any) => (
                   <button
                     key={cat}
                     onClick={() => setCategory(cat)}
-                    className={`px-8 py-3 rounded-2xl text-[11px] font-black uppercase tracking-widest border-2 transition-all ${
+                    className={`px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest border-2 transition-all ${
                       category === cat
-                        ? "bg-slate-950 dark:bg-white text-white dark:text-slate-950 border-slate-950"
-                        : "bg-transparent text-slate-400 border-slate-100 dark:border-slate-800"
+                        ? "bg-slate-900 dark:bg-white text-white dark:text-slate-950 border-slate-900"
+                        : "bg-transparent text-slate-300 border-slate-100 dark:border-slate-800"
                     }`}
                   >
                     {cat}
@@ -129,44 +134,44 @@ const PostPage: React.FC<PostPageProps> = ({ onPublish, editData }) => {
             </div>
 
             <div className="space-y-4">
-              <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest">
-                Who can see this?
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                Visibility
               </label>
-              <div className="flex gap-3">
+              <div className="flex gap-2">
                 <button
                   onClick={() => setIsPublic(true)}
-                  className={`flex-1 flex items-center justify-center gap-3 px-6 py-3 rounded-2xl text-[11px] font-black uppercase border-2 transition-all ${
+                  className={`flex-1 flex items-center justify-center gap-3 px-6 py-3 rounded-2xl text-[10px] font-black uppercase border-2 transition-all ${
                     isPublic
                       ? "bg-emerald-600 text-white border-emerald-600"
-                      : "bg-transparent text-slate-400 border-slate-100 dark:border-slate-800"
+                      : "bg-transparent text-slate-300 border-slate-100 dark:border-slate-800"
                   }`}
                 >
-                  <Unlock size={16} /> Everyone
+                  <Unlock size={16} /> Public
                 </button>
                 <button
                   onClick={() => setIsPublic(false)}
-                  className={`flex-1 flex items-center justify-center gap-3 px-6 py-3 rounded-2xl text-[11px] font-black uppercase border-2 transition-all ${
+                  className={`flex-1 flex items-center justify-center gap-3 px-6 py-3 rounded-2xl text-[10px] font-black uppercase border-2 transition-all ${
                     !isPublic
-                      ? "bg-amber-600 text-white border-amber-600"
-                      : "bg-transparent text-slate-400 border-slate-100 dark:border-slate-800"
+                      ? "bg-slate-400 text-white border-slate-400"
+                      : "bg-transparent text-slate-300 border-slate-100 dark:border-slate-800"
                   }`}
                 >
-                  <Lock size={16} /> Only Me
+                  <Lock size={16} /> Private
                 </button>
               </div>
             </div>
           </div>
 
           <div className="space-y-4">
-            <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest">
-              Add Image
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+              Feature Image
             </label>
             <div
               onClick={() => fileInputRef.current?.click()}
-              className="aspect-video bg-slate-50 dark:bg-slate-950 rounded-[2.5rem] border-4 border-dashed border-slate-200 dark:border-slate-800 flex flex-col items-center justify-center group cursor-pointer hover:border-blue-600 transition-all overflow-hidden relative shadow-inner"
+              className="aspect-video bg-slate-50 dark:bg-slate-950 rounded-[2.5rem] border-4 border-dashed border-slate-200 dark:border-slate-800 flex flex-col items-center justify-center group cursor-pointer hover:border-blue-600 transition-all overflow-hidden relative"
             >
               {isEncoding ? (
-                <Loader2 size={40} className="text-blue-600 animate-spin" />
+                <Loader2 size={32} className="text-blue-600 animate-spin" />
               ) : imageUrl ? (
                 <>
                   <img src={imageUrl} className="object-cover w-full h-full" />
@@ -175,19 +180,16 @@ const PostPage: React.FC<PostPageProps> = ({ onPublish, editData }) => {
                       e.stopPropagation();
                       setImageUrl("");
                     }}
-                    className="absolute p-3 text-white transition-transform bg-red-600 shadow-xl top-6 right-6 rounded-2xl hover:scale-110"
+                    className="absolute p-2 text-white bg-red-600 shadow-xl top-6 right-6 rounded-xl"
                   >
-                    <X size={20} />
+                    <X size={18} />
                   </button>
                 </>
               ) : (
-                <div className="p-10 text-center">
-                  <Camera
-                    size={48}
-                    className="mx-auto mb-4 transition-colors text-slate-300 group-hover:text-blue-600"
-                  />
-                  <span className="block text-sm font-black tracking-widest uppercase text-slate-400">
-                    Click to Upload Photo
+                <div className="text-center opacity-50">
+                  <Camera size={40} className="mx-auto mb-3" />
+                  <span className="block text-[10px] font-black uppercase tracking-widest">
+                    Add Media
                   </span>
                 </div>
               )}
@@ -202,36 +204,30 @@ const PostPage: React.FC<PostPageProps> = ({ onPublish, editData }) => {
           </div>
 
           <div className="space-y-4">
-            <label className="text-[11px] font-black text-blue-600 uppercase tracking-widest">
-              Article Story
+            <label className="text-[10px] font-black text-blue-600 uppercase tracking-widest">
+              The Full Story
             </label>
             <textarea
               value={content}
               onChange={(e) => setContent(e.target.value)}
-              rows={12}
-              className="w-full p-0 text-xl font-bold leading-relaxed bg-transparent border-none outline-none md:text-2xl placeholder:text-slate-100 dark:placeholder:text-slate-800 focus:ring-0 text-slate-800 dark:text-slate-200"
-              placeholder="Tell your story here..."
+              rows={10}
+              className="w-full p-0 text-xl font-bold leading-relaxed bg-transparent border-none outline-none placeholder:text-slate-100 focus:ring-0 text-slate-700 dark:text-slate-300"
+              placeholder="Start writing..."
             />
           </div>
 
-          <div className="flex flex-col items-center justify-between gap-6 pt-10 border-t-2 border-slate-100 dark:border-slate-800 sm:flex-row">
-            <div className="flex items-center gap-3 px-6 py-3 border rounded-full bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-white/5">
-              <Zap size={18} className="text-blue-600" />
-              <span className="text-[11px] font-black uppercase tracking-widest text-slate-500">
-                Auto-Save Enabled
-              </span>
-            </div>
+          <div className="flex flex-col items-center justify-end gap-6 pt-8 border-t border-slate-100 dark:border-slate-800 sm:flex-row">
             <button
               onClick={handleSubmit}
               disabled={isSyncing || isEncoding}
-              className={`w-full sm:w-auto px-12 py-5 rounded-full text-sm font-black uppercase tracking-widest shadow-2xl transition-all active:scale-95 flex items-center justify-center gap-3 ${
+              className={`w-full sm:w-auto px-12 py-5 rounded-full text-[12px] font-black uppercase tracking-widest shadow-2xl transition-all active:scale-95 flex items-center justify-center gap-3 ${
                 isSyncing
                   ? "bg-slate-200 text-slate-400"
-                  : "bg-blue-600 text-white hover:bg-slate-900 dark:hover:bg-white dark:hover:text-slate-900"
+                  : "bg-blue-600 text-white hover:bg-slate-900"
               }`}
             >
-              {isSyncing ? "Posting..." : "Publish Now"}
-              {!isSyncing && <Send size={20} />}
+              {isSyncing ? "Syncing..." : "Publish Story"}
+              {!isSyncing && <Send size={18} />}
             </button>
           </div>
         </div>
