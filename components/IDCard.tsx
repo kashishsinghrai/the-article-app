@@ -20,131 +20,126 @@ const IDCard: React.FC<IDCardProps> = ({ profile }) => {
   const downloadPass = async () => {
     if (!cardRef.current) return;
     try {
-      // Ensure all images (QR) are loaded before capturing
+      // Use a slightly larger capture area to prevent clipping
       const canvas = await html2canvas(cardRef.current, {
-        scale: 4, // Ultra-high resolution
+        scale: 3,
         backgroundColor: "#ffffff",
         useCORS: true,
         logging: false,
-        onclone: (clonedDoc) => {
-          // Force visibility of elements in the clone
-          const el = clonedDoc.getElementById("downloadable-card");
-          if (el) el.style.opacity = "1";
-        },
+        x: -1, // Subtle offset to fix border clipping
+        y: -1,
+        width: cardRef.current.offsetWidth + 2,
+        height: cardRef.current.offsetHeight + 2,
       });
       const link = document.createElement("a");
-      link.download = `THE_ARTICLES_PASS_${profile.serial_id}.png`;
+      link.download = `PRESS_PASS_${profile.serial_id}.png`;
       link.href = canvas.toDataURL("image/png", 1.0);
       link.click();
     } catch (e) {
-      console.error("Download failed", e);
+      console.error("Export failed", e);
     }
   };
 
   return (
     <div className="flex flex-col items-center w-full gap-8">
-      <div
-        ref={cardRef}
-        id="downloadable-card"
-        className="relative w-[360px] aspect-[1.6/1] bg-white dark:bg-slate-900 rounded-[2.5rem] overflow-hidden shadow-2xl border border-slate-200 dark:border-slate-800 flex flex-col p-8 transition-all group select-none"
-      >
-        {/* Security Watermark Overlay */}
-        <div className="absolute inset-0 opacity-[0.04] pointer-events-none overflow-hidden text-[7px] font-black uppercase rotate-[-12deg] leading-none whitespace-pre italic">
-          {Array(40).fill("VERIFIED PRESS PASS NETWORK NODE ").join("\n")}
-        </div>
-
-        {/* Minimal Header */}
-        <div className="relative z-10 flex items-start justify-between mb-6">
-          <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <Shield size={14} className="text-blue-600" />
-              <p className="text-[9px] font-black text-slate-400 tracking-[0.25em] uppercase">
-                Operations Node
-              </p>
-            </div>
-            <h2 className="text-xl italic font-black leading-none tracking-tighter uppercase text-slate-950 dark:text-white">
-              ThE-ARTICLES
-            </h2>
-          </div>
-          <div className="text-right">
-            <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">
-              Digital Serial
-            </p>
-            <p className="text-[12px] font-black text-slate-950 dark:text-white uppercase">
-              ID: {profile.serial_id?.split("-")[1] || "00000"}
-            </p>
-          </div>
-        </div>
-
-        {/* Identity Body */}
-        <div className="relative z-10 flex items-center flex-grow gap-6">
-          <div className="w-20 h-20 rounded-[1.5rem] bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 flex items-center justify-center flex-shrink-0 shadow-inner overflow-hidden">
-            <Fingerprint
-              size={32}
-              className="transition-all duration-700 text-slate-200 group-hover:text-blue-600"
-            />
+      {/* Container with extra padding to ensure no clipping during capture */}
+      <div className="p-2 bg-transparent">
+        <div
+          ref={cardRef}
+          className="relative w-[360px] aspect-[1.6/1] bg-white dark:bg-slate-900 rounded-[2.5rem] overflow-hidden shadow-2xl border border-slate-200 dark:border-slate-800 flex flex-col p-8 select-none"
+        >
+          {/* Security Watermark */}
+          <div className="absolute inset-0 opacity-[0.04] pointer-events-none overflow-hidden text-[7px] font-black uppercase rotate-[-12deg] leading-none whitespace-pre italic">
+            {Array(40).fill("VERIFIED PRESS PASS NETWORK NODE ").join("\n")}
           </div>
 
-          <div className="flex-grow space-y-3 overflow-hidden">
-            <div className="space-y-0.5">
-              <p className="text-[8px] text-slate-300 font-bold uppercase tracking-widest">
-                Full Name
-              </p>
-              <p className="text-[15px] font-black text-slate-950 dark:text-white uppercase truncate tracking-tight">
-                {profile.full_name || "PENDING IDENTITY"}
-              </p>
-            </div>
-
-            <div className="flex items-center justify-between gap-4">
-              <div className="space-y-0.5">
-                <p className="text-[8px] text-slate-300 font-bold uppercase tracking-widest">
-                  Network UID
-                </p>
-                <p className="text-[10px] font-bold text-slate-600 dark:text-slate-400 italic tracking-tighter">
-                  {profile.serial_id}
+          <div className="relative z-10 flex items-start justify-between mb-6">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <Shield size={14} className="text-blue-600" />
+                <p className="text-[9px] font-bold text-slate-400 tracking-[0.25em] uppercase">
+                  Operations Node
                 </p>
               </div>
-              <div className="space-y-0.5 text-right">
+              <h2 className="text-xl italic font-black leading-none tracking-tighter uppercase text-slate-950 dark:text-white">
+                ThE-ARTICLES
+              </h2>
+            </div>
+            <div className="text-right">
+              <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">
+                Serial Index
+              </p>
+              <p className="text-[12px] font-black text-slate-950 dark:text-white uppercase tracking-tight">
+                {profile.serial_id?.split("-")[1] || "00000"}
+              </p>
+            </div>
+          </div>
+
+          <div className="relative z-10 flex items-center flex-grow gap-6">
+            <div className="w-20 h-20 rounded-[1.5rem] bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 flex items-center justify-center flex-shrink-0 shadow-inner overflow-hidden">
+              <Fingerprint size={32} className="text-slate-200" />
+            </div>
+
+            <div className="flex-grow space-y-3 overflow-hidden">
+              <div className="space-y-0.5">
                 <p className="text-[8px] text-slate-300 font-bold uppercase tracking-widest">
-                  Status
+                  Operator Name
                 </p>
-                <div className="flex items-center justify-end gap-1">
-                  <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
-                  <p className="text-[9px] font-black text-emerald-500 uppercase tracking-widest italic">
-                    Live
+                <p className="text-[16px] font-black text-slate-950 dark:text-white uppercase truncate tracking-tight">
+                  {profile.full_name || "PENDING IDENTITY"}
+                </p>
+              </div>
+
+              <div className="flex items-center justify-between gap-4">
+                <div className="space-y-0.5">
+                  <p className="text-[8px] text-slate-300 font-bold uppercase tracking-widest">
+                    UID
                   </p>
+                  <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400 italic tracking-tighter">
+                    {profile.serial_id}
+                  </p>
+                </div>
+                <div className="space-y-0.5 text-right">
+                  <p className="text-[8px] text-slate-300 font-bold uppercase tracking-widest">
+                    Status
+                  </p>
+                  <div className="flex items-center justify-end gap-1">
+                    <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full" />
+                    <p className="text-[9px] font-black text-emerald-500 uppercase tracking-widest italic">
+                      Live
+                    </p>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
-        </div>
 
-        {/* Modern Footer */}
-        <div className="relative z-10 flex items-end justify-between pt-4 mt-4 border-t border-slate-100 dark:border-slate-800">
-          <div className="space-y-1">
-            <div className="flex items-center gap-1.5 text-slate-300 dark:text-slate-600">
-              <Globe size={10} />
-              <span className="text-[7px] font-black uppercase tracking-[0.2em]">
-                Verified Correspondent Platform
-              </span>
+          <div className="relative z-10 flex items-end justify-between pt-4 mt-4 border-t border-slate-100 dark:border-slate-800">
+            <div className="space-y-1">
+              <div className="flex items-center gap-1.5 text-slate-300 dark:text-slate-600">
+                <Globe size={10} />
+                <span className="text-[7px] font-black uppercase tracking-[0.2em]">
+                  Verified Correspondent
+                </span>
+              </div>
+              <p className="text-[6px] font-medium text-slate-300 uppercase">
+                Hash: {profile.id?.substring(0, 16)}
+              </p>
             </div>
-            <p className="text-[6px] font-medium text-slate-300 uppercase">
-              Hash: {profile.id?.substring(0, 16)}...
-            </p>
+            <img
+              src={qrUrl}
+              alt="QR"
+              className="w-10 h-10 rounded-md opacity-60 dark:invert"
+            />
           </div>
-          <img
-            src={qrUrl}
-            alt="QR"
-            className="w-10 h-10 opacity-60 dark:invert rounded-md border border-slate-50 dark:border-slate-800 p-0.5"
-          />
         </div>
       </div>
 
       <button
         onClick={downloadPass}
-        className="flex items-center gap-3 px-10 py-4 bg-slate-950 dark:bg-white text-white dark:text-slate-950 text-[11px] font-black uppercase tracking-widest rounded-2xl hover:scale-105 active:scale-95 transition-all shadow-2xl border border-white/10"
+        className="flex items-center gap-3 px-10 py-4 bg-slate-950 dark:bg-white text-white dark:text-slate-950 text-[11px] font-black uppercase tracking-widest rounded-2xl hover:scale-105 active:scale-95 transition-all shadow-xl"
       >
-        <Download size={16} /> Export Digital Pass (PNG)
+        <Download size={16} /> Export High-Res Pass
       </button>
     </div>
   );
