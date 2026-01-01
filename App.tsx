@@ -117,7 +117,6 @@ const App: React.FC = () => {
   useEffect(() => {
     if (!profile?.id) return;
 
-    // Incoming requests for this user
     const inboxChannel = supabase.channel(`inbox_${profile.id}`);
     inboxChannel
       .on("broadcast", { event: "handshake" }, (p) => {
@@ -128,29 +127,38 @@ const App: React.FC = () => {
         toast(`New Link Request from ${req.fromName}`, {
           icon: "💬",
           style: {
-            borderRadius: "15px",
-            background: "#2563eb",
-            color: "#fff",
+            borderRadius: "20px",
+            background: isDarkMode ? "#1e293b" : "#ffffff",
+            color: isDarkMode ? "#ffffff" : "#0f172a",
             fontSize: "11px",
-            fontWeight: "bold",
+            fontWeight: "900",
+            textTransform: "uppercase",
+            letterSpacing: "0.05em",
+            padding: "16px 24px",
+            border: "1px solid rgba(37, 99, 235, 0.2)",
+            boxShadow: "0 20px 40px rgba(0,0,0,0.1)",
           },
         });
       })
       .on("broadcast", { event: "handshake_accepted" }, async (p) => {
         const { acceptorId, acceptorName } = p.payload;
-        // Automatically open chat UI for the original requester
         const acceptorProfile = users.find((u) => u.id === acceptorId);
         if (acceptorProfile) {
           setActiveChat(acceptorProfile);
           setChatMessages([]);
           toast.success(`Secure link connected with ${acceptorName}`, {
             icon: "⚡",
+            style: {
+              borderRadius: "20px",
+              fontSize: "11px",
+              fontWeight: "900",
+              textTransform: "uppercase",
+            },
           });
         }
       })
       .subscribe();
 
-    // Admin Monitor Channel logic
     if (profile.role === "admin") {
       const adminMonitor = supabase.channel("admin_oversight");
       adminMonitor
@@ -163,11 +171,14 @@ const App: React.FC = () => {
               `Live Node Pulse Detected: ${p.payload.node1} <-> ${p.payload.node2}`,
               {
                 icon: "👁️",
-                duration: 5000,
+                duration: 4000,
                 style: {
                   background: "#000",
                   color: "#fff",
                   border: "1px solid #dc2626",
+                  fontSize: "10px",
+                  fontWeight: "bold",
+                  borderRadius: "15px",
                 },
               }
             );
@@ -180,7 +191,7 @@ const App: React.FC = () => {
     return () => {
       supabase.removeChannel(inboxChannel);
     };
-  }, [profile?.id, profile?.role, users]);
+  }, [profile?.id, profile?.role, users, isDarkMode]);
 
   const handleSendMessage = useCallback(
     (text: string) => {
@@ -227,12 +238,10 @@ const App: React.FC = () => {
     }
 
     if (sender) {
-      // 1. Activate UI for acceptor
       setActiveChat(sender);
       setChatRequests((prev) => prev.filter((r) => r.id !== req.id));
       setChatMessages([]);
 
-      // 2. Broadcast acceptance to the requester so their UI opens too
       const confirmationChannel = supabase.channel(`inbox_${req.fromId}`);
       confirmationChannel.subscribe((status) => {
         if (status === "SUBSCRIBED") {
@@ -246,8 +255,23 @@ const App: React.FC = () => {
           });
         }
       });
-      toast.success(`Handshake Complete with ${sender.full_name}`);
+      toast.success(`Handshake Complete: ${sender.full_name}`, {
+        style: {
+          borderRadius: "20px",
+          fontSize: "11px",
+          fontWeight: "900",
+          textTransform: "uppercase",
+        },
+      });
     }
+  };
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    setIsLoggedIn(false);
+    setProfile(null);
+    setCurrentPage("home");
+    toast.success("Session Terminated Safely.");
   };
 
   const handleNavigate = (page: string) => {
@@ -262,7 +286,15 @@ const App: React.FC = () => {
         isDarkMode ? "dark bg-slate-950" : "bg-slate-50"
       } transition-colors duration-500`}
     >
-      <Toaster position="top-center" />
+      <Toaster
+        position="bottom-center"
+        toastOptions={{
+          className: "notranslate",
+          style: {
+            marginBottom: "24px",
+          },
+        }}
+      />
       {showAuth === "login" && (
         <LoginPage
           onBack={() => setShowAuth(null)}
@@ -291,6 +323,7 @@ const App: React.FC = () => {
           <Navbar
             onNavigate={handleNavigate}
             onLogin={() => setShowAuth("login")}
+            onLogout={handleLogout}
             currentPage={currentPage}
             isLoggedIn={isLoggedIn}
             userRole={profile?.role || "user"}
@@ -346,12 +379,7 @@ const App: React.FC = () => {
             {currentPage === "profile" && (viewingProfile || profile) && (
               <ProfilePage
                 profile={viewingProfile || profile!}
-                onLogout={() => {
-                  supabase.auth.signOut();
-                  setIsLoggedIn(false);
-                  setProfile(null);
-                  handleNavigate("home");
-                }}
+                onLogout={handleLogout}
                 isExternal={!!viewingProfile}
                 onCloseExternal={() => {
                   if (viewingProfile) {

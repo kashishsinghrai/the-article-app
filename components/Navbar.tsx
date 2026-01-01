@@ -12,12 +12,16 @@ import {
   ShieldAlert,
   Check,
   ChevronRight,
+  Smartphone,
+  LogOut,
 } from "lucide-react";
 import { ChatRequest, Profile } from "../types";
+import { toast } from "react-hot-toast";
 
 interface NavbarProps {
   onNavigate: (page: string) => void;
   onLogin: () => void;
+  onLogout: () => void;
   onSearch?: (query: string) => void;
   currentPage: string;
   isLoggedIn: boolean;
@@ -32,6 +36,7 @@ interface NavbarProps {
 const Navbar: React.FC<NavbarProps> = ({
   onNavigate,
   onLogin,
+  onLogout,
   onSearch,
   currentPage,
   isLoggedIn,
@@ -54,6 +59,25 @@ const Navbar: React.FC<NavbarProps> = ({
     onNavigate(page);
     setIsMobileMenuOpen(false);
     setIsInboxOpen(false);
+  };
+
+  const handleDownloadApp = () => {
+    toast(
+      "App Distribution Pending: Engineering team is finalizing the mobile binary for Phase 3.",
+      {
+        icon: "📲",
+        style: {
+          borderRadius: "20px",
+          background: "#1e293b",
+          color: "#fff",
+          fontSize: "10px",
+          fontWeight: "900",
+          textTransform: "uppercase",
+          letterSpacing: "0.1em",
+          padding: "16px",
+        },
+      }
+    );
   };
 
   useEffect(() => {
@@ -113,7 +137,19 @@ const Navbar: React.FC<NavbarProps> = ({
             )}
           </div>
 
-          <div className="flex items-center gap-3 md:gap-6">
+          <div className="flex items-center gap-2 md:gap-4">
+            {/* App Download Link */}
+            <button
+              onClick={handleDownloadApp}
+              className="items-center hidden gap-2 p-2 transition-all text-slate-400 hover:text-blue-600 xs:flex"
+              title="Download Mobile App"
+            >
+              <Smartphone size={18} />
+              <span className="hidden xl:block text-[9px] font-black uppercase tracking-widest">
+                App
+              </span>
+            </button>
+
             <button
               onClick={onToggleDarkMode}
               className="transition-colors text-slate-400 hover:text-slate-950 dark:hover:text-white"
@@ -139,7 +175,6 @@ const Navbar: React.FC<NavbarProps> = ({
                   )}
                 </button>
 
-                {/* Responsive Inbox Dropdown - Fixed position on mobile to prevent clipping */}
                 {isInboxOpen && (
                   <div className="fixed left-4 right-4 sm:absolute sm:left-auto sm:right-0 mt-4 sm:w-[380px] bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200 z-[200]">
                     <div className="flex items-center justify-between p-5 border-b border-slate-50 dark:border-white/5 bg-slate-50 dark:bg-slate-950/50">
@@ -237,16 +272,28 @@ const Navbar: React.FC<NavbarProps> = ({
             )}
 
             {isLoggedIn ? (
-              <button
-                onClick={() => navTo("profile")}
-                className={`w-9 h-9 md:w-10 md:h-10 rounded-full flex items-center justify-center border transition-all ${
-                  currentPage === "profile"
-                    ? "bg-slate-950 dark:bg-white text-white dark:text-slate-950 border-slate-950 dark:border-white"
-                    : "border-slate-200 dark:border-slate-800 text-slate-400"
-                }`}
-              >
-                <User size={18} />
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => navTo("profile")}
+                  className={`w-9 h-9 md:w-10 md:h-10 rounded-full flex items-center justify-center border transition-all ${
+                    currentPage === "profile"
+                      ? "bg-slate-950 dark:bg-white text-white dark:text-slate-950 border-slate-950 dark:border-white"
+                      : "border-slate-200 dark:border-slate-800 text-slate-400 hover:text-slate-950 dark:hover:text-white"
+                  }`}
+                >
+                  <User size={18} />
+                </button>
+                <button
+                  onClick={onLogout}
+                  className="items-center hidden gap-2 px-3 py-2 text-red-500 transition-all md:flex rounded-xl hover:bg-red-50 dark:hover:bg-red-900/20"
+                  title="Logout"
+                >
+                  <LogOut size={16} />
+                  <span className="text-[9px] font-black uppercase tracking-widest">
+                    Logout
+                  </span>
+                </button>
+              </div>
             ) : (
               <button
                 onClick={onLogin}
@@ -277,7 +324,7 @@ const Navbar: React.FC<NavbarProps> = ({
           onClick={() => setIsMobileMenuOpen(false)}
         />
         <div
-          className={`absolute right-0 top-0 bottom-0 w-[80%] bg-white dark:bg-slate-950 shadow-2xl transition-transform duration-300 p-12 space-y-12 ${
+          className={`absolute right-0 top-0 bottom-0 w-[80%] bg-white dark:bg-slate-950 shadow-2xl transition-transform duration-300 p-8 space-y-12 flex flex-col ${
             isMobileMenuOpen ? "translate-x-0" : "translate-x-full"
           }`}
         >
@@ -289,7 +336,7 @@ const Navbar: React.FC<NavbarProps> = ({
               <X size={24} className="dark:text-white" />
             </button>
           </div>
-          <div className="flex flex-col gap-6">
+          <div className="flex flex-col flex-grow gap-6">
             <MobileNavItem
               label="Feed"
               active={currentPage === "home"}
@@ -319,7 +366,23 @@ const Navbar: React.FC<NavbarProps> = ({
               active={currentPage === "profile"}
               onClick={() => navTo("profile")}
             />
+
+            <button
+              onClick={handleDownloadApp}
+              className="flex items-center gap-4 pt-4 text-lg font-bold tracking-tighter uppercase border-t text-slate-400 border-slate-50 dark:border-white/5"
+            >
+              <Smartphone size={20} /> Download App
+            </button>
           </div>
+
+          {isLoggedIn && (
+            <button
+              onClick={onLogout}
+              className="flex items-center gap-4 pb-10 text-xl italic font-black tracking-tighter text-red-600 uppercase"
+            >
+              <LogOut size={24} /> Terminate Session
+            </button>
+          )}
         </div>
       </div>
     </>
