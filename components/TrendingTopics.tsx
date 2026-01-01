@@ -105,7 +105,6 @@ const TrendingTopics: React.FC = () => {
           throw new Error("API Key Missing");
         }
 
-        // Fix: Always use 'gemini-3-flash-preview' for basic text tasks
         const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
         const response = await ai.models.generateContent({
           model: "gemini-3-flash-preview",
@@ -143,11 +142,7 @@ const TrendingTopics: React.FC = () => {
         );
         setTopics(getFallbackData());
         setIsMock(true);
-        if (err.message?.includes("403")) {
-          toast.error("AI Node Access Restricted. Check API Key permissions.", {
-            duration: 5000,
-          });
-        }
+        // Removed the technical toast error message as requested
       } finally {
         setLoading(false);
         fetchLock.current = false;
@@ -165,7 +160,6 @@ const TrendingTopics: React.FC = () => {
     try {
       if (!process.env.API_KEY) throw new Error("Skip API");
 
-      // Fix: Always use 'gemini-3-flash-preview' for basic text tasks
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
       const response = await ai.models.generateContent({
         model: "gemini-3-flash-preview",
@@ -215,7 +209,7 @@ const TrendingTopics: React.FC = () => {
                   isMock ? "text-amber-500" : "text-blue-600"
                 }`}
               >
-                {isMock ? "PROTOCOL: LOCAL ARCHIVE (403)" : "LIVE INTELLIGENCE"}
+                {isMock ? "PROTOCOL: LOCAL ARCHIVE" : "LIVE INTELLIGENCE"}
               </span>
             </div>
             <h2 className="text-5xl font-black text-slate-900 dark:text-white uppercase italic tracking-tighter transition-colors leading-[0.9]">

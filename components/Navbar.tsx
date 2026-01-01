@@ -50,9 +50,6 @@ const Navbar: React.FC<NavbarProps> = ({
     if (googleCombo) {
       googleCombo.value = lang;
       googleCombo.dispatchEvent(new Event("change"));
-      window.dispatchEvent(
-        new CustomEvent("siteTranslated", { detail: { lang } })
-      );
     }
   };
 
@@ -63,7 +60,7 @@ const Navbar: React.FC<NavbarProps> = ({
 
   return (
     <>
-      <nav className="fixed top-0 left-0 right-0 z-[150] px-4 py-3 md:px-6 md:py-5">
+      <nav className="fixed top-0 left-0 right-0 z-[150] px-3 py-2 md:px-6 md:py-5">
         <div className="max-w-7xl mx-auto glass rounded-2xl md:rounded-full px-4 md:px-8 py-2 md:py-3 flex items-center justify-between shadow-xl relative ring-1 ring-black/5 dark:ring-white/5 transition-all duration-300">
           <div
             className="flex items-center gap-2 md:gap-3 cursor-pointer group"
@@ -72,12 +69,11 @@ const Navbar: React.FC<NavbarProps> = ({
             <div className="bg-blue-600 p-2 md:p-2.5 rounded-xl text-white group-hover:rotate-12 transition-transform shadow-lg shadow-blue-600/20">
               <Shield size={18} strokeWidth={2.5} />
             </div>
-            <span className="text-lg md:text-xl font-black tracking-[-0.05em] text-slate-900 dark:text-white uppercase hidden xs:block">
+            <span className="text-base md:text-xl font-black tracking-[-0.05em] text-slate-900 dark:text-white uppercase hidden xs:block">
               ThE-ARTICLES
             </span>
           </div>
 
-          {/* Desktop Nav */}
           <div className="hidden lg:flex items-center gap-8 mx-6">
             <NavItem
               label="Wire"
@@ -99,22 +95,6 @@ const Navbar: React.FC<NavbarProps> = ({
           </div>
 
           <div className="flex items-center gap-1.5 md:gap-4">
-            {/* Translation Dropdown - Hidden on very small screens, visible on desktop/tablet */}
-            <div className="hidden sm:flex items-center gap-2 bg-slate-100 dark:bg-slate-800/50 rounded-full px-3 py-1.5 border border-slate-200 dark:border-slate-700 hover:border-blue-300 transition-colors">
-              <Globe2 size={12} className="text-blue-600" />
-              <select
-                onChange={(e) => handleTranslate(e.target.value)}
-                className="bg-transparent border-none text-[8px] font-black uppercase tracking-widest text-slate-600 dark:text-slate-300 cursor-pointer focus:ring-0 appearance-none"
-              >
-                <option value="en">English</option>
-                <option value="hi">हिन्दी</option>
-                <option value="es">Español</option>
-                <option value="fr">Français</option>
-                <option value="bn">বাংলা</option>
-                <option value="ta">தமிழ்</option>
-              </select>
-            </div>
-
             {isLoggedIn && (
               <div className="relative">
                 <button
@@ -128,22 +108,22 @@ const Navbar: React.FC<NavbarProps> = ({
                   <MessageSquare size={16} />
                 </button>
                 {showRequests && (
-                  <div className="absolute top-14 right-0 w-72 md:w-80 glass dark:bg-slate-900 rounded-[2rem] shadow-2xl border border-slate-100 dark:border-white/10 p-4 md:p-6 space-y-4 animate-in fade-in slide-in-from-top-4">
+                  <div className="fixed sm:absolute top-[80px] sm:top-14 left-4 right-4 sm:left-auto sm:right-0 sm:w-80 glass dark:bg-slate-900 rounded-[2.5rem] shadow-2xl border border-slate-100 dark:border-white/10 p-5 md:p-6 space-y-4 animate-in fade-in slide-in-from-top-4 z-[200]">
                     <div className="flex justify-between items-center pb-2 border-b border-slate-100 dark:border-white/5">
                       <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                        Signals
+                        Handshake Signals
                       </span>
                       <button
                         onClick={() => setShowRequests(false)}
-                        className="text-slate-300 hover:text-red-500"
+                        className="text-slate-300 hover:text-red-500 p-1"
                       >
-                        <X size={14} />
+                        <X size={16} />
                       </button>
                     </div>
                     <div className="space-y-3 max-h-60 overflow-y-auto custom-scrollbar">
                       {chatRequests.length === 0 ? (
                         <p className="text-[9px] text-center font-black uppercase tracking-[0.2em] text-slate-300 py-6">
-                          No active signals
+                          No active signals found
                         </p>
                       ) : (
                         chatRequests.map((req) => (
@@ -151,26 +131,29 @@ const Navbar: React.FC<NavbarProps> = ({
                             key={req.id}
                             className="bg-slate-50 dark:bg-white/5 p-3 rounded-2xl flex items-center justify-between border border-transparent"
                           >
-                            <div className="flex items-center gap-2">
-                              <div className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center text-[10px] font-black">
+                            <div className="flex items-center gap-2 overflow-hidden">
+                              <div className="w-8 h-8 rounded-lg bg-blue-600 text-white flex-shrink-0 flex items-center justify-center text-[10px] font-black">
                                 {req.fromName[0]}
                               </div>
-                              <span className="text-[10px] font-black text-slate-900 dark:text-white uppercase truncate w-20">
+                              <span className="text-[10px] font-black text-slate-900 dark:text-white uppercase truncate">
                                 {req.fromName}
                               </span>
                             </div>
-                            <div className="flex gap-1.5">
+                            <div className="flex gap-1.5 ml-2">
                               <button
-                                onClick={() => onAcceptRequest?.(req)}
-                                className="p-1.5 bg-blue-600 text-white rounded-lg hover:scale-105 transition-transform"
+                                onClick={() => {
+                                  onAcceptRequest?.(req);
+                                  setShowRequests(false);
+                                }}
+                                className="p-2 bg-blue-600 text-white rounded-lg hover:scale-105 transition-transform"
                               >
-                                <Check size={12} />
+                                <Check size={14} />
                               </button>
                               <button
                                 onClick={() => setShowRequests(false)}
-                                className="p-1.5 bg-slate-200 dark:bg-slate-800 text-slate-400 rounded-lg"
+                                className="p-2 bg-slate-200 dark:bg-slate-800 text-slate-400 rounded-lg"
                               >
-                                <X size={12} />
+                                <X size={14} />
                               </button>
                             </div>
                           </div>
@@ -219,7 +202,6 @@ const Navbar: React.FC<NavbarProps> = ({
         </div>
       </nav>
 
-      {/* Mobile Slide-out Menu */}
       <div
         className={`fixed inset-0 z-[200] lg:hidden transition-all duration-500 ${
           isMobileMenuOpen
@@ -232,13 +214,13 @@ const Navbar: React.FC<NavbarProps> = ({
           onClick={() => setIsMobileMenuOpen(false)}
         />
         <div
-          className={`absolute right-0 top-0 bottom-0 w-[80%] max-w-sm bg-white dark:bg-slate-950 shadow-2xl transition-transform duration-500 p-8 flex flex-col gap-10 ${
+          className={`absolute right-0 top-0 bottom-0 w-[85%] max-w-sm bg-white dark:bg-slate-950 shadow-2xl transition-transform duration-500 p-6 flex flex-col gap-8 ${
             isMobileMenuOpen ? "translate-x-0" : "translate-x-full"
           }`}
         >
-          <div className="flex justify-between items-center">
+          <div className="flex justify-between items-center pb-4 border-b border-slate-100 dark:border-white/5">
             <span className="text-xl font-black uppercase italic tracking-tighter">
-              Menu
+              Terminal Menu
             </span>
             <button
               onClick={() => setIsMobileMenuOpen(false)}
@@ -248,13 +230,7 @@ const Navbar: React.FC<NavbarProps> = ({
             </button>
           </div>
 
-          <div className="flex flex-col gap-6">
-            <MobileNavItem
-              icon={<Globe2 size={18} />}
-              label="Global Wire"
-              active={currentPage === "home"}
-              onClick={() => navTo("home")}
-            />
+          <div className="flex flex-col gap-4">
             <MobileNavItem
               icon={<Network size={18} />}
               label="The Network"
@@ -271,23 +247,23 @@ const Navbar: React.FC<NavbarProps> = ({
             )}
             <MobileNavItem
               icon={<User size={18} />}
-              label="My Credentials"
+              label="My Profile"
               active={currentPage === "profile"}
               onClick={() => navTo("profile")}
             />
           </div>
 
-          <div className="mt-auto space-y-6">
-            <div className="flex items-center gap-3 bg-slate-50 dark:bg-slate-900 p-4 rounded-2xl">
+          <div className="mt-auto space-y-4">
+            <div className="flex items-center gap-3 bg-slate-50 dark:bg-slate-900 p-4 rounded-2xl border border-slate-100 dark:border-white/5">
               <Globe2 size={16} className="text-blue-600" />
               <select
                 onChange={(e) => handleTranslate(e.target.value)}
-                className="bg-transparent border-none text-[10px] font-black uppercase tracking-widest w-full dark:text-white"
+                className="bg-transparent border-none text-[10px] font-black uppercase tracking-widest w-full dark:text-white focus:ring-0"
               >
-                <option value="en">English Language</option>
-                <option value="hi">हिन्दी भाषा</option>
-                <option value="es">Español Idioma</option>
-                <option value="bn">বাংলা ভাষা</option>
+                <option value="en">English (Global)</option>
+                <option value="hi">हिन्दी (India)</option>
+                <option value="es">Español</option>
+                <option value="bn">বাংলা</option>
               </select>
             </div>
             {!isLoggedIn && (
@@ -296,7 +272,7 @@ const Navbar: React.FC<NavbarProps> = ({
                   onLogin();
                   setIsMobileMenuOpen(false);
                 }}
-                className="w-full py-4 bg-blue-600 text-white rounded-2xl font-black uppercase tracking-widest flex items-center justify-center gap-3"
+                className="w-full py-4 bg-blue-600 text-white rounded-2xl font-black uppercase tracking-widest flex items-center justify-center gap-3 shadow-xl"
               >
                 <LogIn size={18} /> Establish Identity
               </button>
@@ -327,14 +303,14 @@ const NavItem = ({ label, active, onClick }: any) => (
 const MobileNavItem = ({ icon, label, active, onClick }: any) => (
   <button
     onClick={onClick}
-    className={`flex items-center gap-4 p-4 rounded-2xl transition-all ${
+    className={`flex items-center gap-4 p-4 rounded-2xl transition-all border ${
       active
-        ? "bg-blue-600 text-white"
-        : "bg-slate-50 dark:bg-slate-900 text-slate-500 hover:text-slate-900 dark:hover:text-white"
+        ? "bg-blue-600 text-white border-blue-500 shadow-lg"
+        : "bg-slate-50 dark:bg-slate-900 text-slate-500 border-transparent hover:text-slate-900"
     }`}
   >
     {icon}
-    <span className="text-xs font-black uppercase tracking-widest">
+    <span className="text-[11px] font-black uppercase tracking-widest">
       {label}
     </span>
   </button>

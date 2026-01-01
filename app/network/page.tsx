@@ -1,186 +1,201 @@
-import React from "react";
+import React, { useState, useMemo } from "react";
 import {
   Globe,
   Users,
   Zap,
-  ShieldCheck,
-  Map,
   Search,
   MessageSquare,
-  ExternalLink,
-  UserCheck,
+  ShieldCheck,
+  Fingerprint,
+  Network as NetworkIcon,
+  Filter,
 } from "lucide-react";
 import { Profile } from "../../types";
 
 interface NetworkPageProps {
-  users?: Profile[];
-  onViewProfile?: (u: Profile) => void;
-  onChat?: (u: Profile) => void;
+  users: Profile[];
+  onViewProfile: (user: Profile) => void;
+  onChat: (user: Profile) => void;
 }
 
 const NetworkPage: React.FC<NetworkPageProps> = ({
-  users = [],
+  users,
   onViewProfile,
   onChat,
 }) => {
+  const [searchTerm, setSearchTerm] = useState("");
+  const [filterRole, setFilterRole] = useState<"all" | "admin" | "user">("all");
+
+  const filteredUsers = useMemo(() => {
+    return users.filter((u) => {
+      const matchesSearch =
+        u.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        u.serial_id.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesRole = filterRole === "all" || u.role === filterRole;
+      return matchesSearch && matchesRole;
+    });
+  }, [users, searchTerm, filterRole]);
+
   return (
-    <main className="max-w-7xl mx-auto px-6 py-32 space-y-40">
-      <section className="text-center space-y-10">
-        <div className="inline-flex items-center gap-3 px-5 py-2 rounded-full bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800/40 text-blue-600">
-          <Globe size={14} />
-          <span className="text-[10px] font-black uppercase tracking-[0.3em]">
-            Global Node Directory
-          </span>
-        </div>
-        <h1 className="text-8xl font-black text-slate-900 dark:text-white tracking-tighter uppercase italic leading-none transition-colors">
-          The <span className="text-blue-600">Correspondents</span>
-        </h1>
-        <p className="text-slate-500 max-w-2xl mx-auto text-xl font-medium leading-relaxed uppercase tracking-tight italic transition-colors">
-          A real-time index of verified citizen journalists maintaining the
-          network's integrity.
-        </p>
-      </section>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-        <Stat icon={<Globe />} label="Active Regions" val="142" />
-        <Stat
-          icon={<Users />}
-          label="Nodes Syncing"
-          val={users.length.toString()}
-        />
-        <Stat icon={<Zap />} label="Handshakes" val="1.2m" />
-        <Stat icon={<ShieldCheck />} label="Trust Level" val="99.4%" />
-      </div>
-
-      {/* Users Directory */}
-      <div className="space-y-16">
-        <div className="flex flex-col md:flex-row justify-between items-end gap-10">
+    <main className="max-w-7xl mx-auto px-4 sm:px-6 py-20 md:py-32 space-y-12 md:space-y-24">
+      {/* Header Section */}
+      <section className="space-y-8 md:space-y-12">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
           <div className="space-y-4">
-            <h2 className="text-5xl font-black text-slate-900 dark:text-white uppercase italic tracking-tighter leading-none">
-              Global <br />
-              Directory
-            </h2>
+            <div className="flex items-center gap-2 text-blue-600">
+              <NetworkIcon size={18} />
+              <span className="text-[10px] font-black uppercase tracking-[0.4em]">
+                Node Connectivity Terminal
+              </span>
+            </div>
+            <h1 className="text-4xl sm:text-6xl md:text-8xl font-black text-slate-900 dark:text-white uppercase italic tracking-tighter leading-[0.85] transition-all">
+              The <br className="hidden md:block" /> Network
+            </h1>
           </div>
-          <div className="bg-white dark:bg-slate-900 px-8 py-4 rounded-full border border-slate-100 dark:border-slate-800 flex items-center gap-4 w-full max-w-md shadow-sm">
-            <Search size={16} className="text-slate-400" />
-            <input
-              className="bg-transparent border-none focus:ring-0 text-xs font-black uppercase tracking-widest w-full dark:text-white"
-              placeholder="QUERY SERIAL ID OR NAME..."
+          <div className="grid grid-cols-2 gap-4 w-full md:w-auto">
+            <StatSmall
+              label="Active Nodes"
+              value={users.length}
+              icon={<Users size={14} />}
+            />
+            <StatSmall
+              label="Verified"
+              value={users.filter((u) => u.role === "admin").length}
+              icon={<ShieldCheck size={14} />}
             />
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
-          {users.map((user) => (
+        {/* Filter Bar */}
+        <div className="flex flex-col lg:flex-row gap-4 bg-white dark:bg-slate-900 p-3 rounded-[2rem] border border-slate-100 dark:border-white/5 shadow-xl">
+          <div className="flex-grow flex items-center gap-4 bg-slate-50 dark:bg-slate-950 px-6 py-3 rounded-2xl border border-slate-100 dark:border-white/5">
+            <Search size={18} className="text-slate-400" />
+            <input
+              type="text"
+              placeholder="Search nodes by name or serial..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="bg-transparent border-none focus:ring-0 w-full text-sm font-medium text-slate-900 dark:text-white placeholder:text-slate-400"
+            />
+          </div>
+          <div className="flex gap-2 overflow-x-auto custom-scrollbar pb-2 lg:pb-0">
+            <FilterButton
+              label="All Nodes"
+              active={filterRole === "all"}
+              onClick={() => setFilterRole("all")}
+            />
+            <FilterButton
+              label="Authority"
+              active={filterRole === "admin"}
+              onClick={() => setFilterRole("admin")}
+            />
+            <FilterButton
+              label="Correspondents"
+              active={filterRole === "user"}
+              onClick={() => setFilterRole("user")}
+            />
+          </div>
+        </div>
+      </section>
+
+      {/* Network Grid */}
+      <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-8">
+        {filteredUsers.length === 0 ? (
+          <div className="col-span-full py-20 text-center opacity-30">
+            <Zap size={48} className="mx-auto mb-4 text-slate-300" />
+            <p className="text-xl font-black uppercase italic tracking-widest text-slate-400">
+              No matching nodes found in directory
+            </p>
+          </div>
+        ) : (
+          filteredUsers.map((user) => (
             <div
               key={user.id}
-              className="group p-10 bg-white dark:bg-slate-900 rounded-[3rem] border border-slate-100 dark:border-white/5 shadow-sm hover:shadow-2xl transition-all duration-500 flex flex-col items-center text-center space-y-6 relative overflow-hidden"
+              className="group bg-white dark:bg-slate-900/50 p-6 md:p-8 rounded-[2.5rem] border border-slate-100 dark:border-white/5 hover:border-blue-600 dark:hover:border-blue-600 transition-all duration-500 relative flex flex-col justify-between"
             >
-              {user.is_online && (
-                <div className="absolute top-8 right-8 flex items-center gap-2">
-                  <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
-                  <span className="text-[7px] font-black text-emerald-600 uppercase tracking-widest">
-                    LIVE
-                  </span>
+              <div className="space-y-6">
+                <div className="flex justify-between items-start">
+                  <div className="relative">
+                    <div className="w-14 h-14 md:w-16 md:h-16 rounded-2xl bg-slate-50 dark:bg-slate-800 flex items-center justify-center text-blue-600 border border-slate-100 dark:border-white/5 group-hover:bg-blue-600 group-hover:text-white transition-all">
+                      <Fingerprint size={28} />
+                    </div>
+                    {user.is_online && (
+                      <div className="absolute -top-1 -right-1 w-4 h-4 bg-emerald-500 rounded-full border-4 border-white dark:border-slate-900 animate-pulse" />
+                    )}
+                  </div>
+                  <div
+                    className={`px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest ${
+                      user.role === "admin"
+                        ? "bg-blue-600 text-white"
+                        : "bg-slate-100 dark:bg-slate-800 text-slate-500"
+                    }`}
+                  >
+                    {user.role === "admin" ? "Authority Node" : "Correspondent"}
+                  </div>
                 </div>
-              )}
 
-              <div className="w-24 h-24 rounded-[2rem] bg-slate-50 dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 flex items-center justify-center text-slate-300 group-hover:border-blue-600 transition-all duration-500">
-                <img
-                  src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${user.username}`}
-                  className="w-full h-full object-cover p-2"
-                  alt={user.username}
-                />
-              </div>
+                <div className="space-y-1">
+                  <h3 className="text-lg md:text-xl font-black text-slate-900 dark:text-white uppercase italic tracking-tighter truncate group-hover:text-blue-600 transition-colors">
+                    {user.full_name}
+                  </h3>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                    {user.serial_id}
+                  </p>
+                </div>
 
-              <div className="space-y-2">
-                <h3 className="text-2xl font-black text-slate-900 dark:text-white uppercase italic tracking-tight">
-                  {user.full_name}
-                </h3>
-                <p className="text-[10px] font-black text-blue-600 uppercase tracking-[0.2em]">
-                  {user.serial_id}
+                <p className="text-xs font-medium text-slate-500 dark:text-slate-400 line-clamp-2 leading-relaxed h-8">
+                  {user.bio ||
+                    "Journalistic node specializing in regional investigations and global data integrity."}
                 </p>
               </div>
 
-              <p className="text-xs font-medium text-slate-500 dark:text-slate-400 italic leading-relaxed line-clamp-2 px-4">
-                "{user.bio}"
-              </p>
-
-              <div className="flex gap-3 pt-4 w-full">
+              <div className="mt-8 pt-6 border-t border-slate-50 dark:border-white/5 grid grid-cols-2 gap-3">
                 <button
-                  onClick={() => onViewProfile?.(user)}
-                  className="flex-1 py-4 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-2xl flex items-center justify-center gap-2 text-[9px] font-black uppercase tracking-widest hover:bg-blue-600 dark:hover:bg-blue-50 transition-all"
+                  onClick={() => onViewProfile(user)}
+                  className="py-3 rounded-xl bg-slate-50 dark:bg-slate-800 text-[9px] font-black uppercase tracking-widest text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-all"
                 >
-                  <ExternalLink size={12} /> View File
+                  View Intel
                 </button>
                 <button
-                  onClick={() => onChat?.(user)}
-                  className="p-4 bg-blue-50 dark:bg-blue-900/20 text-blue-600 rounded-2xl hover:bg-blue-600 hover:text-white transition-all shadow-sm"
+                  onClick={() => onChat(user)}
+                  className="py-3 rounded-xl bg-blue-600 text-white text-[9px] font-black uppercase tracking-widest hover:bg-blue-500 shadow-lg shadow-blue-500/20 transition-all flex items-center justify-center gap-2"
                 >
-                  <MessageSquare size={16} />
+                  <MessageSquare size={12} /> Link
                 </button>
               </div>
             </div>
-          ))}
-        </div>
-      </div>
-
-      <div className="bg-slate-900 rounded-[4rem] p-20 text-white flex flex-col lg:flex-row items-center gap-24 overflow-hidden relative">
-        <Map className="absolute -left-20 -bottom-20 w-[600px] h-[600px] text-white/[0.02] rotate-12" />
-        <div className="flex-1 space-y-10 relative z-10">
-          <h2 className="text-5xl font-black uppercase italic tracking-tighter">
-            Peer-to-Peer <br />
-            Handshake Protocol
-          </h2>
-          <p className="text-slate-400 text-lg font-medium leading-relaxed italic">
-            The directory utilizes a high-frequency polling service to maintain
-            node presence. Communications are ephemeral and encrypted at the
-            network layer.
-          </p>
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2 px-6 py-2 bg-white/5 rounded-full border border-white/10">
-              <UserCheck size={14} className="text-blue-400" />
-              <span className="text-[10px] font-black uppercase tracking-widest">
-                {users.length} Nodes Online
-              </span>
-            </div>
-          </div>
-        </div>
-        <div className="flex-1 grid grid-cols-2 gap-6 relative z-10 w-full">
-          <div className="aspect-square bg-white/5 rounded-[2.5rem] border border-white/10 flex flex-col items-center justify-center space-y-2">
-            <span className="text-4xl font-black italic tracking-tighter tabular-nums text-white">
-              1.2s
-            </span>
-            <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">
-              Sync Latency
-            </span>
-          </div>
-          <div className="aspect-square bg-blue-600 rounded-[2.5rem] flex flex-col items-center justify-center space-y-2 shadow-2xl">
-            <span className="text-4xl font-black italic tracking-tighter tabular-nums text-white">
-              24/7
-            </span>
-            <span className="text-[10px] font-black uppercase tracking-widest text-blue-100">
-              Live Uptime
-            </span>
-          </div>
-        </div>
-      </div>
+          ))
+        )}
+      </section>
     </main>
   );
 };
 
-const Stat = ({ icon, label, val }: any) => (
-  <div className="p-10 rounded-[2.5rem] bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 shadow-sm space-y-4 group hover:border-blue-200 transition-all">
+const StatSmall = ({ label, value, icon }: any) => (
+  <div className="bg-white dark:bg-slate-900 px-4 py-3 rounded-2xl border border-slate-100 dark:border-white/5 flex items-center gap-3">
     <div className="text-blue-600">{icon}</div>
     <div>
-      <div className="text-4xl font-black tracking-tighter italic tabular-nums text-slate-900 dark:text-white transition-colors">
-        {val}
-      </div>
-      <div className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mt-1">
+      <p className="text-[8px] font-black uppercase text-slate-400 tracking-widest leading-none mb-1">
         {label}
-      </div>
+      </p>
+      <p className="text-sm font-black text-slate-900 dark:text-white leading-none">
+        {value}
+      </p>
     </div>
   </div>
+);
+
+const FilterButton = ({ label, active, onClick }: any) => (
+  <button
+    onClick={onClick}
+    className={`px-5 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest border transition-all whitespace-nowrap ${
+      active
+        ? "bg-slate-900 dark:bg-white text-white dark:text-slate-900 border-slate-900 dark:border-white shadow-lg"
+        : "bg-transparent text-slate-400 dark:text-slate-500 border-slate-100 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700"
+    }`}
+  >
+    {label}
+  </button>
 );
 
 export default NetworkPage;
