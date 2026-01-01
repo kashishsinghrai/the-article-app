@@ -54,7 +54,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
   if (!profile || !profile.id) {
     return (
       <div className="min-h-[60vh] flex items-center justify-center flex-col gap-4 opacity-50">
-        <Loader2 className="animate-spin text-blue-600" size={32} />
+        <Loader2 className="text-blue-600 animate-spin" size={32} />
         <p className="text-[10px] font-black uppercase tracking_widest">
           Retrieving Node Identity...
         </p>
@@ -88,9 +88,9 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
   };
 
   return (
-    <main className="max-w-7xl mx-auto px-4 md:px-6 py-24 md:py-32 animate-in fade-in duration-700">
+    <main className="px-4 py-24 mx-auto duration-700 max-w-7xl md:px-6 md:py-32 animate-in fade-in">
       {isExternal && (
-        <div className="mb-8 md:mb-12 flex justify-between items-center bg-blue-50 dark:bg-blue-950/30 p-4 rounded-2xl border border-blue-100 dark:border-blue-900/40">
+        <div className="flex items-center justify-between p-4 mb-8 border border-blue-100 md:mb-12 bg-blue-50 dark:bg-blue-950/30 rounded-2xl dark:border-blue-900/40">
           <div className="flex items-center gap-3">
             <span className="text-[9px] md:text-[10px] font-black uppercase tracking-widest text-blue-600 italic">
               Remote Access
@@ -100,7 +100,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
                 onClick={() =>
                   onSendChatRequest?.(profile.id, profile.full_name)
                 }
-                className="flex items-center gap-2 px-4 py-2 rounded-full bg-blue-600 text-white hover:bg-blue-500 shadow-lg"
+                className="flex items-center gap-2 px-4 py-2 text-white bg-blue-600 rounded-full shadow-lg hover:bg-blue-500"
               >
                 <MessageSquare size={14} />
                 <span className="text-[10px] font-black uppercase">Link</span>
@@ -109,17 +109,17 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
           </div>
           <button
             onClick={onCloseExternal}
-            className="p-2 hover:bg-blue-100 rounded-full text-blue-600 transition-colors"
+            className="p-2 text-blue-600 transition-colors rounded-full hover:bg-blue-100"
           >
             <X size={20} />
           </button>
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 md:gap-20">
-        <div className="lg:col-span-5 space-y-10">
+      <div className="grid grid-cols-1 gap-10 lg:grid-cols-12 md:gap-20">
+        <div className="space-y-10 lg:col-span-5">
           <div className="space-y-6">
-            <div className="flex justify-between items-center">
+            <div className="flex items-center justify-between">
               <h2 className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">
                 Identity Status
               </h2>
@@ -183,13 +183,13 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
           )}
         </div>
 
-        <div className="lg:col-span-7 space-y-12">
-          <div className="flex flex-col md:flex-row items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-8 gap-6">
-            <h2 className="text-3xl md:text-5xl font-black text-slate-900 dark:text-white uppercase italic tracking-tighter leading-none">
+        <div className="space-y-12 lg:col-span-7">
+          <div className="flex flex-col items-center justify-between gap-6 pb-8 border-b md:flex-row border-slate-100 dark:border-slate-800">
+            <h2 className="text-3xl italic font-black leading-none tracking-tighter uppercase md:text-5xl text-slate-900 dark:text-white">
               Intelligence <br /> Control
             </h2>
             {isOwnProfile && (
-              <div className="flex gap-2 bg-slate-50 dark:bg-slate-900 p-2 rounded-2xl">
+              <div className="flex gap-2 p-2 bg-slate-50 dark:bg-slate-900 rounded-2xl">
                 <button
                   onClick={() => setActiveTab("intel")}
                   className={`px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
@@ -215,9 +215,9 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
           </div>
 
           {activeTab === "intel" ? (
-            <section className="space-y-8 animate-in slide-in-from-left-4 duration-500">
+            <section className="space-y-8 duration-500 animate-in slide-in-from-left-4">
               <div className="bg-white dark:bg-slate-900 p-8 md:p-12 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-sm space-y-10">
-                <div className="flex justify-between items-center mb-4">
+                <div className="flex items-center justify-between mb-4">
                   <label className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-300">
                     Identity Details
                   </label>
@@ -226,7 +226,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
                       onClick={() =>
                         isEditing ? handleSave() : setIsEditing(true)
                       }
-                      className="p-3 bg-slate-50 dark:bg-slate-950 rounded-2xl text-blue-600"
+                      className="p-3 text-blue-600 bg-slate-50 dark:bg-slate-950 rounded-2xl"
                     >
                       {isEditing ? <Save size={18} /> : <Edit3 size={18} />}
                     </button>
@@ -247,7 +247,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
                             full_name: e.target.value,
                           })
                         }
-                        className="w-full bg-slate-50 dark:bg-slate-950 border-none rounded-xl px-4 py-3 text-sm font-bold"
+                        className="w-full px-4 py-3 text-sm font-bold border-none bg-slate-50 dark:bg-slate-950 rounded-xl"
                       />
                     </div>
                     <div className="space-y-2">
@@ -260,19 +260,19 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
                         onChange={(e) =>
                           setEditData({ ...editData, bio: e.target.value })
                         }
-                        className="w-full bg-slate-50 dark:bg-slate-950 border-none rounded-xl px-4 py-3 text-sm font-medium"
+                        className="w-full px-4 py-3 text-sm font-medium border-none bg-slate-50 dark:bg-slate-950 rounded-xl"
                       />
                     </div>
                   </div>
                 ) : (
                   <>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
                       <div className="space-y-1.5">
                         <p className="text-[9px] text-slate-300 font-black uppercase tracking-[0.2em]">
                           Full Name
                         </p>
                         <div className="flex items-center gap-3">
-                          <p className="text-xl md:text-2xl font-black text-slate-900 dark:text-white uppercase italic">
+                          <p className="text-xl italic font-black uppercase md:text-2xl text-slate-900 dark:text-white">
                             {profile.full_name}
                           </p>
                           <UserCheck size={16} className="text-blue-600" />
@@ -282,7 +282,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
                         <p className="text-[9px] text-slate-300 font-black uppercase tracking-[0.2em]">
                           Gender
                         </p>
-                        <p className="text-xl md:text-2xl font-black text-blue-600 uppercase italic">
+                        <p className="text-xl italic font-black text-blue-600 uppercase md:text-2xl">
                           {profile.gender || "Global"}
                         </p>
                       </div>
@@ -297,7 +297,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
                     </div>
                   </>
                 )}
-                <div className="pt-6 border-t border-slate-50 dark:border-white/5 flex items-center gap-4 text-slate-400">
+                <div className="flex items-center gap-4 pt-6 border-t border-slate-50 dark:border-white/5 text-slate-400">
                   <Info size={16} />
                   <span className="text-[9px] font-black uppercase tracking-widest">
                     Serial ID: {profile.serial_id}
@@ -329,7 +329,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
 
 const StatCard = ({ icon, label, value, color }: any) => (
   <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-sm space-y-4 group">
-    <div className="flex items-center gap-2 text-slate-300 group-hover:text-blue-600 transition-colors">
+    <div className="flex items-center gap-2 transition-colors text-slate-300 group-hover:text-blue-600">
       {icon}
       <span className="text-[8px] font-black uppercase tracking-[0.2em]">
         {label}
