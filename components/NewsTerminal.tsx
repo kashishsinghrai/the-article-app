@@ -56,7 +56,7 @@ const NewsTerminal: React.FC = () => {
 
     setLoading(true);
     try {
-      // Gemini only used to FETCH headlines, NOT for translation
+      // Fix: Use 'gemini-3-flash-preview' for tasks requiring search grounding
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || "" });
       const response = await ai.models.generateContent({
         model: "gemini-3-flash-preview",
@@ -90,10 +90,17 @@ const NewsTerminal: React.FC = () => {
       );
       setIsCached(false);
     } catch (err: any) {
+      console.error("AI Error:", err);
+      if (err.message?.includes("403")) {
+        toast.error(
+          "403 Forbidden: API Key might not support Search Tool or Regional Limits."
+        );
+      }
       const cached = localStorage.getItem(NEWS_CACHE_KEY);
       if (cached) {
         const { data } = JSON.parse(cached);
         setNews(data);
+        setIsCached(true);
       }
     } finally {
       setLoading(false);
@@ -112,7 +119,6 @@ const NewsTerminal: React.FC = () => {
       Gujarati: "gu",
     };
     const code = langMap[langName];
-    // Native Browser DOM Select
     const googleCombo = document.querySelector(
       ".goog-te-combo"
     ) as HTMLSelectElement;
@@ -120,7 +126,7 @@ const NewsTerminal: React.FC = () => {
       googleCombo.value = code;
       googleCombo.dispatchEvent(new Event("change"));
       setLanguage(langName);
-      toast.success(`Language: ${langName} (Native Engine)`);
+      toast.success(`Language: ${langName}`);
     }
   };
 
@@ -188,7 +194,7 @@ const NewsTerminal: React.FC = () => {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
         {loading
-          ? Array(3)
+          ? Array(6)
               .fill(0)
               .map((_, i) => (
                 <div

@@ -89,7 +89,6 @@ const TrendingTopics: React.FC = () => {
     fetchLock.current = true;
 
     const fetchTrendingTopics = async () => {
-      // 1. Check Cache First
       const cached = localStorage.getItem(CACHE_KEY);
       if (cached) {
         const { data, timestamp } = JSON.parse(cached);
@@ -101,12 +100,12 @@ const TrendingTopics: React.FC = () => {
         }
       }
 
-      // 2. No cache or expired, call API
       try {
         if (!process.env.API_KEY) {
           throw new Error("API Key Missing");
         }
 
+        // Fix: Always use 'gemini-3-flash-preview' for basic text tasks
         const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
         const response = await ai.models.generateContent({
           model: "gemini-3-flash-preview",
@@ -133,25 +132,22 @@ const TrendingTopics: React.FC = () => {
         const data = JSON.parse(response.text || "[]");
         const finalData = data.length > 0 ? data : getFallbackData();
 
-        // Save to cache
         localStorage.setItem(
           CACHE_KEY,
           JSON.stringify({ data: finalData, timestamp: Date.now() })
         );
         setTopics(finalData);
-        setIsMock(false);
-        setIsThrottled(false);
       } catch (err: any) {
-        console.error("AI Node Error:", err);
-        if (err.message?.includes("429")) {
-          setIsThrottled(true);
-          toast.error(
-            "Network Throttled: Free Tier Limit Reached. Using Archive.",
-            { duration: 5000 }
-          );
-        }
+        console.warn(
+          "AI Node Warning: Switching to local archive due to key restrictions."
+        );
         setTopics(getFallbackData());
         setIsMock(true);
+        if (err.message?.includes("403")) {
+          toast.error("AI Node Access Restricted. Check API Key permissions.", {
+            duration: 5000,
+          });
+        }
       } finally {
         setLoading(false);
         fetchLock.current = false;
@@ -167,10 +163,9 @@ const TrendingTopics: React.FC = () => {
     setBriefing(null);
 
     try {
-      if (!process.env.API_KEY || isMock || isThrottled) {
-        throw new Error("Skip API");
-      }
+      if (!process.env.API_KEY) throw new Error("Skip API");
 
+      // Fix: Always use 'gemini-3-flash-preview' for basic text tasks
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
       const response = await ai.models.generateContent({
         model: "gemini-3-flash-preview",
@@ -181,7 +176,6 @@ const TrendingTopics: React.FC = () => {
       const data = JSON.parse(response.text || "{}");
       setBriefing(data);
     } catch (err) {
-      // Quick mock fallback for individual briefing to save tokens
       setBriefing({
         context: `The topic of ${topic.title} is currently being monitored by our regional nodes. Preliminary intel suggests a ${topic.heat}% public interest surge in ${topic.region}. Investigative teams are advised to proceed with verified sources only.`,
         key_players: [
@@ -218,23 +212,11 @@ const TrendingTopics: React.FC = () => {
               <TrendingUp size={18} className="text-blue-600" />
               <span
                 className={`text-[10px] font-black uppercase tracking-[0.4em] ${
-                  isThrottled ? "text-amber-500" : "text-blue-600"
+                  isMock ? "text-amber-500" : "text-blue-600"
                 }`}
               >
-                {isThrottled
-                  ? "PROTOCOL: THROTTLED (FREE TIER)"
-                  : isMock
-                  ? "LOCAL ARCHIVE"
-                  : "LIVE INTELLIGENCE"}
+                {isMock ? "PROTOCOL: LOCAL ARCHIVE (403)" : "LIVE INTELLIGENCE"}
               </span>
-              {(isMock || isThrottled) && (
-                <div className="flex items-center gap-1 ml-2 bg-slate-100 dark:bg-slate-800 px-3 py-1 rounded-full border border-slate-200 dark:border-slate-700">
-                  <Clock size={10} className="text-slate-400" />
-                  <span className="text-[8px] font-black uppercase text-slate-400 tracking-widest">
-                    Cached Data Active
-                  </span>
-                </div>
-              )}
             </div>
             <h2 className="text-5xl font-black text-slate-900 dark:text-white uppercase italic tracking-tighter transition-colors leading-[0.9]">
               Wire <br /> Intelligence
@@ -297,7 +279,6 @@ const TrendingTopics: React.FC = () => {
         </div>
       </section>
 
-      {/* Briefing Modal */}
       {selectedTopic && (
         <div className="fixed inset-0 z-[300] flex items-center justify-center p-6 md:p-12 animate-in fade-in duration-300">
           <div

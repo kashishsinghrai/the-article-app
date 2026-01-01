@@ -3,7 +3,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0" />
     <title>ThE-ARTICLES | Global Citizen Journalism</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -31,6 +31,9 @@
                 50: '#eff6ff', 100: '#dbeafe', 200: '#bfdbfe', 300: '#93c5fd', 400: '#60a5fa',
                 500: '#3b82f6', 600: '#2563eb', 700: '#1d4ed8', 800: '#1e40af', 900: '#1e3a8a', 950: '#172554',
               }
+            },
+            screens: {
+              'xs': '400px',
             }
           }
         }
@@ -38,7 +41,12 @@
     </script>
     <style type="text/tailwindcss">
       @layer base {
-        body { @apply bg-[#f8fafc] text-[#0f172a] transition-colors duration-300; top: 0 !important; }
+        body { 
+          @apply bg-[#f8fafc] text-[#0f172a] transition-colors duration-300; 
+          top: 0 !important; 
+          overflow-x: hidden;
+          width: 100vw;
+        }
         .dark body { @apply bg-[#020617] text-[#f1f5f9]; }
         
         /* COMPLETELY HIDE GOOGLE OVERLAYS */
@@ -47,10 +55,22 @@
         body { top: 0px !important; }
         #google_translate_element { position: absolute; left: -9999px; top: -9999px; visibility: hidden; }
         iframe.skiptranslate { display: none !important; }
+
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        .dark .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; }
       }
       @layer components {
         .glass { @apply bg-white/70 backdrop-blur-[24px] border border-white/30; }
         .dark .glass { @apply bg-slate-900/80 border-white/5; }
+        
+        .ticker-wrap { width: 100%; overflow: hidden; }
+        .ticker-move { display: inline-block; white-space: nowrap; animation: ticker 60s linear infinite; }
+        @keyframes ticker {
+          0% { transform: translateX(0); }
+          100% { transform: translateX(-50%); }
+        }
       }
     </style>
   <script type="importmap">
@@ -71,7 +91,6 @@
 </script>
 </head>
   <body>
-    <!-- Element must exist and be accessible to JS, even if hidden from view -->
     <div id="google_translate_element"></div>
     <div id="root"></div>
     <script type="module" src="/index.tsx"></script>

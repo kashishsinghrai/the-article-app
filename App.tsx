@@ -43,6 +43,12 @@ const App: React.FC = () => {
   const [users, setUsers] = useState<Profile[]>([]);
   const initializationInProgress = useRef(false);
 
+  // Refs for real-time listeners to avoid closure staleness
+  const activeChatRef = useRef<Profile | null>(null);
+  useEffect(() => {
+    activeChatRef.current = activeChat;
+  }, [activeChat]);
+
   const fetchArticles = useCallback(async () => {
     try {
       const { data: arts, error } = await supabase
@@ -110,30 +116,42 @@ const App: React.FC = () => {
     return () => clearInterval(ticker);
   }, [fetchArticles, fetchUsers]);
 
+  // SINGLE PERSISTENT CHAT CHANNEL (The "WhatsApp" style central hub)
   useEffect(() => {
     if (!profile?.id) return;
-    const channel = supabase.channel(`inbox_node_${profile.id}`);
+
+    // Subscribe to a profile-specific inbox channel
+    const channel = supabase.channel(`realtime_inbox_${profile.id}`, {
+      config: { broadcast: { self: false } },
+    });
+
     channel
       .on("broadcast", { event: "handshake" }, (p) => {
         const req = p.payload as ChatRequest;
         setChatRequests((prev) =>
           prev.some((r) => r.id === req.id) ? prev : [...prev, req]
         );
-        toast("Incoming Transmission", {
-          icon: "📡",
-          style: {
-            background: "#1e293b",
-            color: "#fff",
-            fontSize: "10px",
-            fontWeight: "900",
-          },
-        });
+        toast(`Incoming Signal: ${req.fromName}`, { icon: "📡" });
+      })
+      .on("broadcast", { event: "chat_message" }, (p) => {
+        // Fix: Use the LiveMessage interface which now includes senderName
+        const msg = p.payload as LiveMessage & { recipientId: string };
+        // Check if message is for us AND if the chat box with this sender is open
+        if (activeChatRef.current?.id === msg.senderId) {
+          setChatMessages((prev) => [...prev, msg]);
+        } else {
+          // Fix: Ensure senderName is checked and remove unsupported onClick property
+          toast(`Message from ${msg.senderName || "Node"}`, {
+            icon: "💬",
+          });
+        }
       })
       .subscribe();
+
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [profile?.id]);
+  }, [profile?.id, users]);
 
   const handleNavigate = useCallback((page: string) => {
     setViewingProfile(null);
@@ -217,10 +235,18 @@ const App: React.FC = () => {
         toId: tid,
         timestamp: Date.now(),
       };
-      supabase
-        .channel(`inbox_node_${tid}`)
-        .send({ type: "broadcast", event: "handshake", payload: req });
-      toast.success(`Request Sent to ${tname}`);
+
+      // Broadcast to target's inbox channel
+      supabase.channel(`realtime_inbox_${tid}`).subscribe((status) => {
+        if (status === "SUBSCRIBED") {
+          supabase.channel(`realtime_inbox_${tid}`).send({
+            type: "broadcast",
+            event: "handshake",
+            payload: req,
+          });
+          toast.success(`Request Sent to ${tname}`);
+        }
+      });
     },
     [profile]
   );
@@ -231,13 +257,41 @@ const App: React.FC = () => {
       if (sender) {
         setActiveChat(sender);
         setChatRequests((prev) => prev.filter((r) => r.id !== req.id));
-        setChatMessages([]); // Clear previous session messages
-        toast.success("Encryption Link Established", { icon: "🔐" });
-      } else {
-        toast.error("Source node unavailable");
+        setChatMessages([]);
+        toast.success("Link Secured");
       }
     },
     [users]
+  );
+
+  const handleSendMessage = useCallback(
+    (text: string) => {
+      if (!profile || !activeChat) return;
+
+      const message = {
+        id: Math.random().toString(36).substr(2, 9),
+        senderId: profile.id,
+        senderName: profile.full_name,
+        text: text,
+        timestamp: Date.now(),
+      };
+
+      // 1. Show in our own UI
+      setChatMessages((prev) => [...prev, message]);
+
+      // 2. Transmit to recipient's persistent inbox channel
+      const channel = supabase.channel(`realtime_inbox_${activeChat.id}`);
+      channel.subscribe((status) => {
+        if (status === "SUBSCRIBED") {
+          channel.send({
+            type: "broadcast",
+            event: "chat_message",
+            payload: message,
+          });
+        }
+      });
+    },
+    [profile, activeChat]
   );
 
   const displayedArticles = useMemo(() => {
@@ -415,15 +469,7 @@ const App: React.FC = () => {
           currentUserId={profile?.id || ""}
           onClose={() => setActiveChat(null)}
           messages={chatMessages}
-          onSendMessage={(txt) => {
-            const m: LiveMessage = {
-              id: Math.random().toString(),
-              senderId: profile?.id || "",
-              text: txt,
-              timestamp: Date.now(),
-            };
-            setChatMessages((prev) => [...prev, m]);
-          }}
+          onSendMessage={handleSendMessage}
         />
       )}
 

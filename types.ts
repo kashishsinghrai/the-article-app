@@ -27,6 +27,7 @@ export interface ChatRequest {
 export interface LiveMessage {
   id: string;
   senderId: string;
+  senderName?: string; // Added senderName to match broadcast payload
   text: string;
   timestamp: number;
 }
