@@ -41,9 +41,11 @@ const LoginPage: React.FC<LoginPageProps> = ({
 
   const handleSocialLogin = async (provider: "google") => {
     try {
+      // Correctly detect the current origin for Vercel/Local support
+      const redirectTo = window.location.origin;
       const { error } = await supabase.auth.signInWithOAuth({
         provider,
-        options: { redirectTo: window.location.origin },
+        options: { redirectTo },
       });
       if (error) throw error;
     } catch (err: any) {

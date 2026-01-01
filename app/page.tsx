@@ -144,13 +144,33 @@ const HomePage: React.FC<HomePageProps> = ({
               className="space-y-6 cursor-pointer group"
               onClick={() => onReadArticle?.(article)}
             >
-              <div className="aspect-[16/9] overflow-hidden rounded-3xl bg-slate-100 dark:bg-slate-900 border border-slate-50 dark:border-slate-800">
+              <div className="aspect-[16/9] overflow-hidden rounded-[2.5rem] bg-slate-100 dark:bg-slate-900 border border-slate-50 dark:border-slate-800 relative">
                 <img
                   src={article.image_url}
                   className="object-cover w-full h-full transition-all duration-700 group-hover:scale-105"
                 />
+
+                {/* Kinetic Tags Overlay */}
+                {article.hashtags && article.hashtags.length > 0 && (
+                  <div className="absolute flex overflow-hidden pointer-events-none bottom-4 left-4 right-4">
+                    <div className="flex gap-4 animate-[ticker_10s_linear_infinite] whitespace-nowrap">
+                      {article.hashtags
+                        .concat(article.hashtags)
+                        .map((tag, idx) => (
+                          <span
+                            key={idx}
+                            className="bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-full text-[8px] font-black text-white uppercase tracking-widest flex items-center gap-1 border border-white/10"
+                          >
+                            <Hash size={10} className="text-blue-400" />
+                            {tag}
+                          </span>
+                        ))}
+                    </div>
+                  </div>
+                )}
               </div>
-              <div className="space-y-4">
+
+              <div className="px-2 space-y-4">
                 <div className="flex flex-wrap items-center gap-3">
                   <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">
                     {article.category}
@@ -161,24 +181,9 @@ const HomePage: React.FC<HomePageProps> = ({
                   </span>
                 </div>
 
-                <h3 className="text-3xl font-bold leading-tight transition-colors dark:text-white group-hover:text-slate-500">
+                <h3 className="text-3xl font-bold leading-tight transition-colors dark:text-white group-hover:text-blue-600">
                   {article.title}
                 </h3>
-
-                {article.hashtags && article.hashtags.length > 0 && (
-                  <div className="flex flex-wrap gap-2">
-                    {article.hashtags.map((tag, idx) => (
-                      <span
-                        key={idx}
-                        className="text-[9px] font-bold text-slate-400 dark:text-slate-600 uppercase flex items-center gap-0.5"
-                      >
-                        <Hash size={10} />
-                        {tag}
-                      </span>
-                    ))}
-                  </div>
-                )}
-
                 <p className="italic leading-relaxed text-slate-500 dark:text-slate-400 line-clamp-2">
                   "{article.content}"
                 </p>
