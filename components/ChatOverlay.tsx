@@ -9,6 +9,7 @@ import {
   Video,
   Info,
   ChevronLeft,
+  User2,
 } from "lucide-react";
 import { LiveMessage, Profile } from "../types";
 import { supabase } from "../lib/supabase";
@@ -104,12 +105,19 @@ const ChatOverlay: React.FC<ChatOverlayProps> = ({
             </div>
 
             <div className="cursor-pointer max-w-[120px] xs:max-w-none">
-              <h4 className="text-[14px] md:text-sm font-bold truncate">
+              <h4 className="text-[14px] md:text-sm font-bold truncate flex items-center gap-2">
                 {recipient.full_name}
               </h4>
-              <p className="text-[10px] text-emerald-300 font-medium">
-                Verified Online
-              </p>
+              <div className="flex items-center gap-2">
+                <p className="text-[10px] text-emerald-300 font-medium">
+                  Verified Online
+                </p>
+                <span className="w-1 h-1 rounded-full bg-white/30" />
+                <div className="flex items-center gap-1 bg-white/10 px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-widest text-white/90">
+                  <User2 size={8} />
+                  {recipient.gender || "Node"}
+                </div>
+              </div>
             </div>
           </div>
 
