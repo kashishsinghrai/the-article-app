@@ -122,8 +122,12 @@ const App: React.FC = () => {
           .select("*")
           .eq("id", session.user.id)
           .maybeSingle();
-        if (prof) setProfile(prof);
-        else setNeedsOnboarding(true);
+        if (prof) {
+          setProfile(prof);
+          setNeedsOnboarding(false);
+        } else {
+          setNeedsOnboarding(true);
+        }
       }
     } catch (e: any) {
       console.error(e);
@@ -333,22 +337,14 @@ const App: React.FC = () => {
   };
 
   const deleteUser = async (id: string) => {
-    // NOTE: Deleting from 'profiles' only works if RLS policy allows it.
-    // Also, you may need to delete their articles first if there are foreign key constraints.
     const { error } = await supabase.from("profiles").delete().eq("id", id);
-
     if (!error) {
       setUsers((prev) => prev.filter((u) => u.id !== id));
       toast.success("Node Terminated from Registry");
-      // Re-fetch users to be absolutely sure
       fetchUsers();
     } else {
       console.error("Delete Node Error:", error);
-      if (error.code === "42501") {
-        toast.error("Permission Denied: Check Supabase RLS Policies.");
-      } else {
-        toast.error(`Expulsion failed: ${error.message}`);
-      }
+      toast.error(`Expulsion failed: ${error.message}`);
     }
   };
 
@@ -372,10 +368,14 @@ const App: React.FC = () => {
               id: session.user.id,
               settings: defaultSettings,
             };
-            await supabase.from("profiles").upsert(finalP);
-            setProfile(finalP);
-            setNeedsOnboarding(false);
-            if ("Notification" in window) Notification.requestPermission();
+            const { error } = await supabase.from("profiles").upsert(finalP);
+            if (!error) {
+              setProfile(finalP);
+              setNeedsOnboarding(false);
+              if ("Notification" in window) Notification.requestPermission();
+            } else {
+              toast.error("Identity creation failed: " + error.message);
+            }
           }
         }}
       />
@@ -423,19 +423,42 @@ const App: React.FC = () => {
         {currentPage === "post" && (
           <PostPage
             onPublish={async (data) => {
-              if (!profile) return;
+              if (!profile) {
+                toast.error("Node identity required to publish.");
+                return;
+              }
+
+              // Construct clean payload to avoid 400 errors
               const payload = {
-                ...data,
+                title: data.title,
+                content: data.content,
+                category: data.category,
+                image_url: data.image_url,
+                is_private: data.is_private ?? false,
                 author_id: profile.id,
                 author_name: profile.full_name,
                 author_serial: profile.serial_id,
               };
+
               const { error } = await supabase.from("articles").insert(payload);
+
               if (!error) {
                 toast.success("Transmission Successful");
                 fetchArticles();
                 handleNavigate("home");
-              } else toast.error("Network sync failed");
+              } else {
+                console.error("Publish Error:", error);
+                // Provide specific error message for 400/RLS issues
+                if (error.code === "42501") {
+                  toast.error(
+                    "Permission Denied: Run SQL policies in Supabase Dashboard."
+                  );
+                } else {
+                  toast.error(
+                    `Transmission Error [${error.code}]: ${error.message}`
+                  );
+                }
+              }
             }}
           />
         )}
