@@ -20,16 +20,15 @@ const IDCard: React.FC<IDCardProps> = ({ profile }) => {
   const downloadPass = async () => {
     if (!cardRef.current) return;
     try {
-      // Use a slightly larger capture area to prevent clipping
       const canvas = await html2canvas(cardRef.current, {
         scale: 3,
         backgroundColor: "#ffffff",
         useCORS: true,
         logging: false,
-        x: -1, // Subtle offset to fix border clipping
-        y: -1,
-        width: cardRef.current.offsetWidth + 2,
-        height: cardRef.current.offsetHeight + 2,
+        x: -2,
+        y: -2,
+        width: cardRef.current.offsetWidth + 4,
+        height: cardRef.current.offsetHeight + 4,
       });
       const link = document.createElement("a");
       link.download = `PRESS_PASS_${profile.serial_id}.png`;
@@ -41,12 +40,11 @@ const IDCard: React.FC<IDCardProps> = ({ profile }) => {
   };
 
   return (
-    <div className="flex flex-col items-center w-full gap-8">
-      {/* Container with extra padding to ensure no clipping during capture */}
-      <div className="p-2 bg-transparent">
+    <div className="flex flex-col items-center w-full max-w-full gap-8 overflow-visible">
+      <div className="flex justify-center w-full p-4 overflow-visible bg-transparent">
         <div
           ref={cardRef}
-          className="relative w-[360px] aspect-[1.6/1] bg-white dark:bg-slate-900 rounded-[2.5rem] overflow-hidden shadow-2xl border border-slate-200 dark:border-slate-800 flex flex-col p-8 select-none"
+          className="relative w-full max-w-[360px] aspect-[1.6/1] bg-white dark:bg-slate-900 rounded-[2.5rem] overflow-hidden shadow-2xl border border-slate-200 dark:border-slate-800 flex flex-col p-8 select-none transition-transform hover:scale-[1.02]"
         >
           {/* Security Watermark */}
           <div className="absolute inset-0 opacity-[0.04] pointer-events-none overflow-hidden text-[7px] font-black uppercase rotate-[-12deg] leading-none whitespace-pre italic">

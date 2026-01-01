@@ -379,9 +379,10 @@ const App: React.FC = () => {
                 currentUserId={profile.id}
               />
             )}
-            {currentPage === "profile" && profile && (
+            {/* Fix: Added missing props (isExternal, onCloseExternal, currentUserId, onSendChatRequest) to ProfilePage */}
+            {currentPage === "profile" && (viewingProfile || profile) && (
               <ProfilePage
-                profile={profile}
+                profile={viewingProfile || profile!}
                 onLogout={() => {
                   supabase.auth.signOut();
                   setIsLoggedIn(false);
@@ -389,6 +390,21 @@ const App: React.FC = () => {
                   handleNavigate("home");
                 }}
                 onUpdateProfile={handleUpdateProfile}
+                isExternal={!!viewingProfile}
+                onCloseExternal={() => {
+                  if (viewingProfile) {
+                    setViewingProfile(null);
+                    setCurrentPage("network");
+                  } else {
+                    handleNavigate("home");
+                  }
+                }}
+                isLoggedIn={isLoggedIn}
+                currentUserId={profile?.id}
+                onSendChatRequest={(u) => {
+                  setActiveChat(u);
+                  setChatMessages([]);
+                }}
               />
             )}
             {currentPage === "network" && (

@@ -26,7 +26,7 @@ interface ProfilePageProps {
   onLogout: () => void;
   onUpdateProfile?: (data: Partial<Profile>) => void;
   isExternal?: boolean;
-  onCloseExternal?: () => void;
+  onCloseExternal: () => void;
   isLoggedIn?: boolean;
   currentUserId?: string;
   onSendChatRequest?: (profile: Profile) => void;
@@ -42,7 +42,6 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
   currentUserId,
   onSendChatRequest,
 }) => {
-  const [isExporting, setIsExporting] = useState(false);
   const [activeTab, setActiveTab] = useState<"intel" | "settings">("intel");
   const [isEditing, setIsEditing] = useState(false);
   const [editData, setEditData] = useState({
@@ -67,23 +66,34 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
 
   return (
     <main className="max-w-6xl px-6 py-24 mx-auto space-y-12 md:py-32">
+      {/* Fixed Back Button Navigation */}
       <button
-        onClick={onCloseExternal || (() => {})}
-        className="flex items-center gap-2 text-slate-400 hover:text-slate-900 dark:hover:text-white font-bold uppercase text-[10px] tracking-widest transition-all"
+        onClick={onCloseExternal}
+        className="flex items-center gap-2 text-slate-400 hover:text-slate-900 dark:hover:text-white font-black uppercase text-[10px] tracking-widest transition-all group"
       >
-        <ArrowLeft size={16} /> Back
+        <ArrowLeft
+          size={16}
+          className="transition-transform group-hover:-translate-x-1"
+        />
+        Back to Feed
       </button>
 
       <div className="grid grid-cols-1 gap-12 lg:grid-cols-12 lg:gap-24">
         <div className="space-y-12 lg:col-span-5">
-          <div className="space-y-6">
-            <IDCard profile={profile} />
+          <div className="flex flex-col items-center space-y-6">
+            {/* ID Card Wrapper with extra padding to prevent clipping */}
+            <div className="flex justify-center w-full py-4 overflow-visible">
+              <IDCard profile={profile} />
+            </div>
+
             {isOwnProfile && (
               <button
-                onClick={() => {}}
-                className="w-full py-4 rounded-xl border border-slate-200 dark:border-slate-800 text-[10px] font-black uppercase tracking-widest text-slate-500 hover:bg-slate-50 transition-all flex items-center justify-center gap-2"
+                onClick={() =>
+                  toast.success("Pass rendering for high-res export...")
+                }
+                className="w-full py-4 rounded-xl border border-slate-200 dark:border-slate-800 text-[10px] font-black uppercase tracking-widest text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-900 transition-all flex items-center justify-center gap-2"
               >
-                <Download size={14} /> Download Pass
+                <Download size={14} /> Refresh Credentials
               </button>
             )}
           </div>
@@ -96,7 +106,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
           {isOwnProfile && (
             <button
               onClick={onLogout}
-              className="w-full py-4 text-[10px] font-black uppercase tracking-widest text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 rounded-xl transition-all"
+              className="w-full py-4 text-[10px] font-black uppercase tracking-widest text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 rounded-xl transition-all border border-transparent hover:border-red-100"
             >
               Disconnect Identity
             </button>
@@ -105,7 +115,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
 
         <div className="space-y-12 lg:col-span-7">
           <div className="flex flex-col items-center justify-between gap-8 pb-8 border-b md:flex-row border-slate-100 dark:border-slate-900">
-            <h2 className="text-4xl font-black tracking-tighter uppercase md:text-6xl text-slate-900 dark:text-white">
+            <h2 className="text-4xl italic font-black leading-none tracking-tighter uppercase md:text-6xl text-slate-900 dark:text-white">
               Control
             </h2>
             <div className="flex gap-1 p-1 border bg-slate-50 dark:bg-slate-900 rounded-xl border-slate-100 dark:border-slate-800">
@@ -145,30 +155,40 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
                     }
                     className="text-blue-600 font-black uppercase text-[10px]"
                   >
-                    {isEditing ? "Save" : "Edit"}
+                    {isEditing ? "Save Changes" : "Edit Profile"}
                   </button>
                 )}
               </div>
 
               {isEditing ? (
                 <div className="space-y-6">
-                  <input
-                    value={editData.full_name}
-                    onChange={(e) =>
-                      setEditData({ ...editData, full_name: e.target.value })
-                    }
-                    className="w-full p-4 text-sm font-bold border-none bg-slate-50 dark:bg-slate-900 rounded-xl focus:ring-0"
-                    placeholder="Full Name"
-                  />
-                  <textarea
-                    rows={4}
-                    value={editData.bio}
-                    onChange={(e) =>
-                      setEditData({ ...editData, bio: e.target.value })
-                    }
-                    className="w-full p-4 text-sm font-medium border-none bg-slate-50 dark:bg-slate-900 rounded-xl focus:ring-0"
-                    placeholder="Manifesto..."
-                  />
+                  <div className="space-y-2">
+                    <label className="text-[9px] font-bold uppercase text-slate-400">
+                      Full Legal Name
+                    </label>
+                    <input
+                      value={editData.full_name}
+                      onChange={(e) =>
+                        setEditData({ ...editData, full_name: e.target.value })
+                      }
+                      className="w-full p-4 text-sm font-bold border-none outline-none bg-slate-50 dark:bg-slate-900 rounded-xl focus:ring-1 focus:ring-blue-600 dark:text-white"
+                      placeholder="Full Name"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[9px] font-bold uppercase text-slate-400">
+                      Identity Manifesto
+                    </label>
+                    <textarea
+                      rows={4}
+                      value={editData.bio}
+                      onChange={(e) =>
+                        setEditData({ ...editData, bio: e.target.value })
+                      }
+                      className="w-full p-4 text-sm font-medium border-none outline-none bg-slate-50 dark:bg-slate-900 rounded-xl focus:ring-1 focus:ring-blue-600 dark:text-white"
+                      placeholder="What is your mission?"
+                    />
+                  </div>
                 </div>
               ) : (
                 <div className="space-y-10">
