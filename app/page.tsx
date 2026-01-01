@@ -1,5 +1,4 @@
 import React, { useState, useMemo } from "react";
-// Added ShieldCheck to fix the missing icon name error
 import {
   ArrowRight,
   Tag,
@@ -16,6 +15,7 @@ import {
   Users,
   Star,
   ShieldCheck,
+  PenSquare,
 } from "lucide-react";
 import { Article, Category } from "../types";
 import { toast } from "react-hot-toast";
@@ -55,108 +55,47 @@ const HomePage: React.FC<HomePageProps> = ({
     return articles.filter((a) => a.category === selectedCategory);
   }, [articles, selectedCategory]);
 
-  const getCategoryIcon = (cat: Category, size = 12) => {
-    switch (cat) {
-      case "Investigative":
-        return <Search size={size} />;
-      case "Economic":
-        return <BarChart3 size={size} />;
-      case "Regional":
-        return <Map size={size} />;
-      default:
-        return <Tag size={size} />;
-    }
-  };
-
-  const getCategoryColor = (cat: Category) => {
-    switch (cat) {
-      case "Investigative":
-        return "bg-blue-600";
-      case "Economic":
-        return "bg-emerald-600";
-      case "Regional":
-        return "bg-amber-500";
-      default:
-        return "bg-slate-900";
-    }
-  };
-
   if (!isLoggedIn && !isArchive) {
     return (
-      <main className="flex flex-col">
-        {/* Hero Section - Redesigned for clarity */}
-        <section className="min-h-[85vh] flex flex-col items-center justify-center py-20 px-6 max-w-7xl mx-auto text-center animate-in fade-in duration-1000">
-          <div className="inline-flex items-center gap-2 mb-8 px-5 py-2.5 rounded-full bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800/30 text-blue-600 dark:text-blue-400">
-            <Star size={14} className="fill-current animate-pulse" />
-            <span className="text-[10px] font-bold uppercase tracking-[0.25em]">
-              Trusted Global News Network
+      <main className="flex flex-col bg-slate-50 dark:bg-slate-950">
+        {/* Simplified Hero */}
+        <section className="min-h-[80vh] flex flex-col items-center justify-center py-24 px-6 max-w-7xl mx-auto text-center animate-in fade-in duration-1000">
+          <div className="inline-flex items-center gap-2 px-6 py-3 mb-10 text-white bg-blue-600 rounded-full shadow-xl shadow-blue-600/30">
+            <Star size={16} className="fill-current" />
+            <span className="text-[11px] font-black uppercase tracking-[0.2em]">
+              Verified News for Everyone
             </span>
           </div>
 
-          <h1 className="text-5xl sm:text-7xl md:text-8xl lg:text-[9rem] font-black text-slate-900 dark:text-white tracking-tight mb-8 leading-[0.9] transition-all">
-            Real Stories. <br />{" "}
-            <span className="italic text-blue-600">Real People.</span>
+          <h1 className="text-6xl sm:text-8xl md:text-[10rem] font-black text-slate-950 dark:text-white tracking-tighter mb-10 leading-[0.85] italic uppercase transition-all">
+            The News <br /> <span className="text-blue-600">You Trust.</span>
           </h1>
 
-          <p className="max-w-2xl mx-auto mb-12 text-lg font-medium leading-relaxed text-slate-500 dark:text-slate-400 md:text-xl">
-            Join a community of honest reporters sharing news from around the
-            world. No fake news, just the truth.
+          <p className="max-w-2xl mx-auto text-xl font-bold leading-relaxed text-slate-700 dark:text-slate-400 md:text-2xl mb-14">
+            Read stories shared by real people. No fake news, no corporate bias.
+            Just facts.
           </p>
 
-          <div className="flex flex-col items-center gap-4 sm:flex-row">
+          <div className="flex flex-col items-center gap-6 sm:flex-row">
             <button
               onClick={onLogin}
-              className="relative inline-flex items-center gap-4 px-10 py-5 text-base font-bold tracking-widest text-white uppercase transition-all rounded-full shadow-2xl group bg-slate-900 dark:bg-white dark:text-slate-900 hover:bg-blue-600 hover:text-white hover:shadow-blue-500/25 active:scale-95"
+              className="relative inline-flex items-center gap-4 px-12 py-6 text-lg font-black tracking-widest text-white uppercase transition-all rounded-full shadow-2xl group bg-slate-950 dark:bg-white dark:text-slate-950 hover:bg-blue-600 hover:text-white active:scale-95"
             >
-              Start Reading Now
-              <ArrowRight
-                size={20}
-                className="transition-transform group-hover:translate-x-2"
-              />
+              Start Reading
+              <ArrowRight size={24} />
             </button>
             <button
-              onClick={() =>
-                document
-                  .getElementById("news-ticker")
-                  ?.scrollIntoView({ behavior: "smooth" })
-              }
-              className="px-10 py-5 font-bold tracking-widest uppercase transition-all border rounded-full border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-900"
+              onClick={() => onLogin()}
+              className="px-12 py-6 font-black tracking-widest uppercase transition-all border-4 rounded-full border-slate-900 dark:border-white text-slate-900 dark:text-white hover:bg-slate-900 hover:text-white dark:hover:bg-white dark:hover:text-slate-900"
             >
-              Learn More
+              Join Us
             </button>
-          </div>
-
-          <div className="grid grid-cols-2 gap-8 mt-20 opacity-50 md:grid-cols-3 md:gap-16">
-            <div className="flex flex-col items-center gap-2">
-              <Users size={24} />
-              <span className="text-[10px] font-black uppercase tracking-widest">
-                Global Community
-              </span>
-            </div>
-            <div className="flex flex-col items-center gap-2">
-              <ShieldCheck size={24} />
-              <span className="text-[10px] font-black uppercase tracking-widest">
-                Verified Content
-              </span>
-            </div>
-            <div className="flex-col items-center hidden gap-2 md:flex">
-              <Zap size={24} />
-              <span className="text-[10px] font-black uppercase tracking-widest">
-                Instant Updates
-              </span>
-            </div>
           </div>
         </section>
 
-        <section
-          id="news-ticker"
-          className="px-4 mx-auto mb-24 space-y-16 max-w-7xl md:px-6 md:mb-32 md:space-y-32"
-        >
-          <div className="p-8 bg-white dark:bg-slate-900 rounded-[3rem] border border-slate-100 dark:border-white/5 shadow-xl">
+        <section className="w-full px-6 mx-auto mb-32 space-y-32 max-w-7xl">
+          <div className="bg-white dark:bg-slate-900 p-10 rounded-[4rem] shadow-2xl border border-slate-200 dark:border-white/5">
             <NewsTerminal />
-          </div>
-          <div className="pt-16 md:pt-20">
-            <TrendingTopics />
           </div>
         </section>
       </main>
@@ -164,44 +103,43 @@ const HomePage: React.FC<HomePageProps> = ({
   }
 
   return (
-    <main className="px-4 py-12 mx-auto space-y-16 max-w-7xl md:px-6 md:py-24 md:space-y-24">
-      {/* Featured News Section */}
-      <div className="bg-white dark:bg-slate-900 p-6 md:p-12 rounded-[3rem] border border-slate-100 dark:border-white/5 shadow-xl">
+    <main className="px-6 py-12 mx-auto space-y-24 max-w-7xl md:py-24 bg-slate-50 dark:bg-slate-950">
+      <div className="bg-white dark:bg-slate-900 p-8 md:p-14 rounded-[4rem] shadow-2xl border border-slate-200 dark:border-white/5">
         <NewsTerminal />
       </div>
 
       <div id="latest-stories" className="scroll-mt-32">
-        <div className="flex flex-col items-start justify-between gap-6 pb-8 mb-12 border-b md:flex-row md:items-center md:gap-8 md:mb-16 border-slate-100 dark:border-white/5 md:pb-12">
-          <div className="space-y-2">
+        <div className="flex flex-col items-start justify-between gap-10 mb-20 border-b-4 md:flex-row md:items-end border-slate-950 dark:border-white pb-14">
+          <div className="space-y-4">
             <div className="flex items-center gap-2 text-blue-600">
-              <TrendingUp size={18} />
-              <span className="text-[10px] font-black uppercase tracking-[0.3em]">
+              <TrendingUp size={24} strokeWidth={3} />
+              <span className="text-xs font-black uppercase tracking-[0.4em]">
                 Latest Stories
               </span>
             </div>
-            <h2 className="text-4xl font-black leading-none tracking-tight uppercase md:text-6xl text-slate-900 dark:text-white">
-              {isArchive ? "Archive" : "Recent News"}
+            <h2 className="text-6xl italic font-black leading-none tracking-tighter uppercase md:text-8xl text-slate-950 dark:text-white">
+              {isArchive ? "Archives" : "News Feed"}
             </h2>
           </div>
 
-          <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 p-1.5 rounded-full overflow-x-auto max-w-full">
+          <div className="flex flex-wrap items-center gap-3 bg-white dark:bg-slate-800 p-2 rounded-[2rem] shadow-xl border border-slate-200 dark:border-white/5">
             <FilterTag
-              label="All"
+              label="All Stories"
               active={selectedCategory === "All"}
               onClick={() => setSelectedCategory("All")}
             />
             <FilterTag
-              label="Deep Dives"
+              label="Investigative"
               active={selectedCategory === "Investigative"}
               onClick={() => setSelectedCategory("Investigative")}
             />
             <FilterTag
-              label="Business"
+              label="Economics"
               active={selectedCategory === "Economic"}
               onClick={() => setSelectedCategory("Economic")}
             />
             <FilterTag
-              label="Local"
+              label="Regional"
               active={selectedCategory === "Regional"}
               onClick={() => setSelectedCategory("Regional")}
             />
@@ -209,21 +147,24 @@ const HomePage: React.FC<HomePageProps> = ({
         </div>
 
         {filteredArticles.length === 0 ? (
-          <div className="py-32 text-center opacity-30">
-            <Newspaper size={48} className="mx-auto mb-6 text-slate-300" />
-            <p className="text-xl font-bold tracking-widest uppercase text-slate-400">
-              No news to show yet.
+          <div className="py-40 text-center">
+            <Newspaper
+              size={80}
+              className="mx-auto mb-8 text-slate-200 dark:text-slate-800"
+            />
+            <p className="text-2xl font-black tracking-widest uppercase text-slate-400">
+              No news articles found.
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 gap-8 md:grid-cols-2 md:gap-12">
+          <div className="grid grid-cols-1 gap-12 md:grid-cols-2 md:gap-16">
             {filteredArticles.map((article) => (
               <div
                 key={article.id}
-                className="group cursor-pointer bg-white dark:bg-slate-900/60 rounded-[2.5rem] border border-slate-100 dark:border-white/5 hover:border-blue-500 transition-all duration-500 relative flex flex-col overflow-hidden shadow-sm hover:shadow-2xl hover:shadow-blue-500/10"
+                className="group cursor-pointer bg-white dark:bg-slate-900 p-8 rounded-[3.5rem] border-2 border-slate-100 dark:border-white/5 hover:border-blue-600 transition-all duration-500 flex flex-col shadow-lg hover:shadow-2xl"
                 onClick={() => onReadArticle?.(article)}
               >
-                <div className="aspect-[16/9] overflow-hidden relative">
+                <div className="aspect-video overflow-hidden rounded-[2.5rem] mb-8 relative border border-slate-100 dark:border-white/10">
                   <img
                     src={
                       article.image_url ||
@@ -232,54 +173,39 @@ const HomePage: React.FC<HomePageProps> = ({
                     className="object-cover w-full h-full transition-transform duration-1000 group-hover:scale-105"
                     alt={article.title}
                   />
-
-                  <div className="absolute flex gap-2 top-4 left-4">
-                    <div
-                      className={`${getCategoryColor(
-                        article.category
-                      )} text-white px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest flex items-center gap-2 shadow-lg`}
-                    >
-                      {getCategoryIcon(article.category, 12)}{" "}
-                      {article.category === "Investigative"
-                        ? "Deep Dive"
-                        : article.category}
-                    </div>
+                  <div className="absolute top-6 left-6 bg-blue-600 text-white px-5 py-2 rounded-full text-[11px] font-black uppercase tracking-widest shadow-xl">
+                    {article.category}
                   </div>
-
-                  {article.is_private && (
-                    <div className="absolute top-4 right-4 bg-slate-900/80 backdrop-blur-md text-white px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest flex items-center gap-2">
-                      <Lock size={12} /> Only You
-                    </div>
-                  )}
                 </div>
 
-                <div className="flex flex-col flex-grow p-8 space-y-6 md:p-10">
-                  <div className="flex justify-between items-center text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                <div className="flex flex-col flex-grow space-y-6">
+                  <div className="flex justify-between items-center text-[11px] font-black uppercase tracking-widest text-slate-500">
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
                         onViewProfile(article.author_id);
                       }}
-                      className="flex items-center gap-2 transition-colors hover:text-blue-600"
+                      className="flex items-center gap-2 hover:text-blue-600"
                     >
-                      <Users size={12} /> By {article.author_name}
+                      <Users size={14} /> {article.author_name}
                     </button>
-                    <span>
+                    <span className="flex items-center gap-2">
+                      <Zap size={14} className="text-amber-500" />{" "}
                       {new Date(article.created_at).toLocaleDateString()}
                     </span>
                   </div>
 
-                  <h3 className="text-2xl font-black leading-tight tracking-tight transition-colors md:text-3xl text-slate-900 dark:text-white group-hover:text-blue-600">
+                  <h3 className="text-3xl italic font-black leading-tight tracking-tight uppercase transition-colors md:text-4xl text-slate-950 dark:text-white group-hover:text-blue-600">
                     {article.title}
                   </h3>
 
-                  <p className="text-sm leading-relaxed text-slate-500 dark:text-slate-400 md:text-base line-clamp-3">
+                  <p className="text-lg font-bold leading-relaxed text-slate-600 dark:text-slate-400 line-clamp-3">
                     {article.content}
                   </p>
 
-                  <div className="flex items-center justify-between pt-6 mt-auto border-t border-slate-50 dark:border-white/5">
-                    <span className="text-[10px] font-bold text-blue-600 uppercase tracking-widest flex items-center gap-2">
-                      Read More <ArrowRight size={14} />
+                  <div className="flex items-center justify-between pt-8 mt-auto border-t-2 border-slate-100 dark:border-white/5">
+                    <span className="flex items-center gap-2 text-xs font-black tracking-widest text-blue-600 uppercase transition-all group-hover:gap-4">
+                      Read Full Story <ArrowRight size={18} />
                     </span>
 
                     {(userRole === "admin" ||
@@ -287,16 +213,12 @@ const HomePage: React.FC<HomePageProps> = ({
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          if (
-                            confirm(
-                              "Are you sure you want to delete this story?"
-                            )
-                          )
+                          if (confirm("Are you sure? This cannot be undone."))
                             onDelete(article.id);
                         }}
-                        className="p-2.5 bg-red-50 dark:bg-red-950/30 text-red-500 rounded-full hover:bg-red-500 hover:text-white transition-all shadow-sm"
+                        className="p-3 text-white transition-all bg-red-600 shadow-lg rounded-2xl hover:bg-red-700"
                       >
-                        <Trash2 size={16} />
+                        <Trash2 size={20} />
                       </button>
                     )}
                   </div>
@@ -321,10 +243,10 @@ const FilterTag = ({
 }) => (
   <button
     onClick={onClick}
-    className={`px-6 py-2.5 rounded-full text-[10px] font-bold uppercase tracking-widest transition-all ${
+    className={`px-8 py-3 rounded-full text-xs font-black uppercase tracking-widest transition-all ${
       active
-        ? "bg-white dark:bg-slate-700 text-blue-600 shadow-md"
-        : "text-slate-400 hover:text-slate-900 dark:hover:text-white"
+        ? "bg-blue-600 text-white shadow-xl"
+        : "text-slate-500 hover:text-slate-900 dark:hover:text-white"
     }`}
   >
     {label}

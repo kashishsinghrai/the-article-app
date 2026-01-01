@@ -2,18 +2,14 @@ import React, { useState, useEffect, useRef } from "react";
 import {
   Camera,
   Send,
-  Search,
-  BarChart3,
-  Map,
-  TrendingUp,
-  Globe,
   ShieldCheck,
   Zap,
   X,
   Loader2,
-  ArrowLeft,
   Lock,
   Unlock,
+  PenSquare,
+  FileText,
 } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { Article, Category } from "../../types";
@@ -56,7 +52,7 @@ const PostPage: React.FC<PostPageProps> = ({ onPublish, editData }) => {
       reader.onloadend = () => {
         setImageUrl(reader.result as string);
         setIsEncoding(false);
-        toast.success("Evidence Encoding Complete");
+        toast.success("Image Uploaded Successfully");
       };
       reader.readAsDataURL(file);
     }
@@ -64,7 +60,7 @@ const PostPage: React.FC<PostPageProps> = ({ onPublish, editData }) => {
 
   const handleSubmit = () => {
     if (!title.trim() || !content.trim()) {
-      toast.error("Headline and Content are required.");
+      toast.error("Headline and Story are required.");
       return;
     }
     setIsSyncing(true);
@@ -80,51 +76,49 @@ const PostPage: React.FC<PostPageProps> = ({ onPublish, editData }) => {
   const categories: Category[] = ["Investigative", "Economic", "Regional"];
 
   return (
-    <main className="flex flex-col gap-8 px-4 py-20 mx-auto max-w-7xl md:px-6 md:py-32 lg:flex-row md:gap-16">
-      <div className="flex-1 space-y-8 md:space-y-12">
-        <div className="flex flex-col items-start justify-between gap-4 md:flex-row md:items-end">
-          <div className="space-y-2 md:space-y-4">
-            <div className="flex items-center gap-2 text-blue-600">
-              <ShieldCheck size={16} />
-              <span className="text-[8px] md:text-[10px] font-black uppercase tracking-[0.4em]">
-                Verified Terminal
-              </span>
-            </div>
-            <h1 className="text-3xl italic font-black leading-none tracking-tighter uppercase md:text-6xl text-slate-900 dark:text-white">
-              {editData ? "Update Record" : "File Dispatch"}
-            </h1>
+    <main className="flex flex-col min-h-screen gap-16 px-6 py-24 mx-auto max-w-7xl md:py-32 lg:flex-row bg-slate-50 dark:bg-slate-950">
+      <div className="flex-1 space-y-12">
+        <div className="space-y-6">
+          <div className="flex items-center gap-3 text-blue-600">
+            <PenSquare size={24} strokeWidth={3} />
+            <span className="text-xs font-black uppercase tracking-[0.4em]">
+              Article Editor
+            </span>
           </div>
-          <p className="text-slate-400 font-bold uppercase tracking-[0.2em] text-[8px] md:text-[10px] max-w-xs md:border-r border-slate-200 dark:border-slate-800 md:pr-4">
-            Authorized correspondence for the global truth ledger.
+          <h1 className="text-5xl italic font-black leading-none tracking-tighter uppercase md:text-8xl text-slate-950 dark:text-white">
+            {editData ? "Edit Story" : "Post News"}
+          </h1>
+          <p className="max-w-lg text-sm font-bold uppercase text-slate-500 dark:text-slate-400">
+            Share your verified news with the world. Your voice matters.
           </p>
         </div>
 
-        <div className="space-y-8 md:space-y-10 bg-white dark:bg-slate-900 p-5 md:p-12 rounded-[2rem] md:rounded-[3rem] border border-slate-100 dark:border-white/5 shadow-xl">
-          <div className="space-y-2 md:space-y-4">
-            <label className="text-[8px] md:text-[10px] font-black text-blue-600 uppercase tracking-[0.3em]">
-              Operational Headline
+        <div className="bg-white dark:bg-slate-900 p-8 md:p-14 rounded-[3.5rem] shadow-2xl border-2 border-slate-100 dark:border-white/5 space-y-10">
+          <div className="space-y-4">
+            <label className="text-[11px] font-black text-blue-600 uppercase tracking-widest">
+              News Headline
             </label>
             <input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="w-full p-0 text-xl italic font-black tracking-tighter uppercase bg-transparent border-none outline-none md:text-5xl placeholder:text-slate-100 dark:placeholder:text-slate-800 focus:ring-0 text-slate-900 dark:text-white"
-              placeholder="Record Headline..."
+              className="w-full p-0 text-3xl italic font-black tracking-tighter uppercase bg-transparent border-none outline-none md:text-5xl placeholder:text-slate-200 dark:placeholder:text-slate-800 focus:ring-0 text-slate-950 dark:text-white"
+              placeholder="Enter headline here..."
             />
           </div>
 
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-2 md:gap-8">
-            <div className="space-y-3">
-              <label className="text-[8px] md:text-[10px] font-black text-slate-300 dark:text-slate-600 uppercase tracking-[0.3em]">
-                Intel Category
+          <div className="grid grid-cols-1 gap-10 md:grid-cols-2">
+            <div className="space-y-4">
+              <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest">
+                Category
               </label>
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap gap-3">
                 {categories.map((cat) => (
                   <button
                     key={cat}
                     onClick={() => setCategory(cat)}
-                    className={`px-4 py-2 md:px-6 md:py-3 rounded-xl md:rounded-2xl text-[8px] md:text-[10px] font-black uppercase tracking-widest border transition-all ${
+                    className={`px-8 py-3 rounded-2xl text-[11px] font-black uppercase tracking-widest border-2 transition-all ${
                       category === cat
-                        ? "bg-slate-900 dark:bg-white text-white dark:text-slate-900 border-slate-900"
+                        ? "bg-slate-950 dark:bg-white text-white dark:text-slate-950 border-slate-950"
                         : "bg-transparent text-slate-400 border-slate-100 dark:border-slate-800"
                     }`}
                   >
@@ -134,45 +128,45 @@ const PostPage: React.FC<PostPageProps> = ({ onPublish, editData }) => {
               </div>
             </div>
 
-            <div className="space-y-3">
-              <label className="text-[8px] md:text-[10px] font-black text-slate-300 dark:text-slate-600 uppercase tracking-[0.3em]">
-                Visibility Mode
+            <div className="space-y-4">
+              <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest">
+                Who can see this?
               </label>
-              <div className="flex gap-2">
+              <div className="flex gap-3">
                 <button
                   onClick={() => setIsPublic(true)}
-                  className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl md:rounded-2xl text-[8px] md:text-[10px] font-black uppercase tracking-widest border transition-all ${
+                  className={`flex-1 flex items-center justify-center gap-3 px-6 py-3 rounded-2xl text-[11px] font-black uppercase border-2 transition-all ${
                     isPublic
-                      ? "bg-emerald-600 text-white border-emerald-600 shadow-md"
+                      ? "bg-emerald-600 text-white border-emerald-600"
                       : "bg-transparent text-slate-400 border-slate-100 dark:border-slate-800"
                   }`}
                 >
-                  <Unlock size={12} /> Public
+                  <Unlock size={16} /> Everyone
                 </button>
                 <button
                   onClick={() => setIsPublic(false)}
-                  className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl md:rounded-2xl text-[8px] md:text-[10px] font-black uppercase tracking-widest border transition-all ${
+                  className={`flex-1 flex items-center justify-center gap-3 px-6 py-3 rounded-2xl text-[11px] font-black uppercase border-2 transition-all ${
                     !isPublic
-                      ? "bg-amber-600 text-white border-amber-600 shadow-md"
+                      ? "bg-amber-600 text-white border-amber-600"
                       : "bg-transparent text-slate-400 border-slate-100 dark:border-slate-800"
                   }`}
                 >
-                  <Lock size={12} /> Private
+                  <Lock size={16} /> Only Me
                 </button>
               </div>
             </div>
           </div>
 
-          <div className="space-y-3">
-            <label className="text-[8px] md:text-[10px] font-black text-slate-300 dark:text-slate-600 uppercase tracking-[0.3em]">
-              Asset Upload
+          <div className="space-y-4">
+            <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest">
+              Add Image
             </label>
             <div
               onClick={() => fileInputRef.current?.click()}
-              className="aspect-[16/9] md:aspect-[21/9] bg-slate-50 dark:bg-slate-950 rounded-[1.5rem] md:rounded-[2.5rem] border-2 border-dashed border-slate-200 dark:border-slate-800 flex flex-col items-center justify-center group cursor-pointer hover:border-blue-500 transition-all overflow-hidden relative"
+              className="aspect-video bg-slate-50 dark:bg-slate-950 rounded-[2.5rem] border-4 border-dashed border-slate-200 dark:border-slate-800 flex flex-col items-center justify-center group cursor-pointer hover:border-blue-600 transition-all overflow-hidden relative shadow-inner"
             >
               {isEncoding ? (
-                <Loader2 size={24} className="text-blue-600 animate-spin" />
+                <Loader2 size={40} className="text-blue-600 animate-spin" />
               ) : imageUrl ? (
                 <>
                   <img src={imageUrl} className="object-cover w-full h-full" />
@@ -181,19 +175,19 @@ const PostPage: React.FC<PostPageProps> = ({ onPublish, editData }) => {
                       e.stopPropagation();
                       setImageUrl("");
                     }}
-                    className="absolute top-3 right-3 p-1.5 bg-red-600 text-white rounded-lg shadow-xl"
+                    className="absolute p-3 text-white transition-transform bg-red-600 shadow-xl top-6 right-6 rounded-2xl hover:scale-110"
                   >
-                    <X size={14} />
+                    <X size={20} />
                   </button>
                 </>
               ) : (
-                <div className="p-4 text-center">
+                <div className="p-10 text-center">
                   <Camera
-                    size={24}
-                    className="mx-auto mb-2 transition-colors text-slate-300 group-hover:text-blue-500"
+                    size={48}
+                    className="mx-auto mb-4 transition-colors text-slate-300 group-hover:text-blue-600"
                   />
-                  <span className="block text-[8px] font-black uppercase tracking-widest text-slate-400">
-                    Upload Evidence
+                  <span className="block text-sm font-black tracking-widest uppercase text-slate-400">
+                    Click to Upload Photo
                   </span>
                 </div>
               )}
@@ -207,44 +201,44 @@ const PostPage: React.FC<PostPageProps> = ({ onPublish, editData }) => {
             </div>
           </div>
 
-          <div className="space-y-2">
-            <label className="text-[8px] md:text-[10px] font-black text-blue-600 uppercase tracking-[0.3em]">
-              Dispatch Content
+          <div className="space-y-4">
+            <label className="text-[11px] font-black text-blue-600 uppercase tracking-widest">
+              Article Story
             </label>
             <textarea
               value={content}
               onChange={(e) => setContent(e.target.value)}
-              rows={8}
-              className="w-full p-0 text-sm font-medium leading-relaxed bg-transparent border-none outline-none md:text-xl placeholder:text-slate-100 dark:placeholder:text-slate-800 focus:ring-0 text-slate-700 dark:text-slate-300"
-              placeholder="Begin intelligence transmission..."
+              rows={12}
+              className="w-full p-0 text-xl font-bold leading-relaxed bg-transparent border-none outline-none md:text-2xl placeholder:text-slate-100 dark:placeholder:text-slate-800 focus:ring-0 text-slate-800 dark:text-slate-200"
+              placeholder="Tell your story here..."
             />
           </div>
 
-          <div className="flex flex-col items-center justify-between gap-4 pt-6 border-t border-slate-100 dark:border-slate-800 sm:flex-row">
-            <div className="flex items-center w-full gap-2 px-4 py-2 rounded-full bg-slate-50 dark:bg-slate-950 sm:w-auto">
-              <Globe size={14} className="text-blue-600" />
-              <span className="text-[8px] font-black uppercase tracking-widest text-slate-400">
-                Live Sync Ready
+          <div className="flex flex-col items-center justify-between gap-6 pt-10 border-t-2 border-slate-100 dark:border-slate-800 sm:flex-row">
+            <div className="flex items-center gap-3 px-6 py-3 border rounded-full bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-white/5">
+              <Zap size={18} className="text-blue-600" />
+              <span className="text-[11px] font-black uppercase tracking-widest text-slate-500">
+                Auto-Save Enabled
               </span>
             </div>
             <button
               onClick={handleSubmit}
               disabled={isSyncing || isEncoding}
-              className={`w-full sm:w-auto px-8 py-4 rounded-full text-[10px] md:text-xs font-black uppercase tracking-widest shadow-xl transition-all active:scale-95 flex items-center justify-center gap-2 ${
+              className={`w-full sm:w-auto px-12 py-5 rounded-full text-sm font-black uppercase tracking-widest shadow-2xl transition-all active:scale-95 flex items-center justify-center gap-3 ${
                 isSyncing
                   ? "bg-slate-200 text-slate-400"
-                  : "bg-slate-900 dark:bg-white dark:text-slate-900 text-white hover:bg-blue-600 hover:text-white"
+                  : "bg-blue-600 text-white hover:bg-slate-900 dark:hover:bg-white dark:hover:text-slate-900"
               }`}
             >
-              {isSyncing ? "Synchronizing..." : "Sync Dispatch"}
-              {!isSyncing && <Send size={14} />}
+              {isSyncing ? "Posting..." : "Publish Now"}
+              {!isSyncing && <Send size={20} />}
             </button>
           </div>
         </div>
       </div>
 
-      <div className="flex-shrink-0 w-full lg:w-80">
-        <div className="lg:sticky lg:top-32">
+      <div className="flex-shrink-0 w-full lg:w-96">
+        <div className="lg:sticky lg:top-36">
           <AiAssistant currentHeadline={title} currentContent={content} />
         </div>
       </div>

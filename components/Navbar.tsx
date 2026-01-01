@@ -8,17 +8,15 @@ import {
   Check,
   X,
   Menu,
-  Globe2,
-  FileText,
-  Network,
+  Newspaper,
+  PenSquare,
+  Users,
+  HelpCircle,
   LogIn,
-  TrendingUp,
-  Info,
   LayoutDashboard,
   Sliders,
   Zap,
   Smartphone,
-  Download,
 } from "lucide-react";
 import { ChatRequest } from "../types";
 import { toast } from "react-hot-toast";
@@ -51,34 +49,6 @@ const Navbar: React.FC<NavbarProps> = ({
   const [showRequests, setShowRequests] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  const handleTranslate = (lang: string) => {
-    const googleCombo = document.querySelector(
-      ".goog-te-combo"
-    ) as HTMLSelectElement;
-    if (googleCombo) {
-      googleCombo.value = lang;
-      googleCombo.dispatchEvent(new Event("change"));
-    }
-  };
-
-  const notifyAppStatus = () => {
-    toast(
-      "Android Terminal: Project in Beta Development. APK release expected in Phase 2.",
-      {
-        icon: "📱",
-        style: {
-          borderRadius: "20px",
-          background: "#0f172a",
-          color: "#fff",
-          fontSize: "10px",
-          fontWeight: "900",
-          textTransform: "uppercase",
-          letterSpacing: "0.1em",
-        },
-      }
-    );
-  };
-
   const navTo = (page: string) => {
     onNavigate(page);
     setIsMobileMenuOpen(false);
@@ -86,180 +56,158 @@ const Navbar: React.FC<NavbarProps> = ({
 
   return (
     <>
-      <nav className="fixed top-0 left-0 right-0 z-[150] px-3 py-2 md:px-6 md:py-5">
-        <div className="relative flex items-center justify-between px-4 py-2 mx-auto transition-all duration-300 shadow-xl max-w-7xl glass rounded-2xl md:rounded-full md:px-8 md:py-3 ring-1 ring-black/5 dark:ring-white/5">
+      <nav className="fixed top-0 left-0 right-0 z-[150] px-3 py-3 md:px-6 md:py-6">
+        <div className="relative flex items-center justify-between px-5 py-3 mx-auto transition-all duration-300 border shadow-2xl max-w-7xl glass rounded-2xl md:rounded-full md:px-10 md:py-4 border-slate-200 dark:border-white/10">
           <div
-            className="flex items-center gap-2 cursor-pointer md:gap-3 group"
+            className="flex items-center gap-3 cursor-pointer group"
             onClick={() => navTo("home")}
           >
-            <div className="bg-blue-600 p-2 md:p-2.5 rounded-xl text-white group-hover:rotate-12 transition-transform shadow-lg shadow-blue-600/20">
-              <Shield size={18} strokeWidth={2.5} />
+            <div className="bg-blue-600 p-2.5 rounded-xl text-white group-hover:scale-110 transition-transform shadow-lg shadow-blue-600/30">
+              <Shield size={20} strokeWidth={3} />
             </div>
-            <span className="text-[14px] xs:text-base md:text-xl font-black tracking-[-0.05em] text-slate-900 dark:text-white uppercase block italic">
+            <span className="text-lg italic font-black tracking-tighter uppercase md:text-2xl text-slate-900 dark:text-white">
               ThE-ARTICLES
             </span>
           </div>
 
-          {/* Desktop Navigation */}
-          <div className="items-center hidden gap-6 mx-4 lg:flex">
+          {/* Desktop Navigation - Simple Labels */}
+          <div className="items-center hidden gap-8 lg:flex">
             <NavItem
-              label="Wire"
+              icon={<Newspaper size={16} />}
+              label="Home"
               active={currentPage === "home"}
               onClick={() => navTo("home")}
             />
             <NavItem
-              label="Network"
+              icon={<Users size={16} />}
+              label="Reporters"
               active={currentPage === "network"}
               onClick={() => navTo("network")}
             />
             {isLoggedIn && (
               <NavItem
-                label="Dispatch"
+                icon={<PenSquare size={16} />}
+                label="Write News"
                 active={currentPage === "post"}
                 onClick={() => navTo("post")}
               />
             )}
             <NavItem
-              label="Terminal"
+              icon={<HelpCircle size={16} />}
+              label="Help"
               active={currentPage === "support"}
               onClick={() => navTo("support")}
             />
 
-            {/* Download Android Feature */}
-            <button
-              onClick={notifyAppStatus}
-              className="flex items-center gap-2 px-4 py-1.5 rounded-full bg-slate-100 dark:bg-slate-800 text-[10px] font-black uppercase tracking-widest text-slate-500 hover:bg-blue-600 hover:text-white transition-all shadow-sm"
-            >
-              <Smartphone size={12} /> Node Mobile
-            </button>
-
             {isLoggedIn && userRole === "admin" && (
               <button
                 onClick={() => navTo("admin")}
-                className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${
+                className={`flex items-center gap-2 px-5 py-2 rounded-full text-[11px] font-black uppercase tracking-widest transition-all ${
                   currentPage === "admin"
-                    ? "bg-red-500 text-white shadow-lg shadow-red-500/20"
-                    : "bg-red-50 dark:bg-red-900/10 text-red-500 hover:bg-red-500 hover:text-white"
+                    ? "bg-red-600 text-white shadow-lg"
+                    : "bg-red-50 dark:bg-red-900/20 text-red-600 hover:bg-red-600 hover:text-white"
                 }`}
               >
-                <LayoutDashboard size={12} /> Authority
+                <LayoutDashboard size={14} /> Admin
               </button>
             )}
           </div>
 
-          <div className="flex items-center gap-1.5 md:gap-3">
+          <div className="flex items-center gap-2 md:gap-4">
             {isLoggedIn && (
-              <div className="flex items-center gap-1 mr-1 md:gap-2">
-                <button
-                  onClick={() => setShowRequests(!showRequests)}
-                  className={`w-9 h-9 md:w-10 md:h-10 rounded-full flex items-center justify-center transition-all ${
-                    chatRequests.length > 0
-                      ? "bg-blue-600 text-white animate-pulse shadow-lg shadow-blue-600/40"
-                      : "bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-300"
-                  }`}
-                >
-                  <MessageSquare size={16} />
-                </button>
-                <button
-                  onClick={() => navTo("profile")}
-                  className={`hidden md:flex w-10 h-10 rounded-full items-center justify-center transition-all bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-300 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:text-blue-600`}
-                >
-                  <Sliders size={16} />
-                </button>
-              </div>
+              <button
+                onClick={() => setShowRequests(!showRequests)}
+                className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${
+                  chatRequests.length > 0
+                    ? "bg-blue-600 text-white animate-pulse shadow-lg"
+                    : "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300"
+                }`}
+              >
+                <MessageSquare size={18} />
+              </button>
             )}
 
             <button
               onClick={onToggleDarkMode}
-              className="flex items-center justify-center transition-transform rounded-full w-9 h-9 md:w-10 md:h-10 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-300 active:scale-90"
+              className="flex items-center justify-center w-10 h-10 transition-all rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-blue-50 dark:hover:bg-blue-900/20"
             >
-              {isDarkMode ? <Sun size={16} /> : <Moon size={16} />}
+              {isDarkMode ? <Sun size={20} /> : <Moon size={20} />}
             </button>
 
             {isLoggedIn ? (
-              <div className="relative group">
-                <button
-                  onClick={() => navTo("profile")}
-                  className={`w-9 h-9 md:w-10 md:h-10 rounded-full flex items-center justify-center relative ${
-                    currentPage === "profile"
-                      ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20"
-                      : "bg-slate-900 text-white dark:bg-white dark:text-slate-900"
-                  }`}
-                >
-                  <User size={18} />
-                  <div className="absolute -top-0.5 -right-0.5 w-3 h-3 bg-emerald-500 rounded-full border-2 border-white dark:border-slate-950 animate-pulse" />
-                </button>
-              </div>
+              <button
+                onClick={() => navTo("profile")}
+                className={`w-10 h-10 rounded-full flex items-center justify-center relative ${
+                  currentPage === "profile"
+                    ? "bg-blue-600 text-white shadow-lg"
+                    : "bg-slate-900 text-white dark:bg-white dark:text-slate-900"
+                }`}
+              >
+                <User size={20} />
+                <div className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 bg-emerald-500 rounded-full border-2 border-white dark:border-slate-950 shadow-sm" />
+              </button>
             ) : (
               <button
                 onClick={onLogin}
-                className="hidden sm:flex px-5 md:px-6 py-2 bg-slate-900 dark:bg-white dark:text-slate-900 text-white text-[10px] font-black uppercase tracking-[0.2em] rounded-full hover:bg-blue-600 transition-all items-center gap-2 shadow-lg"
+                className="hidden sm:flex px-6 py-2.5 bg-blue-600 text-white text-[11px] font-black uppercase tracking-widest rounded-full hover:bg-slate-900 dark:hover:bg-white dark:hover:text-slate-900 transition-all items-center gap-2 shadow-xl shadow-blue-600/20"
               >
-                <Zap size={14} className="fill-current" /> LOGIN
+                <LogIn size={14} /> LOGIN
               </button>
             )}
 
             <button
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              className="flex items-center justify-center transition-transform rounded-full lg:hidden w-9 h-9 md:w-10 md:h-10 text-slate-900 dark:text-white bg-slate-100 dark:bg-slate-800 active:scale-90"
+              className="flex items-center justify-center w-10 h-10 transition-transform rounded-full lg:hidden text-slate-900 dark:text-white bg-slate-100 dark:bg-slate-800 active:scale-95"
             >
-              {isMobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
+              {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
             </button>
           </div>
         </div>
       </nav>
 
-      {/* Handshake Acceptance Overlay */}
+      {/* Message Requests - Simple Label */}
       {showRequests && isLoggedIn && (
-        <div className="fixed top-[85px] right-4 md:right-10 w-80 glass dark:bg-slate-950 rounded-[2.5rem] shadow-2xl border border-slate-100 dark:border-white/10 p-6 space-y-4 animate-in fade-in slide-in-from-top-4 z-[200]">
-          <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-white/5">
-            <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-              Handshake Signals
+        <div className="fixed top-[100px] right-4 md:right-10 w-80 glass dark:bg-slate-900 rounded-[2rem] shadow-2xl border border-slate-200 dark:border-white/10 p-6 space-y-4 animate-in fade-in slide-in-from-top-4 z-[200]">
+          <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-white/5">
+            <span className="text-[11px] font-black uppercase tracking-widest text-slate-900 dark:text-white">
+              New Message Requests
             </span>
             <button
               onClick={() => setShowRequests(false)}
-              className="p-1 transition-colors text-slate-300 hover:text-red-500"
+              className="transition-colors text-slate-400 hover:text-red-500"
             >
-              <X size={16} />
+              <X size={18} />
             </button>
           </div>
-          <div className="pr-1 space-y-3 overflow-y-auto max-h-60 custom-scrollbar">
+          <div className="space-y-3 overflow-y-auto max-h-60 custom-scrollbar">
             {chatRequests.length === 0 ? (
-              <p className="text-[9px] text-center font-black uppercase tracking-[0.2em] text-slate-300 py-6">
-                No signals detected
+              <p className="text-[10px] text-center font-bold text-slate-400 py-6">
+                No new requests
               </p>
             ) : (
               chatRequests.map((req) => (
                 <div
                   key={req.id}
-                  className="flex items-center justify-between p-3 transition-all border border-transparent bg-slate-50 dark:bg-white/5 rounded-2xl hover:border-blue-500/20"
+                  className="flex items-center justify-between p-4 transition-all border border-transparent bg-slate-50 dark:bg-white/5 rounded-2xl hover:border-blue-500/20"
                 >
-                  <div className="flex items-center gap-3 overflow-hidden">
-                    <div className="w-8 h-8 rounded-lg bg-blue-600 text-white flex-shrink-0 flex items-center justify-center text-[10px] font-black uppercase">
-                      {req.fromName[0]}
-                    </div>
-                    <span className="text-[10px] font-black text-slate-900 dark:text-white uppercase truncate">
-                      {req.fromName}
-                    </span>
-                  </div>
-                  <div className="flex gap-1.5 ml-2">
+                  <span className="text-xs font-black truncate text-slate-900 dark:text-white">
+                    {req.fromName}
+                  </span>
+                  <div className="flex gap-2">
                     <button
                       onClick={() => {
                         onAcceptRequest?.(req);
                         setShowRequests(false);
                       }}
-                      className="p-2 text-white transition-all rounded-lg shadow-md bg-emerald-500 hover:scale-110 active:scale-90"
+                      className="p-2 text-white transition-all rounded-lg shadow-md bg-emerald-500 hover:scale-105"
                     >
-                      <Check size={14} />
+                      <Check size={16} />
                     </button>
                     <button
-                      onClick={() => {
-                        // Filter out manually if needed
-                        setShowRequests(false);
-                      }}
-                      className="p-2 transition-colors rounded-lg bg-slate-200 dark:bg-slate-800 text-slate-400 hover:text-red-500"
+                      onClick={() => setShowRequests(false)}
+                      className="p-2 rounded-lg bg-slate-200 dark:bg-slate-700 text-slate-400"
                     >
-                      <X size={14} />
+                      <X size={16} />
                     </button>
                   </div>
                 </div>
@@ -269,144 +217,98 @@ const Navbar: React.FC<NavbarProps> = ({
         </div>
       )}
 
-      {/* Mobile Menu */}
+      {/* Mobile Menu - Simple Labels */}
       <div
         className={`fixed inset-0 z-[200] lg:hidden transition-all duration-500 ${
-          isMobileMenuOpen
-            ? "opacity-100 pointer-events-auto"
-            : "opacity-0 pointer-events-none"
+          isMobileMenuOpen ? "opacity-100" : "opacity-0 pointer-events-none"
         }`}
       >
         <div
-          className="absolute inset-0 bg-slate-950/80 backdrop-blur-md"
+          className="absolute inset-0 bg-slate-950/90 backdrop-blur-xl"
           onClick={() => setIsMobileMenuOpen(false)}
         />
         <div
-          className={`absolute right-0 top-0 bottom-0 w-[85%] max-w-sm bg-white dark:bg-slate-950 shadow-2xl transition-transform duration-500 p-6 flex flex-col gap-8 ${
+          className={`absolute right-0 top-0 bottom-0 w-[80%] bg-white dark:bg-slate-950 shadow-2xl transition-transform duration-500 p-8 flex flex-col gap-10 ${
             isMobileMenuOpen ? "translate-x-0" : "translate-x-full"
           }`}
         >
-          <div className="flex items-center justify-between pb-4 border-b border-slate-100 dark:border-white/5">
-            <div className="flex items-center gap-2">
-              <Shield size={20} className="text-blue-600" />
-              <span className="text-xl italic font-black tracking-tighter uppercase">
-                Terminal
-              </span>
-            </div>
+          <div className="flex items-center justify-between pb-4 border-b dark:border-white/5">
+            <span className="text-2xl italic font-black tracking-tighter uppercase dark:text-white">
+              Menu
+            </span>
             <button
               onClick={() => setIsMobileMenuOpen(false)}
-              className="p-2 rounded-full bg-slate-100 dark:bg-slate-800"
+              className="p-2 rounded-full bg-slate-100 dark:bg-slate-800 dark:text-white"
             >
-              <X size={20} />
+              <X size={24} />
             </button>
           </div>
 
-          <div className="flex flex-col gap-2 pr-2 overflow-y-auto custom-scrollbar">
+          <div className="flex flex-col gap-4">
             <MobileNavItem
-              icon={<TrendingUp size={18} />}
-              label="Wire Feed"
+              icon={<Newspaper size={20} />}
+              label="Home"
               active={currentPage === "home"}
               onClick={() => navTo("home")}
             />
             <MobileNavItem
-              icon={<Network size={18} />}
-              label="The Network"
+              icon={<Users size={20} />}
+              label="Reporters"
               active={currentPage === "network"}
               onClick={() => navTo("network")}
             />
             {isLoggedIn && (
               <MobileNavItem
-                icon={<FileText size={18} />}
-                label="File Dispatch"
+                icon={<PenSquare size={20} />}
+                label="Write News"
                 active={currentPage === "post"}
                 onClick={() => navTo("post")}
               />
             )}
             <MobileNavItem
-              icon={<User size={18} />}
-              label="My Identity"
+              icon={<User size={20} />}
+              label="My Profile"
               active={currentPage === "profile"}
               onClick={() => navTo("profile")}
             />
-
-            {/* Mobile App Download Link */}
             <MobileNavItem
-              icon={<Download size={18} className="text-blue-600" />}
-              label="Download App"
-              active={false}
-              onClick={() => {
-                notifyAppStatus();
-                setIsMobileMenuOpen(false);
-              }}
-            />
-
-            <MobileNavItem
-              icon={<Info size={18} />}
-              label="Support Node"
+              icon={<HelpCircle size={20} />}
+              label="Help & Support"
               active={currentPage === "support"}
               onClick={() => navTo("support")}
             />
-            {isLoggedIn && userRole === "admin" && (
-              <MobileNavItem
-                icon={<LayoutDashboard size={18} />}
-                label="Database Authority"
-                active={currentPage === "admin"}
-                onClick={() => navTo("admin")}
-              />
-            )}
           </div>
 
-          <div className="mt-auto space-y-4">
-            <div className="flex items-center gap-3 p-4 border bg-slate-50 dark:bg-slate-900 rounded-2xl border-slate-100 dark:border-white/5">
-              <Globe2 size={16} className="text-blue-600" />
-              <select
-                onChange={(e) => handleTranslate(e.target.value)}
-                className="bg-transparent border-none text-[10px] font-black uppercase tracking-widest w-full dark:text-white focus:ring-0"
-              >
-                <option value="en">English</option>
-                <option value="hi">हिन्दी</option>
-                <option value="es">Español</option>
-                <option value="bn">বাংলা</option>
-              </select>
-            </div>
-            {!isLoggedIn ? (
-              <button
-                onClick={() => {
-                  onLogin();
-                  setIsMobileMenuOpen(false);
-                }}
-                className="flex items-center justify-center w-full gap-3 py-4 font-black tracking-widest text-white uppercase bg-blue-600 shadow-xl rounded-2xl"
-              >
-                Establish Identity
-                <LogIn size={18} />
-              </button>
-            ) : (
-              <div className="flex items-center justify-between p-4 border bg-emerald-50 dark:bg-emerald-950/20 rounded-2xl border-emerald-100 dark:border-emerald-900/30">
-                <span className="text-[10px] font-black uppercase tracking-widest text-emerald-600">
-                  Active Node
-                </span>
-                <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              </div>
-            )}
-          </div>
+          {!isLoggedIn && (
+            <button
+              onClick={() => {
+                onLogin();
+                setIsMobileMenuOpen(false);
+              }}
+              className="w-full py-5 mt-auto font-black tracking-widest text-white uppercase bg-blue-600 shadow-2xl rounded-2xl"
+            >
+              Establish Account
+            </button>
+          )}
         </div>
       </div>
     </>
   );
 };
 
-const NavItem = ({ label, active, onClick }: any) => (
+const NavItem = ({ icon, label, active, onClick }: any) => (
   <button
     onClick={onClick}
-    className={`text-[11px] font-black uppercase tracking-[0.2em] transition-all relative py-1 ${
+    className={`flex items-center gap-2 text-[12px] font-black uppercase tracking-widest transition-all relative py-1 ${
       active
         ? "text-blue-600"
-        : "text-slate-400 hover:text-slate-900 dark:hover:text-white"
+        : "text-slate-500 hover:text-slate-900 dark:hover:text-white"
     }`}
   >
+    {icon}
     {label}
     {active && (
-      <span className="absolute -bottom-1 left-0 right-0 h-0.5 bg-blue-600 rounded-full" />
+      <span className="absolute left-0 right-0 h-1 bg-blue-600 rounded-full -bottom-2" />
     )}
   </button>
 );
@@ -414,14 +316,14 @@ const NavItem = ({ label, active, onClick }: any) => (
 const MobileNavItem = ({ icon, label, active, onClick }: any) => (
   <button
     onClick={onClick}
-    className={`flex items-center gap-4 p-4 rounded-2xl transition-all border ${
+    className={`flex items-center gap-5 p-5 rounded-[1.5rem] transition-all border ${
       active
-        ? "bg-blue-600 text-white border-blue-500 shadow-lg"
-        : "bg-slate-50 dark:bg-slate-900 text-slate-500 border-transparent hover:text-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800"
+        ? "bg-blue-600 text-white border-blue-500 shadow-xl"
+        : "bg-slate-50 dark:bg-slate-900 text-slate-600 dark:text-slate-400 border-transparent"
     }`}
   >
-    <div className="flex-shrink-0">{icon}</div>
-    <span className="text-[11px] font-black uppercase tracking-widest">
+    {icon}
+    <span className="text-sm font-black tracking-widest uppercase">
       {label}
     </span>
   </button>
