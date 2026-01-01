@@ -18,6 +18,9 @@ import {
   MapPin,
   ExternalLink,
   RefreshCw,
+  UserPlus,
+  LogOut,
+  Shield,
 } from "lucide-react";
 import { Article, Profile, LiveMessage } from "../../types";
 import { supabase } from "../../lib/supabase";
@@ -27,12 +30,16 @@ interface AdminPageProps {
   articles: Article[];
   users: Profile[];
   currentUserId: string;
+  onUpdateUsers?: () => void;
+  onLogout?: () => void;
 }
 
 const AdminPage: React.FC<AdminPageProps> = ({
   articles: initialArticles,
   users: initialUsers,
   currentUserId,
+  onUpdateUsers,
+  onLogout,
 }) => {
   const [activeTab, setActiveTab] = useState<
     "monitor" | "articles" | "users" | "intercept"
@@ -46,7 +53,6 @@ const AdminPage: React.FC<AdminPageProps> = ({
     []
   );
 
-  // Local state for immediate UI feedback after deletion
   const [localArticles, setLocalArticles] =
     useState<Article[]>(initialArticles);
   const [localUsers, setLocalUsers] = useState<Profile[]>(initialUsers);
@@ -95,6 +101,31 @@ const AdminPage: React.FC<AdminPageProps> = ({
     });
   };
 
+  const handleToggleAdmin = async (userId: string, currentRole: string) => {
+    if (userId === currentUserId) {
+      toast.error("Cannot modify own root permissions.");
+      return;
+    }
+
+    const newRole = currentRole === "admin" ? "user" : "admin";
+    const confirm = window.confirm(
+      `CHANGE CLEARANCE: Are you sure you want to set this node as ${newRole.toUpperCase()}?`
+    );
+    if (!confirm) return;
+
+    try {
+      const { error } = await supabase
+        .from("profiles")
+        .update({ role: newRole })
+        .eq("id", userId);
+      if (error) throw error;
+      toast.success(`Clearance Updated: ${newRole.toUpperCase()}`);
+      onUpdateUsers?.();
+    } catch (err: any) {
+      toast.error(err.message);
+    }
+  };
+
   const handleDeleteArticle = async (id: string) => {
     const confirm = window.confirm(
       "RECALL REPORT: Are you sure you want to permanently remove this intel from the network?"
@@ -122,7 +153,6 @@ const AdminPage: React.FC<AdminPageProps> = ({
     if (!confirm) return;
 
     try {
-      // First delete profile from DB
       const { error } = await supabase.from("profiles").delete().eq("id", id);
       if (error) throw error;
       setLocalUsers((prev) => prev.filter((u) => u.id !== id));
@@ -167,32 +197,40 @@ const AdminPage: React.FC<AdminPageProps> = ({
           </p>
         </div>
 
-        <div className="w-full px-4 pb-2 -mx-4 overflow-x-auto lg:w-auto scrollbar-hide lg:p-0 lg:overflow-visible">
-          <div className="flex gap-2 p-1.5 bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl min-w-max shadow-sm">
-            <TabButton
-              active={activeTab === "monitor"}
-              onClick={() => setActiveTab("monitor")}
-              label="System Pulse"
-              icon={<Activity size={14} />}
-            />
-            <TabButton
-              active={activeTab === "intercept"}
-              onClick={() => setActiveTab("intercept")}
-              label="Intercept"
-              icon={<Radio size={14} />}
-            />
-            <TabButton
-              active={activeTab === "articles"}
-              onClick={() => setActiveTab("articles")}
-              label="Intel Index"
-              icon={<FileText size={14} />}
-            />
-            <TabButton
-              active={activeTab === "users"}
-              onClick={() => setActiveTab("users")}
-              label="Node Registry"
-              icon={<Users size={14} />}
-            />
+        <div className="flex flex-col items-end gap-4">
+          <button
+            onClick={onLogout}
+            className="flex items-center gap-2 px-6 py-3 bg-red-600/10 text-red-600 border border-red-600/20 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-red-600 hover:text-white transition-all shadow-sm"
+          >
+            <LogOut size={16} /> Terminate Session
+          </button>
+          <div className="w-full px-4 pb-2 -mx-4 overflow-x-auto lg:w-auto scrollbar-hide lg:p-0 lg:overflow-visible">
+            <div className="flex gap-2 p-1.5 bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl min-w-max shadow-sm">
+              <TabButton
+                active={activeTab === "monitor"}
+                onClick={() => setActiveTab("monitor")}
+                label="System Pulse"
+                icon={<Activity size={14} />}
+              />
+              <TabButton
+                active={activeTab === "intercept"}
+                onClick={() => setActiveTab("intercept")}
+                label="Intercept"
+                icon={<Radio size={14} />}
+              />
+              <TabButton
+                active={activeTab === "articles"}
+                onClick={() => setActiveTab("articles")}
+                label="Intel Index"
+                icon={<FileText size={14} />}
+              />
+              <TabButton
+                active={activeTab === "users"}
+                onClick={() => setActiveTab("users")}
+                label="Node Registry"
+                icon={<Users size={14} />}
+              />
+            </div>
           </div>
         </div>
       </div>
@@ -244,9 +282,9 @@ const AdminPage: React.FC<AdminPageProps> = ({
                     <thead>
                       <tr className="bg-slate-50 dark:bg-slate-900 text-[10px] font-black uppercase tracking-widest text-slate-400 border-b border-slate-100 dark:border-slate-800">
                         <th className="px-8 py-5">Node Identity</th>
-                        <th className="px-8 py-5">Contact / Email</th>
+                        <th className="px-8 py-5">UID / Serial</th>
                         <th className="px-8 py-5">Gender</th>
-                        <th className="px-8 py-5">Standing</th>
+                        <th className="px-8 py-5">Clearance</th>
                         <th className="px-8 py-5 text-right">Protocol</th>
                       </tr>
                     </thead>
@@ -275,9 +313,18 @@ const AdminPage: React.FC<AdminPageProps> = ({
                             <p className="text-[11px] font-medium text-slate-600 dark:text-slate-400">
                               {user.serial_id}
                             </p>
-                            <p className="text-[10px] font-bold text-blue-600">
-                              {user.role.toUpperCase()}
-                            </p>
+                            <div className="flex items-center gap-1.5 pt-1">
+                              <div
+                                className={`w-1.5 h-1.5 rounded-full ${
+                                  user.is_online
+                                    ? "bg-emerald-500"
+                                    : "bg-slate-300"
+                                }`}
+                              />
+                              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                                {user.is_online ? "Active" : "Offline"}
+                              </span>
+                            </div>
                           </td>
                           <td className="px-8 py-5">
                             <span className="text-[10px] font-black uppercase px-3 py-1 bg-slate-100 dark:bg-slate-800 rounded-lg text-slate-500">
@@ -285,21 +332,43 @@ const AdminPage: React.FC<AdminPageProps> = ({
                             </span>
                           </td>
                           <td className="px-8 py-5">
-                            <div className="flex items-center gap-1.5">
-                              <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full" />
-                              <span className="text-[10px] font-black text-emerald-500 uppercase tracking-widest">
-                                Active
-                              </span>
-                            </div>
+                            <span
+                              className={`text-[10px] font-black uppercase px-3 py-1 rounded-lg ${
+                                user.role === "admin"
+                                  ? "bg-red-50 text-red-600 dark:bg-red-900/20"
+                                  : "bg-slate-50 text-slate-600 dark:bg-slate-800"
+                              }`}
+                            >
+                              {user.role}
+                            </span>
                           </td>
                           <td className="px-8 py-5 text-right">
-                            <button
-                              onClick={() => handleDeleteUser(user.id)}
-                              className="p-2.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-all"
-                              title="Terminate Node"
-                            >
-                              <Trash2 size={16} />
-                            </button>
+                            <div className="flex justify-end gap-2">
+                              <button
+                                onClick={() =>
+                                  handleToggleAdmin(user.id, user.role)
+                                }
+                                className={`p-2.5 rounded-xl transition-all ${
+                                  user.role === "admin"
+                                    ? "text-blue-600 bg-blue-50 dark:bg-blue-900/20"
+                                    : "text-slate-400 hover:text-blue-600"
+                                }`}
+                                title={
+                                  user.role === "admin"
+                                    ? "Revoke Admin Clearance"
+                                    : "Promote to Admin"
+                                }
+                              >
+                                <Shield size={16} />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteUser(user.id)}
+                                className="p-2.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-all"
+                                title="Terminate Node"
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       ))}
@@ -429,7 +498,6 @@ const AdminPage: React.FC<AdminPageProps> = ({
             </div>
 
             <div className="lg:col-span-7 bg-slate-950 rounded-[3rem] p-8 min-h-[500px] flex flex-col border border-white/10 shadow-2xl relative overflow-hidden">
-              {/* OLED Scanline Overlay */}
               <div className="absolute inset-0 pointer-events-none opacity-[0.03] bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,255,0.06))] bg-[length:100%_2px,3px_100%]" />
 
               <div className="flex items-center justify-between pb-8 mb-8 border-b border-white/10">

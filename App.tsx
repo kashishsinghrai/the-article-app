@@ -95,7 +95,6 @@ const App: React.FC = () => {
           setProfile(prof);
           setIsSettingUp(false);
         } else {
-          // If logged in but no profile exists in DB, trigger setup
           setIsSettingUp(true);
         }
       }
@@ -164,12 +163,12 @@ const App: React.FC = () => {
   );
 
   const handleLogout = async () => {
+    // SILENT LOGOUT: No alerts or toasts as per UX requirements
     await supabase.auth.signOut();
     setIsLoggedIn(false);
     setProfile(null);
     setCurrentPage("home");
     setIsSettingUp(false);
-    toast.success("Session Terminated.");
   };
 
   const handleNavigate = (page: string) => {
@@ -194,6 +193,10 @@ const App: React.FC = () => {
         toast.error("Profile synchronization failed.");
       }
     }
+  };
+
+  const handleUpdateUsers = () => {
+    fetchUsers();
   };
 
   if (isSettingUp) {
@@ -294,6 +297,8 @@ const App: React.FC = () => {
                 articles={articles}
                 users={users}
                 currentUserId={profile.id}
+                onUpdateUsers={handleUpdateUsers}
+                onLogout={handleLogout}
               />
             )}
             {currentPage === "profile" && (viewingProfile || profile) && (
