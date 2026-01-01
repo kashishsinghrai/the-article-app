@@ -1,17 +1,12 @@
-import React, { useState, useMemo } from "react";
+import React, { useMemo } from "react";
 import {
   ArrowRight,
   Globe,
-  Newspaper,
-  Zap,
   ShieldCheck,
   PenSquare,
   MessageSquare,
   Volume2,
-  Info,
-  Lock,
-  ChevronDown,
-  CheckCircle2,
+  Newspaper,
 } from "lucide-react";
 import { Article, Category, Profile } from "../types";
 import NewsTerminal from "../components/NewsTerminal";
@@ -26,6 +21,7 @@ interface HomePageProps {
   onViewProfile: (id: string) => void;
   onReadArticle?: (article: Article) => void;
   isArchive?: boolean;
+  // Fix: Added missing props passed from App.tsx to resolve TypeScript errors
   currentUserId?: string;
   allUsers?: Profile[];
   onChat?: (user: Profile) => void;
@@ -37,259 +33,164 @@ const HomePage: React.FC<HomePageProps> = ({
   onLogin,
   userRole,
   onDelete,
+  onEdit,
   onViewProfile,
   onReadArticle,
   isArchive = false,
   currentUserId,
+  allUsers,
+  onChat,
 }) => {
-  const [selectedCategory, setSelectedCategory] = useState<Category | "All">(
-    "All"
-  );
-
-  const filteredArticles = useMemo(() => {
-    if (selectedCategory === "All") return articles;
-    return articles.filter((a) => a.category === selectedCategory);
-  }, [articles, selectedCategory]);
-
   if (!isLoggedIn && !isArchive) {
     return (
-      <main className="flex flex-col bg-white dark:bg-slate-950">
-        {/* Minimal Hero Section */}
-        <section className="min-h-[80vh] flex flex-col items-center justify-center py-20 px-6 max-w-5xl mx-auto text-center animate-in fade-in duration-1000">
-          <div className="inline-flex items-center gap-2 mb-8 px-4 py-1.5 rounded-full border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900">
-            <Volume2 size={14} className="text-blue-600" />
-            <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">
-              The Global Voice Initiative
+      <main className="flex flex-col min-h-screen bg-white dark:bg-slate-950">
+        <section className="flex flex-col items-center max-w-5xl px-8 pt-40 pb-32 mx-auto space-y-12 text-center">
+          <div className="flex items-center gap-2 px-3 py-1 border rounded-full border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900">
+            <Volume2 size={12} className="text-slate-500" />
+            <span className="text-[9px] font-bold uppercase tracking-widest text-slate-400">
+              Decentralized Journalism Initiative
             </span>
           </div>
 
-          <h1 className="text-5xl md:text-8xl font-black text-slate-900 dark:text-white tracking-tighter mb-8 leading-[1.05]">
-            Where the youth <br /> finds its{" "}
-            <span className="text-blue-600">expression.</span>
+          <h1 className="text-6xl md:text-9xl font-bold text-slate-950 dark:text-white tracking-tight leading-[0.9]">
+            The platform <br /> for{" "}
+            <span className="text-blue-600">truth.</span>
           </h1>
 
-          <p className="max-w-2xl mx-auto mb-12 text-lg font-medium leading-relaxed text-slate-500 dark:text-slate-400 md:text-xl">
-            A minimalist space for publishing your perspective and connecting
-            with people worldwide through secure, private dialogue.
+          <p className="max-w-xl text-lg font-medium leading-relaxed text-slate-500 dark:text-slate-400 md:text-xl">
+            A high-end, minimal space where the youth publishes perspectives and
+            connects through private, secure dialogue.
           </p>
 
-          <div className="flex flex-col items-center w-full max-w-md gap-4 sm:flex-row">
+          <div className="flex w-full max-w-sm gap-4">
             <button
               onClick={onLogin}
-              className="flex items-center justify-center w-full gap-2 px-8 py-4 text-sm font-black tracking-widest text-white uppercase transition-all sm:flex-1 bg-slate-900 dark:bg-white dark:text-slate-950 rounded-xl hover:bg-blue-600 hover:text-white active:scale-95"
+              className="flex-1 py-4 text-sm font-bold tracking-widest text-white uppercase transition-all bg-slate-950 dark:bg-white dark:text-slate-950 rounded-xl hover:opacity-90"
             >
-              Get Started <ArrowRight size={18} />
+              Join Now
             </button>
-            <a
-              href="#how-it-works"
-              className="flex items-center justify-center w-full gap-2 px-8 py-4 text-sm font-black tracking-widest uppercase transition-all border sm:flex-1 rounded-xl border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-900"
+            <button
+              onClick={() =>
+                document
+                  .getElementById("about")
+                  ?.scrollIntoView({ behavior: "smooth" })
+              }
+              className="flex-1 py-4 text-sm font-bold tracking-widest uppercase transition-all border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-900"
             >
-              Learn More
-            </a>
+              Explore
+            </button>
           </div>
         </section>
 
-        {/* Informational Blocks */}
         <section
-          id="how-it-works"
-          className="w-full max-w-6xl px-6 py-32 mx-auto space-y-40"
+          id="about"
+          className="px-8 py-40 border-t border-slate-100 dark:border-slate-900 bg-slate-50/30 dark:bg-slate-950"
         >
-          {/* Use Case Grid */}
-          <div className="grid grid-cols-1 gap-12 md:grid-cols-3">
-            <InfoBlock
+          <div className="grid max-w-6xl grid-cols-1 gap-20 mx-auto md:grid-cols-3">
+            <Feature
               icon={<PenSquare size={24} />}
-              title="Voice Your Story"
-              desc="Publish articles that matter. From local updates to global perspectives, your voice is indexed and verified."
+              title="Voice"
+              desc="Publish verified articles. Your narrative, unfiltered and globally indexed."
             />
-            <InfoBlock
+            <Feature
               icon={<MessageSquare size={24} />}
-              title="Secure Talk"
-              desc="Connect with random members across the network. Full end-to-end encryption ensures your dialogue is yours alone."
+              title="Connect"
+              desc="Peer-to-peer secure talk with random correspondents across the network."
             />
-            <InfoBlock
+            <Feature
               icon={<ShieldCheck size={24} />}
-              title="Identity First"
-              desc="Your anonymity and security are our priority. We provide the tools; you provide the truth."
+              title="Secure"
+              desc="Encryption by default. Your identity and data are strictly your own."
             />
           </div>
-
-          {/* Mission Statement */}
-          <div className="bg-slate-50 dark:bg-slate-900 p-12 md:p-20 rounded-[3rem] flex flex-col items-center text-center space-y-8 border border-slate-100 dark:border-slate-800">
-            <div className="max-w-3xl space-y-6">
-              <h2 className="text-3xl font-black tracking-tighter uppercase md:text-5xl text-slate-900 dark:text-white">
-                Our motive is your empowerment.
-              </h2>
-              <p className="text-lg font-medium leading-relaxed text-slate-500 dark:text-slate-400">
-                The Articles was built to bridge the gap between information and
-                connection. In an age of noise, we provide the silence needed
-                for real conversations and the platform needed for real impact.
-              </p>
-            </div>
-            <div className="flex flex-wrap justify-center gap-8 pt-8">
-              <Step label="Join" />
-              <div className="self-center w-8 h-px bg-slate-200 dark:bg-slate-800" />
-              <Step label="Verify" />
-              <div className="self-center w-8 h-px bg-slate-200 dark:bg-slate-800" />
-              <Step label="Publish" />
-              <div className="self-center w-8 h-px bg-slate-200 dark:bg-slate-800" />
-              <Step label="Talk" />
-            </div>
-          </div>
-
-          <NewsTerminal />
         </section>
 
-        {/* Footer Promotion */}
-        <section className="py-32 text-center border-t border-slate-100 dark:border-slate-900 bg-slate-50/50 dark:bg-slate-900/20">
-          <h3 className="text-2xl font-black text-slate-400 uppercase tracking-[0.4em] mb-12">
-            Built for the next generation.
-          </h3>
-          <button
-            onClick={onLogin}
-            className="px-12 py-5 text-sm font-black tracking-widest text-white uppercase transition-all bg-blue-600 rounded-full shadow-xl hover:scale-105 shadow-blue-600/20"
-          >
-            Join the Network Now
-          </button>
+        <section className="px-8 py-40 border-t border-slate-100 dark:border-slate-900">
+          <div className="max-w-4xl mx-auto space-y-12 text-center">
+            <h2 className="text-4xl font-bold tracking-tighter md:text-6xl text-slate-950 dark:text-white">
+              Empowering the next generation of reporters.
+            </h2>
+            <p className="text-xl italic font-medium text-slate-500">
+              "Real impact starts with real conversation."
+            </p>
+            <button
+              onClick={onLogin}
+              className="px-12 py-5 text-sm font-bold tracking-widest text-white uppercase transition-all bg-blue-600 rounded-full hover:scale-105"
+            >
+              Establish Credentials
+            </button>
+          </div>
         </section>
       </main>
     );
   }
 
   return (
-    <main className="max-w-6xl px-6 py-12 mx-auto space-y-24 md:py-24">
-      <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-slate-200 dark:border-slate-800">
+    <main className="px-8 py-20 mx-auto space-y-32 max-w-7xl">
+      <div className="pt-10">
         <NewsTerminal />
       </div>
 
-      <div id="latest-stories">
-        <div className="flex flex-col items-start justify-between gap-8 pb-12 mb-16 border-b md:flex-row md:items-center border-slate-200 dark:border-slate-800">
-          <h2 className="text-4xl font-black tracking-tighter uppercase md:text-6xl text-slate-900 dark:text-white">
-            Latest Feed
+      <section className="space-y-16">
+        <div className="flex items-end justify-between pb-10 border-b border-slate-100 dark:border-slate-900">
+          <h2 className="text-5xl font-bold tracking-tighter dark:text-white">
+            Feed
           </h2>
-
-          <div className="flex flex-wrap gap-2 p-1.5 bg-slate-50 dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800">
-            <FilterTag
-              label="All"
-              active={selectedCategory === "All"}
-              onClick={() => setSelectedCategory("All")}
-            />
-            <FilterTag
-              label="Investigative"
-              active={selectedCategory === "Investigative"}
-              onClick={() => setSelectedCategory("Investigative")}
-            />
-            <FilterTag
-              label="Economic"
-              active={selectedCategory === "Economic"}
-              onClick={() => setSelectedCategory("Economic")}
-            />
+          <div className="flex gap-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+            <span className="underline cursor-pointer text-slate-900 dark:text-white underline-offset-8 decoration-2 decoration-blue-600">
+              Latest
+            </span>
+            <span className="cursor-pointer hover:text-slate-600">
+              Trending
+            </span>
           </div>
         </div>
 
-        {filteredArticles.length === 0 ? (
-          <div className="py-40 text-center opacity-40">
-            <Newspaper size={60} className="mx-auto mb-6 text-slate-300" />
-            <p className="text-xl font-bold tracking-widest uppercase text-slate-400">
-              Feed is currently silent.
-            </p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 gap-12 md:grid-cols-2">
-            {filteredArticles.map((article) => (
-              <div
-                key={article.id}
-                className="group cursor-pointer bg-white dark:bg-slate-900 p-6 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 hover:border-blue-600 transition-all flex flex-col"
-                onClick={() => onReadArticle?.(article)}
-              >
-                <div className="aspect-[16/9] overflow-hidden rounded-[1.5rem] mb-8 bg-slate-100 dark:bg-slate-800">
-                  <img
-                    src={article.image_url}
-                    className="object-cover w-full h-full transition-all duration-700 grayscale group-hover:grayscale-0 group-hover:scale-105"
-                    alt={article.title}
-                  />
-                </div>
-
-                <div className="flex flex-col flex-grow space-y-4">
-                  <div className="flex justify-between items-center text-[10px] font-bold uppercase tracking-widest text-slate-400">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onViewProfile(article.author_id);
-                      }}
-                      className="hover:text-blue-600"
-                    >
-                      {article.author_name}
-                    </button>
-                    <span>
-                      {new Date(article.created_at).toLocaleDateString()}
-                    </span>
-                  </div>
-
-                  <h3 className="text-2xl font-black leading-tight uppercase transition-colors text-slate-900 dark:text-white group-hover:text-blue-600">
-                    {article.title}
-                  </h3>
-
-                  <p className="text-base italic font-medium leading-relaxed text-slate-500 dark:text-slate-400 line-clamp-2">
-                    {article.content}
-                  </p>
-
-                  <div className="flex items-center justify-between pt-6 mt-auto border-t border-slate-100 dark:border-white/5">
-                    <span className="text-[10px] font-black text-blue-600 uppercase tracking-[0.2em] flex items-center gap-2">
-                      Read More <ArrowRight size={14} />
-                    </span>
-                  </div>
-                </div>
+        <div className="grid grid-cols-1 gap-16 md:grid-cols-2">
+          {articles.map((article) => (
+            <div
+              key={article.id}
+              className="space-y-6 cursor-pointer group"
+              onClick={() => onReadArticle?.(article)}
+            >
+              <div className="aspect-[16/10] overflow-hidden rounded-2xl bg-slate-100 dark:bg-slate-900 border border-slate-100 dark:border-slate-800">
+                <img
+                  src={article.image_url}
+                  className="object-cover w-full h-full transition-all duration-700 grayscale group-hover:grayscale-0 group-hover:scale-105"
+                />
               </div>
-            ))}
-          </div>
-        )}
-      </div>
+              <div className="space-y-3">
+                <div className="flex gap-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                  <span>{article.category}</span>
+                  <span>
+                    {new Date(article.created_at).toLocaleDateString()}
+                  </span>
+                </div>
+                <h3 className="text-3xl font-bold leading-tight transition-colors dark:text-white group-hover:text-blue-600">
+                  {article.title}
+                </h3>
+                <p className="italic text-slate-500 dark:text-slate-400 line-clamp-2">
+                  "{article.content}"
+                </p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
     </main>
   );
 };
 
-const InfoBlock = ({ icon, title, desc }: any) => (
-  <div className="p-2 space-y-6 text-left">
-    <div className="flex items-center justify-center w-12 h-12 text-blue-600 border rounded-xl bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800">
+const Feature = ({ icon, title, desc }: any) => (
+  <div className="space-y-6">
+    <div className="flex items-center justify-center w-12 h-12 bg-white border dark:bg-slate-900 border-slate-100 dark:border-slate-800 rounded-xl text-slate-900 dark:text-white">
       {icon}
     </div>
-    <h3 className="text-2xl font-black tracking-tighter uppercase text-slate-900 dark:text-white">
-      {title}
-    </h3>
-    <p className="font-medium leading-relaxed text-slate-500 dark:text-slate-400">
+    <h3 className="text-2xl font-bold dark:text-white">{title}</h3>
+    <p className="text-sm leading-relaxed text-slate-500 dark:text-slate-400">
       {desc}
     </p>
   </div>
-);
-
-const Step = ({ label }: any) => (
-  <div className="flex items-center gap-2">
-    <CheckCircle2 size={16} className="text-blue-600" />
-    <span className="text-[10px] font-black uppercase tracking-widest text-slate-900 dark:text-white">
-      {label}
-    </span>
-  </div>
-);
-
-const FilterTag = ({
-  label,
-  active = false,
-  onClick,
-}: {
-  label: string;
-  active?: boolean;
-  onClick: () => void;
-}) => (
-  <button
-    onClick={onClick}
-    className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
-      active
-        ? "bg-white dark:bg-slate-800 text-blue-600 shadow-sm border border-slate-100 dark:border-slate-700"
-        : "text-slate-400 hover:text-slate-600"
-    }`}
-  >
-    {label}
-  </button>
 );
 
 export default HomePage;

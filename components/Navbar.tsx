@@ -1,32 +1,20 @@
 import React, { useState } from "react";
-import {
-  Shield,
-  User,
-  Sun,
-  Moon,
-  MessageSquare,
-  X,
-  Menu,
-  Newspaper,
-  PenSquare,
-  Users,
-  HelpCircle,
-  LogIn,
-  ShieldAlert,
-} from "lucide-react";
+import { Shield, User, Sun, Moon, X, Menu } from "lucide-react";
 import { ChatRequest } from "../types";
 
 interface NavbarProps {
   onNavigate: (page: string) => void;
   onLogin: () => void;
-  onSearch: (query: string) => void;
+  // Fix: Added missing onSearch prop passed from App.tsx
+  onSearch?: (query: string) => void;
   currentPage: string;
   isLoggedIn: boolean;
   userRole: string;
   isDarkMode: boolean;
   onToggleDarkMode: () => void;
+  // Fix: Added missing chatRequests and onAcceptRequest props passed from App.tsx
   chatRequests?: ChatRequest[];
-  onAcceptRequest?: (req: ChatRequest) => void;
+  onAcceptRequest?: (req: ChatRequest) => Promise<void>;
 }
 
 const Navbar: React.FC<NavbarProps> = ({
@@ -38,7 +26,7 @@ const Navbar: React.FC<NavbarProps> = ({
   userRole,
   isDarkMode,
   onToggleDarkMode,
-  chatRequests = [],
+  chatRequests,
   onAcceptRequest,
 }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -50,21 +38,21 @@ const Navbar: React.FC<NavbarProps> = ({
 
   return (
     <>
-      <nav className="fixed top-0 left-0 right-0 z-[150] px-4 py-4 md:px-8 md:py-8 pointer-events-none">
-        <div className="flex items-center justify-between px-6 py-3 mx-auto transition-all border shadow-sm pointer-events-auto max-w-7xl bg-white/90 dark:bg-slate-950/90 backdrop-blur-xl border-slate-200 dark:border-slate-800 rounded-2xl">
+      <nav className="fixed top-0 left-0 right-0 z-[150] p-6 pointer-events-auto">
+        <div className="max-w-6xl mx-auto flex items-center justify-between pointer-events-auto bg-white/95 dark:bg-slate-950/95 backdrop-blur-xl border border-slate-100 dark:border-slate-800 px-8 py-3.5 rounded-2xl shadow-sm transition-all">
           <div
-            className="flex items-center gap-3 cursor-pointer group"
+            className="flex items-center gap-4 cursor-pointer"
             onClick={() => navTo("home")}
           >
-            <Shield size={20} className="text-slate-900 dark:text-white" />
-            <span className="text-sm italic font-black tracking-widest uppercase text-slate-900 dark:text-white">
-              The Articles
+            <Shield size={18} className="text-slate-950 dark:text-white" />
+            <span className="text-[11px] font-black uppercase tracking-[0.2em] dark:text-white italic">
+              ThE-ARTICLES
             </span>
           </div>
 
-          <div className="items-center hidden gap-10 lg:flex">
+          <div className="items-center hidden gap-12 lg:flex">
             <NavItem
-              label="Home"
+              label="Explore"
               active={currentPage === "home"}
               onClick={() => navTo("home")}
             />
@@ -87,17 +75,12 @@ const Navbar: React.FC<NavbarProps> = ({
                 onClick={() => navTo("admin")}
               />
             )}
-            <NavItem
-              label="Support"
-              active={currentPage === "support"}
-              onClick={() => navTo("support")}
-            />
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-6">
             <button
               onClick={onToggleDarkMode}
-              className="flex items-center justify-center transition-colors w-9 h-9 text-slate-400 hover:text-slate-900 dark:hover:text-white"
+              className="transition-colors text-slate-400 hover:text-slate-950 dark:hover:text-white"
             >
               {isDarkMode ? <Sun size={18} /> : <Moon size={18} />}
             </button>
@@ -105,9 +88,9 @@ const Navbar: React.FC<NavbarProps> = ({
             {isLoggedIn ? (
               <button
                 onClick={() => navTo("profile")}
-                className={`w-9 h-9 rounded-full flex items-center justify-center border transition-all ${
+                className={`w-10 h-10 rounded-full flex items-center justify-center border transition-all ${
                   currentPage === "profile"
-                    ? "bg-slate-900 dark:bg-white text-white dark:text-slate-900"
+                    ? "bg-slate-950 dark:bg-white text-white dark:text-slate-950"
                     : "border-slate-200 dark:border-slate-800 text-slate-400"
                 }`}
               >
@@ -116,37 +99,44 @@ const Navbar: React.FC<NavbarProps> = ({
             ) : (
               <button
                 onClick={onLogin}
-                className="hidden sm:block px-6 py-2 bg-slate-900 dark:bg-white text-white dark:text-slate-950 text-[10px] font-black uppercase tracking-widest rounded-lg hover:bg-blue-600 hover:text-white transition-all"
+                className="bg-slate-950 dark:bg-white text-white dark:text-slate-950 px-6 py-2.5 text-[10px] font-bold uppercase tracking-widest rounded-lg hover:opacity-80 transition-all"
               >
-                Join Network
+                Login
               </button>
             )}
 
             <button
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              className="flex items-center justify-center lg:hidden w-9 h-9 text-slate-900 dark:text-white"
+              className="lg:hidden text-slate-950 dark:text-white"
             >
-              {isMobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
+              <Menu size={22} />
             </button>
           </div>
         </div>
       </nav>
 
+      {/* Mobile Drawer */}
       <div
         className={`fixed inset-0 z-[200] lg:hidden transition-all duration-300 ${
           isMobileMenuOpen ? "opacity-100" : "opacity-0 pointer-events-none"
         }`}
       >
         <div
-          className="absolute inset-0 bg-slate-950/40 backdrop-blur-md"
+          className="absolute inset-0 bg-black/50 backdrop-blur-sm"
           onClick={() => setIsMobileMenuOpen(false)}
         />
         <div
-          className={`absolute right-0 top-0 bottom-0 w-[70%] bg-white dark:bg-slate-950 shadow-2xl transition-transform duration-300 p-8 flex flex-col gap-6 ${
+          className={`absolute right-0 top-0 bottom-0 w-[80%] bg-white dark:bg-slate-950 shadow-2xl transition-transform duration-300 p-12 space-y-12 ${
             isMobileMenuOpen ? "translate-x-0" : "translate-x-full"
           }`}
         >
-          <div className="flex flex-col gap-4 mt-12">
+          <div className="flex items-center justify-between">
+            <span className="text-xl font-bold dark:text-white">Menu</span>
+            <button onClick={() => setIsMobileMenuOpen(false)}>
+              <X size={24} className="dark:text-white" />
+            </button>
+          </div>
+          <div className="flex flex-col gap-6">
             <MobileNavItem
               label="Feed"
               active={currentPage === "home"}
@@ -186,10 +176,10 @@ const Navbar: React.FC<NavbarProps> = ({
 const NavItem = ({ label, active, onClick }: any) => (
   <button
     onClick={onClick}
-    className={`text-[10px] font-black uppercase tracking-widest transition-all relative py-1 ${
+    className={`text-[10px] font-bold uppercase tracking-widest transition-all relative py-1 ${
       active
-        ? "text-slate-900 dark:text-white underline underline-offset-8 decoration-2 decoration-blue-600"
-        : "text-slate-400 hover:text-slate-900 dark:hover:text-white"
+        ? "text-slate-950 dark:text-white border-b-2 border-blue-600"
+        : "text-slate-400 hover:text-slate-950 dark:hover:text-white"
     }`}
   >
     {label}
@@ -199,8 +189,8 @@ const NavItem = ({ label, active, onClick }: any) => (
 const MobileNavItem = ({ label, active, onClick }: any) => (
   <button
     onClick={onClick}
-    className={`text-left py-4 border-b border-slate-50 dark:border-slate-900 text-sm font-black uppercase tracking-widest ${
-      active ? "text-blue-600" : "text-slate-500"
+    className={`text-left text-2xl font-bold uppercase tracking-tighter ${
+      active ? "text-blue-600" : "text-slate-400 dark:text-slate-600"
     }`}
   >
     {label}

@@ -1,14 +1,5 @@
 import React, { useState } from "react";
-import {
-  ShieldCheck,
-  ArrowLeft,
-  Lock,
-  Key,
-  X,
-  Mail,
-  User,
-  ShieldAlert,
-} from "lucide-react";
+import { ShieldCheck, ArrowLeft, X } from "lucide-react";
 import { supabase } from "../../lib/supabase";
 import { toast } from "react-hot-toast";
 
@@ -31,20 +22,19 @@ const RegisterPage: React.FC<RegisterPageProps> = ({
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-
     const isAttemptingAdmin = email
       .toLowerCase()
       .endsWith("@the-articles.admin");
     const SYSTEM_ADMIN_SECRET = "ARTICLES_2025_ROOT_ACCESS";
 
     if (isAttemptingAdmin && masterKey !== SYSTEM_ADMIN_SECRET) {
-      toast.error("Incorrect Master Key. Admin registration denied.");
+      toast.error("Admin key mismatch.");
       setLoading(false);
       return;
     }
 
     try {
-      const { data, error } = await (supabase.auth as any).signUp({
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
@@ -56,114 +46,117 @@ const RegisterPage: React.FC<RegisterPageProps> = ({
           },
         },
       });
-
       if (error) toast.error(error.message);
-      else {
-        toast.success("Identity established. Redirecting...");
-        onSuccess(data.user);
-      }
+      else onSuccess(data.user);
     } catch (err: any) {
-      toast.error("Registration node unreachable. Try again later.");
+      toast.error("Registration failed.");
     } finally {
       setLoading(false);
     }
   };
 
+  const handleSocialLogin = async (provider: "google") => {
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider,
+        options: { redirectTo: window.location.origin },
+      });
+      if (error) throw error;
+    } catch (err: any) {
+      toast.error(`Failed to initiate Google registration.`);
+    }
+  };
+
   return (
-    <div className="fixed inset-0 z-[600] flex flex-col bg-slate-50 dark:bg-slate-950 animate-in fade-in duration-500 overflow-y-auto">
-      {/* Top Navigation */}
-      <div className="flex items-center justify-between w-full px-6 py-8 mx-auto max-w-7xl">
+    <div className="fixed inset-0 z-[600] flex flex-col bg-white dark:bg-slate-950 animate-in fade-in duration-300 overflow-y-auto">
+      <div className="flex items-center justify-between w-full max-w-5xl px-8 py-10 mx-auto">
         <button
           onClick={onBack}
-          className="flex items-center gap-2 text-xs font-bold tracking-widest uppercase transition-all group text-slate-500 hover:text-blue-600"
+          className="text-slate-400 hover:text-slate-900 dark:hover:text-white transition-all text-[11px] font-bold uppercase tracking-widest flex items-center gap-2"
         >
-          <ArrowLeft
-            size={18}
-            className="transition-transform group-hover:-translate-x-1"
-          />
-          Go Back
+          <ArrowLeft size={16} /> Exit
         </button>
         <div className="flex items-center gap-2">
-          <ShieldCheck className="text-blue-600" size={24} />
-          <span className="text-lg italic font-black tracking-tighter uppercase dark:text-white">
+          <ShieldCheck className="text-slate-900 dark:text-white" size={20} />
+          <span className="text-xs font-black tracking-[0.2em] uppercase dark:text-white">
             ThE-ARTICLES
           </span>
         </div>
-        <button
-          onClick={onBack}
-          className="p-2 transition-colors rounded-full bg-slate-200 dark:bg-slate-800 text-slate-400 hover:text-red-500"
-        >
-          <X size={20} />
-        </button>
+        <div className="w-10" />
       </div>
 
-      <div className="flex items-center justify-center flex-grow p-6">
-        <div className="w-full max-w-md space-y-8">
+      <div className="flex items-center justify-center flex-grow px-6 pb-20">
+        <div className="w-full max-w-[340px] space-y-12">
           <div className="space-y-3 text-center">
-            <h1 className="text-4xl italic font-black tracking-tighter uppercase md:text-5xl text-slate-900 dark:text-white">
-              Join the Network
+            <h1 className="text-4xl font-semibold tracking-tight text-slate-900 dark:text-white">
+              Create Identity
             </h1>
-            <p className="text-sm font-medium text-slate-500 dark:text-slate-400">
-              Establish your identity as a verified global correspondent.
-            </p>
+            <p className="text-sm text-slate-400">Join the global network.</p>
           </div>
 
-          <form onSubmit={handleRegister} className="space-y-6">
+          <div className="space-y-4">
+            <button
+              onClick={() => handleSocialLogin("google")}
+              className="flex items-center justify-center w-full gap-3 py-3 text-xs font-semibold transition-all border rounded-lg border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-900"
+            >
+              <img
+                src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/smartlock/google.svg"
+                className="w-4 h-4"
+              />
+              Sign up with Google
+            </button>
+          </div>
+
+          <div className="relative flex items-center justify-center">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-slate-100 dark:border-slate-900"></div>
+            </div>
+            <span className="relative px-4 bg-white dark:bg-slate-950 text-[10px] font-bold text-slate-300 uppercase tracking-widest">
+              or
+            </span>
+          </div>
+
+          <form onSubmit={handleRegister} className="space-y-5">
             <div className="space-y-2">
-              <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 dark:text-slate-600 px-1">
-                Email Address
+              <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                Email
               </label>
-              <div className="relative">
-                <Mail
-                  className="absolute -translate-y-1/2 left-4 top-1/2 text-slate-300"
-                  size={18}
-                />
-                <input
-                  required
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full py-4 pl-12 pr-6 text-sm font-bold transition-all bg-white border shadow-sm outline-none dark:bg-slate-900 border-slate-200 dark:border-slate-800 rounded-2xl text-slate-900 dark:text-white placeholder:text-slate-300 dark:placeholder:text-slate-700 focus:ring-2 focus:ring-blue-600"
-                  placeholder="your.email@agency.com"
-                />
-              </div>
+              <input
+                required
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full px-4 py-3 text-sm font-medium transition-all bg-transparent border rounded-lg outline-none border-slate-200 dark:border-slate-800 focus:ring-1 focus:ring-slate-400 dark:text-white"
+                placeholder="correspondent@network.org"
+              />
             </div>
 
             <div className="space-y-2">
-              <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 dark:text-slate-600 px-1">
-                Create Password
+              <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                Password
               </label>
-              <div className="relative">
-                <Lock
-                  className="absolute -translate-y-1/2 left-4 top-1/2 text-slate-300"
-                  size={18}
-                />
-                <input
-                  required
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full py-4 pl-12 pr-6 text-sm font-bold transition-all bg-white border shadow-sm outline-none dark:bg-slate-900 border-slate-200 dark:border-slate-800 rounded-2xl text-slate-900 dark:text-white placeholder:text-slate-300 dark:placeholder:text-slate-700 focus:ring-2 focus:ring-blue-600"
-                  placeholder="Minimum 6 characters"
-                />
-              </div>
+              <input
+                required
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full px-4 py-3 text-sm font-medium transition-all bg-transparent border rounded-lg outline-none border-slate-200 dark:border-slate-800 focus:ring-1 focus:ring-slate-400 dark:text-white"
+                placeholder="6+ characters"
+              />
             </div>
 
             {email.toLowerCase().endsWith("@the-articles.admin") && (
-              <div className="p-6 space-y-2 duration-300 border border-blue-100 animate-in slide-in-from-top-4 bg-blue-50 dark:bg-blue-900/10 rounded-3xl dark:border-blue-900/20">
-                <div className="flex items-center gap-2 mb-2">
-                  <ShieldAlert size={14} className="text-blue-600" />
-                  <label className="text-[10px] font-black uppercase tracking-[0.3em] text-blue-600">
-                    Master Key Verification
-                  </label>
-                </div>
+              <div className="p-4 space-y-2 border rounded-lg bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800">
+                <label className="text-[9px] font-black uppercase text-blue-600">
+                  Master Authorization Key
+                </label>
                 <input
                   required
                   type="password"
                   value={masterKey}
                   onChange={(e) => setMasterKey(e.target.value)}
-                  className="w-full p-4 text-sm font-bold bg-white border border-blue-100 outline-none dark:bg-slate-950 dark:border-blue-900/40 rounded-xl text-slate-900 dark:text-white"
-                  placeholder="System Passcode Required"
+                  className="w-full p-2 text-xs bg-white border rounded dark:bg-slate-950"
+                  placeholder="••••••••"
                 />
               </div>
             )}
@@ -171,31 +164,21 @@ const RegisterPage: React.FC<RegisterPageProps> = ({
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-4 bg-slate-900 dark:bg-white dark:text-slate-900 text-white rounded-full font-black uppercase tracking-widest hover:bg-blue-600 dark:hover:bg-blue-50 hover:text-white transition-all shadow-xl shadow-blue-600/10 flex items-center justify-center gap-3 disabled:opacity-50 active:scale-[0.98]"
+              className="w-full py-3.5 bg-slate-900 dark:bg-white text-white dark:text-slate-950 rounded-lg font-bold text-sm tracking-wide hover:opacity-90 transition-all disabled:opacity-50"
             >
-              {loading ? "Creating Identity..." : "Register Account"}
-              {!loading && <Key size={18} />}
+              {loading ? "Creating..." : "Register"}
             </button>
           </form>
 
-          <div className="pt-8 space-y-4 text-center">
-            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">
-              Already have an account?
-            </p>
+          <p className="text-xs text-center text-slate-400">
+            Already have an identity?{" "}
             <button
               onClick={onGoToLogin}
-              className="px-8 py-3 rounded-full border border-slate-200 dark:border-slate-800 text-[10px] font-black uppercase tracking-widest text-slate-900 dark:text-white hover:bg-slate-900 hover:text-white dark:hover:bg-white dark:hover:text-slate-900 transition-all"
+              className="font-bold text-slate-900 dark:text-white hover:underline"
             >
-              Login to Terminal
+              Sign In
             </button>
-          </div>
-
-          <div className="flex items-center justify-center gap-2 pt-10 opacity-30">
-            <ShieldCheck size={14} className="text-slate-400" />
-            <span className="text-[8px] font-black uppercase tracking-[0.4em] text-slate-400">
-              P2P Verified Registry
-            </span>
-          </div>
+          </p>
         </div>
       </div>
     </div>
