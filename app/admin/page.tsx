@@ -7,14 +7,22 @@ import {
   FileText,
   Users,
   Fingerprint,
+  TrendingUp,
+  ShieldCheck,
+  UserMinus,
+  UserPlus,
+  Coins,
 } from "lucide-react";
 import { Article, Profile } from "../../types";
+import { supabase } from "../../lib/supabase";
+import { toast } from "react-hot-toast";
 
 interface AdminPageProps {
   articles: Article[];
   users: Profile[];
   onDeleteArticle: (id: string) => void;
   onDeleteUser: (id: string) => void;
+  onRefreshData?: () => void;
 }
 
 const AdminPage: React.FC<AdminPageProps> = ({
@@ -22,9 +30,39 @@ const AdminPage: React.FC<AdminPageProps> = ({
   users,
   onDeleteArticle,
   onDeleteUser,
+  onRefreshData,
 }) => {
   const [activeTab, setActiveTab] = useState<"articles" | "users">("articles");
   const [searchTerm, setSearchTerm] = useState("");
+
+  const handleUpdateRole = async (userId: string, currentRole: string) => {
+    const newRole = currentRole === "admin" ? "user" : "admin";
+    const { error } = await supabase
+      .from("profiles")
+      .update({ role: newRole })
+      .eq("id", userId);
+    if (!error) {
+      toast.success(`Node upgraded to ${newRole}`);
+      onRefreshData?.();
+    } else {
+      toast.error("Privilege update failed");
+    }
+  };
+
+  const handleAdjustBudget = async (
+    userId: string,
+    currentBudget: number,
+    amount: number
+  ) => {
+    const { error } = await supabase
+      .from("profiles")
+      .update({ budget: currentBudget + amount })
+      .eq("id", userId);
+    if (!error) {
+      toast.success("Reputation Adjusted");
+      onRefreshData?.();
+    }
+  };
 
   const filteredArticles = articles.filter(
     (a) =>
@@ -52,12 +90,12 @@ const AdminPage: React.FC<AdminPageProps> = ({
               <div className="flex items-center gap-3 text-red-500">
                 <AlertCircle size={20} />
                 <span className="text-[9px] md:text-[11px] font-black uppercase tracking-[0.4em] italic">
-                  Authority Terminal
+                  Authority Command Center
                 </span>
               </div>
-              <h1 className="text-4xl md:text-7xl font-black tracking-tighter uppercase italic leading-none">
-                Database <br />
-                Management
+              <h1 className="text-4xl md:text-7xl font-black tracking-tighter uppercase italic leading-none transition-all">
+                Network <br />
+                Database
               </h1>
             </div>
 
@@ -66,14 +104,14 @@ const AdminPage: React.FC<AdminPageProps> = ({
                 active={activeTab === "articles"}
                 onClick={() => setActiveTab("articles")}
                 icon={<FileText size={14} />}
-                label="Reports"
+                label="Intel Reports"
                 count={articles.length}
               />
               <TabButton
                 active={activeTab === "users"}
                 onClick={() => setActiveTab("users")}
                 icon={<Users size={14} />}
-                label="Correspondents"
+                label="Node Manifest"
                 count={users.length}
               />
             </div>
@@ -85,9 +123,9 @@ const AdminPage: React.FC<AdminPageProps> = ({
               <input
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="bg-transparent border-none focus:ring-0 w-full text-xs md:text-sm font-medium"
-                placeholder={`Search ${
-                  activeTab === "articles" ? "Reports" : "Correspondents"
+                className="bg-transparent border-none focus:ring-0 w-full text-xs md:text-sm font-medium outline-none"
+                placeholder={`Locate ${
+                  activeTab === "articles" ? "Reports" : "Nodes"
                 }...`}
               />
             </div>
@@ -96,8 +134,8 @@ const AdminPage: React.FC<AdminPageProps> = ({
               {activeTab === "articles" ? (
                 filteredArticles.length === 0 ? (
                   <div className="text-center py-20 opacity-20">
-                    <p className="text-2xl md:text-4xl font-black italic uppercase">
-                      No Records Match Query
+                    <p className="text-2xl md:text-4xl font-black italic uppercase tracking-tighter">
+                      No Records Detected
                     </p>
                   </div>
                 ) : (
@@ -116,58 +154,90 @@ const AdminPage: React.FC<AdminPageProps> = ({
                             {article.title}
                           </h4>
                           <p className="text-[8px] md:text-[10px] font-black uppercase tracking-widest text-slate-500 truncate">
-                            Source: {article.author_name} • ID:{" "}
+                            Source: {article.author_name} •{" "}
                             {article.author_serial}
                           </p>
                         </div>
                       </div>
                       <button
                         onClick={() => onDeleteArticle(article.id)}
-                        className="w-full md:w-auto flex items-center justify-center gap-2 px-6 md:px-8 py-2 md:py-3 bg-red-600/20 text-red-400 rounded-xl text-[9px] md:text-[10px] font-black uppercase tracking-widest hover:bg-red-600 hover:text-white transition-all whitespace-nowrap"
+                        className="w-full md:w-auto flex items-center justify-center gap-2 px-6 md:px-8 py-3 bg-red-600/10 text-red-400 rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-red-600 hover:text-white transition-all whitespace-nowrap"
                       >
-                        <Trash2 size={14} /> Purge Record
+                        <Trash2 size={14} /> Purge Intel
                       </button>
                     </div>
                   ))
                 )
               ) : filteredUsers.length === 0 ? (
                 <div className="text-center py-20 opacity-20">
-                  <p className="text-2xl md:text-4xl font-black italic uppercase">
-                    No Identities Found
+                  <p className="text-2xl md:text-4xl font-black italic uppercase tracking-tighter">
+                    No Identity Nodes Found
                   </p>
                 </div>
               ) : (
                 filteredUsers.map((user) => (
                   <div
                     key={user.id}
-                    className="flex flex-col md:flex-row justify-between items-center p-4 md:p-6 bg-white/5 rounded-2xl md:rounded-3xl border border-white/5 hover:border-red-500 transition-all group gap-4"
+                    className="flex flex-col space-y-4 p-4 md:p-6 bg-white/5 rounded-2xl md:rounded-3xl border border-white/5 group"
                   >
-                    <div className="flex gap-4 md:gap-6 items-center w-full">
-                      <div className="w-12 h-12 md:w-16 md:h-16 rounded-xl md:rounded-2xl bg-white/10 flex items-center justify-center text-blue-400 flex-shrink-0">
-                        <Fingerprint size={28} />
+                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                      <div className="flex gap-4 md:gap-6 items-center w-full">
+                        <div className="w-12 h-12 md:w-16 md:h-16 rounded-xl md:rounded-2xl bg-white/10 flex items-center justify-center text-blue-400 flex-shrink-0">
+                          <Fingerprint size={28} />
+                        </div>
+                        <div className="truncate flex-grow">
+                          <div className="flex items-center gap-2">
+                            <h4 className="text-sm md:text-lg font-bold uppercase italic tracking-tight truncate">
+                              {user.full_name}
+                            </h4>
+                            {user.role === "admin" && (
+                              <ShieldCheck
+                                size={14}
+                                className="text-blue-500"
+                              />
+                            )}
+                          </div>
+                          <p className="text-[8px] md:text-[10px] font-black uppercase tracking-widest text-slate-500 truncate">
+                            Serial: {user.serial_id} • Reputation: {user.budget}
+                          </p>
+                        </div>
                       </div>
-                      <div className="truncate flex-grow">
-                        <h4 className="text-sm md:text-lg font-bold uppercase italic tracking-tight truncate">
-                          {user.full_name}
-                        </h4>
-                        <p className="text-[8px] md:text-[10px] font-black uppercase tracking-widest text-slate-500 truncate">
-                          Serial: {user.serial_id} • Budget: ${user.budget}
-                        </p>
+
+                      <div className="flex flex-wrap gap-2 w-full md:w-auto">
+                        <button
+                          onClick={() =>
+                            handleAdjustBudget(user.id, user.budget, 100)
+                          }
+                          className="px-4 py-2 bg-emerald-600/20 text-emerald-400 rounded-lg text-[8px] font-black uppercase tracking-widest hover:bg-emerald-600 hover:text-white transition-all flex items-center gap-2"
+                        >
+                          <Coins size={12} /> Reward
+                        </button>
+                        <button
+                          onClick={() => handleUpdateRole(user.id, user.role)}
+                          className={`px-4 py-2 rounded-lg text-[8px] font-black uppercase tracking-widest transition-all flex items-center gap-2 ${
+                            user.role === "admin"
+                              ? "bg-amber-600/20 text-amber-400 hover:bg-amber-600"
+                              : "bg-blue-600/20 text-blue-400 hover:bg-blue-600"
+                          } hover:text-white`}
+                        >
+                          {user.role === "admin" ? (
+                            <>
+                              <UserMinus size={12} /> Demote
+                            </>
+                          ) : (
+                            <>
+                              <UserPlus size={12} /> Promote
+                            </>
+                          )}
+                        </button>
+                        <button
+                          disabled={user.role === "admin"}
+                          onClick={() => onDeleteUser(user.id)}
+                          className="px-4 py-2 bg-red-600/20 text-red-400 rounded-lg text-[8px] font-black uppercase tracking-widest hover:bg-red-600 hover:text-white transition-all disabled:opacity-30 flex items-center gap-2"
+                        >
+                          <Trash2 size={12} /> Purge
+                        </button>
                       </div>
-                    </div>
-                    <div className="flex flex-col xs:flex-row gap-2 w-full md:w-auto">
-                      {user.role === "admin" && (
-                        <span className="px-4 py-2 bg-blue-600/20 text-blue-400 rounded-xl text-[8px] font-black uppercase tracking-widest flex items-center justify-center">
-                          Admin Node
-                        </span>
-                      )}
-                      <button
-                        disabled={user.role === "admin"}
-                        onClick={() => onDeleteUser(user.id)}
-                        className="flex items-center justify-center gap-2 px-6 md:px-8 py-2 md:py-3 bg-red-600/20 text-red-400 rounded-xl text-[9px] md:text-[10px] font-black uppercase tracking-widest hover:bg-red-600 hover:text-white transition-all disabled:opacity-30 disabled:hover:bg-red-600/20 disabled:hover:text-red-400 whitespace-nowrap"
-                      >
-                        <Trash2 size={14} /> Purge Identity
-                      </button>
                     </div>
                   </div>
                 ))

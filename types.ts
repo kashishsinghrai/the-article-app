@@ -2,6 +2,14 @@
 export type Role = 'user' | 'admin';
 export type Category = 'Investigative' | 'Economic' | 'Regional';
 
+export interface UserSettings {
+  notifications_enabled: boolean;
+  presence_visible: boolean;
+  data_sharing: boolean;
+  ai_briefings: boolean;
+  secure_mode: boolean;
+}
+
 export interface Profile {
   id: string;
   username: string;
@@ -13,7 +21,9 @@ export interface Profile {
   is_private: boolean;
   bio: string;
   following?: string[];
-  is_online?: boolean; // New presence field
+  is_online?: boolean; 
+  last_seen?: string;
+  settings?: UserSettings; // New nested settings
 }
 
 export interface ChatRequest {
@@ -27,7 +37,7 @@ export interface ChatRequest {
 export interface LiveMessage {
   id: string;
   senderId: string;
-  senderName?: string; // Added senderName to match broadcast payload
+  senderName?: string; 
   text: string;
   timestamp: number;
 }
@@ -43,11 +53,4 @@ export interface Article {
   author_serial: string;
   created_at: string;
   is_private?: boolean;
-}
-
-export interface SupportTicket {
-  user_email: string;
-  subject: string;
-  message: string;
-  status: 'open' | 'resolved';
 }
