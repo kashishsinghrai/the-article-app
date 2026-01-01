@@ -428,17 +428,19 @@ const App: React.FC = () => {
                 return;
               }
 
-              // Construct clean payload to avoid 400 errors
+              // Construct strictly typed payload to prevent 400 Bad Request errors
               const payload = {
-                title: data.title,
-                content: data.content,
-                category: data.category,
-                image_url: data.image_url,
-                is_private: data.is_private ?? false,
+                title: String(data.title || "").trim(),
+                content: String(data.content || "").trim(),
+                category: String(data.category || "Investigative"),
+                image_url: String(data.image_url || ""),
+                is_private: Boolean(data.is_private),
                 author_id: profile.id,
-                author_name: profile.full_name,
-                author_serial: profile.serial_id,
+                author_name: String(profile.full_name || ""),
+                author_serial: String(profile.serial_id || ""),
               };
+
+              console.log("Transmission Payload:", payload);
 
               const { error } = await supabase.from("articles").insert(payload);
 
@@ -447,16 +449,21 @@ const App: React.FC = () => {
                 fetchArticles();
                 handleNavigate("home");
               } else {
-                console.error("Publish Error:", error);
-                // Provide specific error message for 400/RLS issues
+                console.error("Transmission Error Object:", error);
+
+                // Dynamic Error Handling
                 if (error.code === "42501") {
                   toast.error(
-                    "Permission Denied: Run SQL policies in Supabase Dashboard."
+                    "Access Denied: Run SQL policies in Supabase SQL Editor."
+                  );
+                } else if (error.code === "23502") {
+                  toast.error("Sync Error: Missing required database column.");
+                } else if (error.code === "42P01") {
+                  toast.error(
+                    "Sync Error: 'articles' table not found in database."
                   );
                 } else {
-                  toast.error(
-                    `Transmission Error [${error.code}]: ${error.message}`
-                  );
+                  toast.error(`Sync Error [${error.code}]: ${error.message}`);
                 }
               }
             }}
