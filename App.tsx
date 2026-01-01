@@ -18,6 +18,7 @@ import SupportPage from "./app/support/page";
 import NetworkPage from "./app/network/page";
 import LoginPage from "./app/auth/login";
 import RegisterPage from "./app/auth/register";
+import SetupProfilePage from "./app/setup-profile/page";
 import {
   Profile,
   Article,
@@ -32,6 +33,7 @@ const App: React.FC = () => {
   const [currentPage, setCurrentPage] = useState("home");
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [showAuth, setShowAuth] = useState<"login" | "register" | null>(null);
+  const [isSettingUp, setIsSettingUp] = useState(false);
   const [viewingProfile, setViewingProfile] = useState<Profile | null>(null);
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [activeArticle, setActiveArticle] = useState<Article | null>(null);
@@ -47,11 +49,6 @@ const App: React.FC = () => {
   const [users, setUsers] = useState<Profile[]>([]);
 
   const initializationInProgress = useRef(false);
-  const activeChatIdRef = useRef<string | null>(null);
-
-  useEffect(() => {
-    activeChatIdRef.current = activeChat?.id || null;
-  }, [activeChat]);
 
   const fetchArticles = useCallback(async () => {
     try {
@@ -96,6 +93,10 @@ const App: React.FC = () => {
 
         if (prof) {
           setProfile(prof);
+          setIsSettingUp(false);
+        } else {
+          // If logged in but no profile exists in DB, trigger setup
+          setIsSettingUp(true);
         }
       }
     } catch (e: any) {
@@ -121,21 +122,7 @@ const App: React.FC = () => {
         setChatRequests((prev) =>
           prev.some((r) => r.fromId === req.fromId) ? prev : [...prev, req]
         );
-        toast(`New Link Request from ${req.fromName}`, {
-          icon: "💬",
-          style: {
-            borderRadius: "20px",
-            background: isDarkMode ? "#1e293b" : "#ffffff",
-            color: isDarkMode ? "#ffffff" : "#0f172a",
-            fontSize: "11px",
-            fontWeight: "900",
-            textTransform: "uppercase",
-            letterSpacing: "0.05em",
-            padding: "16px 24px",
-            border: "1px solid rgba(37, 99, 235, 0.2)",
-            boxShadow: "0 20px 40px rgba(0,0,0,0.1)",
-          },
-        });
+        toast(`New Link Request from ${req.fromName}`, { icon: "💬" });
       })
       .on("broadcast", { event: "handshake_accepted" }, async (p) => {
         const { acceptorId, acceptorName } = p.payload;
@@ -145,50 +132,15 @@ const App: React.FC = () => {
           setChatMessages([]);
           toast.success(`Secure link connected with ${acceptorName}`, {
             icon: "⚡",
-            style: {
-              borderRadius: "20px",
-              fontSize: "11px",
-              fontWeight: "900",
-              textTransform: "uppercase",
-            },
           });
         }
       })
       .subscribe();
 
-    if (profile.role === "admin") {
-      const adminMonitor = supabase.channel("admin_oversight");
-      adminMonitor
-        .on("broadcast", { event: "intercept_pulse" }, (p) => {
-          setAdminIntercepts((prev) => {
-            const exists = prev.some((i) => i.room === p.payload.room);
-            if (exists) return prev;
-
-            toast(
-              `Live Node Pulse Detected: ${p.payload.node1} <-> ${p.payload.node2}`,
-              {
-                icon: "👁️",
-                duration: 4000,
-                style: {
-                  background: "#000",
-                  color: "#fff",
-                  border: "1px solid #dc2626",
-                  fontSize: "10px",
-                  fontWeight: "bold",
-                  borderRadius: "15px",
-                },
-              }
-            );
-            return [...prev, p.payload];
-          });
-        })
-        .subscribe();
-    }
-
     return () => {
       supabase.removeChannel(inboxChannel);
     };
-  }, [profile?.id, profile?.role, users, isDarkMode]);
+  }, [profile?.id, users]);
 
   const handleSendMessage = useCallback(
     (text: string) => {
@@ -207,68 +159,17 @@ const App: React.FC = () => {
       supabase
         .channel(roomName)
         .send({ type: "broadcast", event: "message", payload: message });
-
-      supabase.channel("admin_oversight").send({
-        type: "broadcast",
-        event: "intercept_pulse",
-        payload: {
-          node1: profile.full_name,
-          node2: activeChat.full_name,
-          room: roomName,
-          message: text,
-        },
-      });
     },
     [profile, activeChat]
   );
-
-  const handleAcceptHandshake = async (req: ChatRequest) => {
-    if (!profile) return;
-    let sender = users.find((u) => u.id === req.fromId);
-    if (!sender) {
-      const { data } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", req.fromId)
-        .maybeSingle();
-      if (data) sender = data;
-    }
-
-    if (sender) {
-      setActiveChat(sender);
-      setChatRequests((prev) => prev.filter((r) => r.id !== req.id));
-      setChatMessages([]);
-
-      const confirmationChannel = supabase.channel(`inbox_${req.fromId}`);
-      confirmationChannel.subscribe((status) => {
-        if (status === "SUBSCRIBED") {
-          confirmationChannel.send({
-            type: "broadcast",
-            event: "handshake_accepted",
-            payload: {
-              acceptorId: profile.id,
-              acceptorName: profile.full_name,
-            },
-          });
-        }
-      });
-      toast.success(`Handshake Complete: ${sender.full_name}`, {
-        style: {
-          borderRadius: "20px",
-          fontSize: "11px",
-          fontWeight: "900",
-          textTransform: "uppercase",
-        },
-      });
-    }
-  };
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
     setIsLoggedIn(false);
     setProfile(null);
     setCurrentPage("home");
-    toast.success("Session Terminated Safely.");
+    setIsSettingUp(false);
+    toast.success("Session Terminated.");
   };
 
   const handleNavigate = (page: string) => {
@@ -277,21 +178,44 @@ const App: React.FC = () => {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
+  const handleProfileSetupComplete = async (profileData: Profile) => {
+    const {
+      data: { session },
+    } = await (supabase.auth as any).getSession();
+    if (session?.user) {
+      const finalProfile = { ...profileData, id: session.user.id };
+      const { error } = await supabase.from("profiles").upsert(finalProfile);
+      if (!error) {
+        setProfile(finalProfile);
+        setIsSettingUp(false);
+        handleNavigate("home");
+        toast.success("Identity established. Welcome to the network.");
+      } else {
+        toast.error("Profile synchronization failed.");
+      }
+    }
+  };
+
+  if (isSettingUp) {
+    return (
+      <div
+        className={`min-h-screen ${
+          isDarkMode ? "dark bg-slate-950" : "bg-slate-50"
+        }`}
+      >
+        <Toaster position="bottom-center" />
+        <SetupProfilePage onComplete={handleProfileSetupComplete} />
+      </div>
+    );
+  }
+
   return (
     <div
       className={`min-h-screen ${
         isDarkMode ? "dark bg-slate-950" : "bg-slate-50"
       } transition-colors duration-500`}
     >
-      <Toaster
-        position="bottom-center"
-        toastOptions={{
-          className: "notranslate",
-          style: {
-            marginBottom: "24px",
-          },
-        }}
-      />
+      <Toaster position="bottom-center" />
       {showAuth === "login" && (
         <LoginPage
           onBack={() => setShowAuth(null)}
@@ -327,8 +251,7 @@ const App: React.FC = () => {
             isDarkMode={isDarkMode}
             onToggleDarkMode={() => setIsDarkMode(!isDarkMode)}
             chatRequests={chatRequests}
-            onAcceptRequest={handleAcceptHandshake}
-            adminIntercepts={adminIntercepts}
+            onAcceptRequest={async (req) => {}}
           />
 
           <div className="pt-24">
