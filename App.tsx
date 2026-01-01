@@ -171,7 +171,6 @@ const App: React.FC = () => {
         );
       })
       .on("broadcast", { event: "handshake_accepted" }, async (p) => {
-        // This is triggered when SOMEONE ELSE accepts your request
         const { acceptorId, acceptorName } = p.payload;
         const acceptorProfile = users.find((u) => u.id === acceptorId);
 
@@ -182,7 +181,6 @@ const App: React.FC = () => {
             icon: "⚡",
           });
         } else {
-          // Fetch profile if not in cache
           const { data } = await supabase
             .from("profiles")
             .select("*")
@@ -233,7 +231,6 @@ const App: React.FC = () => {
         .channel(roomName)
         .send({ type: "broadcast", event: "message", payload: message });
 
-      // Also notify active status
       supabase.channel(`notify_${activeChat.id}`).subscribe((status) => {
         if (status === "SUBSCRIBED") {
           supabase
@@ -285,13 +282,11 @@ const App: React.FC = () => {
     }
 
     if (sender) {
-      // 1. Open chat for local user
       setActiveChat(sender);
       setChatRequests((prev) => prev.filter((r) => r.id !== req.id));
       setChatMessages([]);
       toast.success(`Secure link established with ${sender.full_name}`);
 
-      // 2. Broadcast acceptance to the sender's inbox channel
       const senderInbox = supabase.channel(`inbox_${req.fromId}`);
       senderInbox.subscribe((status) => {
         if (status === "SUBSCRIBED") {
@@ -329,17 +324,32 @@ const App: React.FC = () => {
   const deleteArticle = async (id: string) => {
     const { error } = await supabase.from("articles").delete().eq("id", id);
     if (!error) {
-      fetchArticles();
+      setArticles((prev) => prev.filter((a) => a.id !== id));
       toast.success("Intel Expunged");
-    } else toast.error("Purge failed");
+    } else {
+      console.error("Delete Error:", error);
+      toast.error(`Purge failed: ${error.message}`);
+    }
   };
 
   const deleteUser = async (id: string) => {
+    // NOTE: Deleting from 'profiles' only works if RLS policy allows it.
+    // Also, you may need to delete their articles first if there are foreign key constraints.
     const { error } = await supabase.from("profiles").delete().eq("id", id);
+
     if (!error) {
+      setUsers((prev) => prev.filter((u) => u.id !== id));
+      toast.success("Node Terminated from Registry");
+      // Re-fetch users to be absolutely sure
       fetchUsers();
-      toast.success("Node Terminated");
-    } else toast.error("Expulsion failed");
+    } else {
+      console.error("Delete Node Error:", error);
+      if (error.code === "42501") {
+        toast.error("Permission Denied: Check Supabase RLS Policies.");
+      } else {
+        toast.error(`Expulsion failed: ${error.message}`);
+      }
+    }
   };
 
   if (needsOnboarding) {

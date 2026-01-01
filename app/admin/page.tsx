@@ -72,23 +72,25 @@ const AdminPage: React.FC<AdminPageProps> = ({
     setProcessingId(null);
   };
 
-  const confirmPurgeArticle = (id: string) => {
+  const confirmPurgeArticle = async (id: string) => {
     if (
       window.confirm("CRITICAL: Purge this intelligence record permanently?")
     ) {
-      onDeleteArticle(id);
-      toast.success("Record expunged from ledger");
+      setProcessingId(id);
+      await onDeleteArticle(id);
+      setProcessingId(null);
     }
   };
 
-  const confirmPurgeUser = (id: string) => {
+  const confirmPurgeUser = async (id: string) => {
     if (
       window.confirm(
-        "CRITICAL: Expel this node from the network? All credentials will be revoked."
+        "CRITICAL: Expel this node from the network? This requires RLS permissions."
       )
     ) {
-      onDeleteUser(id);
-      toast.success("Node identity terminated");
+      setProcessingId(id);
+      await onDeleteUser(id);
+      setProcessingId(null);
     }
   };
 
@@ -189,10 +191,16 @@ const AdminPage: React.FC<AdminPageProps> = ({
                         </div>
                       </div>
                       <button
+                        disabled={processingId === article.id}
                         onClick={() => confirmPurgeArticle(article.id)}
                         className="w-full md:w-auto flex items-center justify-center gap-2 px-6 md:px-8 py-3 bg-red-600/10 text-red-400 rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-red-600 hover:text-white transition-all whitespace-nowrap"
                       >
-                        <Trash2 size={14} /> Purge Intel
+                        {processingId === article.id ? (
+                          <Loader2 className="animate-spin" size={14} />
+                        ) : (
+                          <Trash2 size={14} />
+                        )}
+                        Purge Intel
                       </button>
                     </div>
                   ))
@@ -239,6 +247,7 @@ const AdminPage: React.FC<AdminPageProps> = ({
 
                       <div className="flex flex-wrap w-full gap-2 md:w-auto">
                         <button
+                          disabled={processingId === user.id}
                           onClick={() =>
                             handleAdjustBudget(user.id, user.budget, 100)
                           }
@@ -247,6 +256,7 @@ const AdminPage: React.FC<AdminPageProps> = ({
                           <Coins size={12} /> Reward
                         </button>
                         <button
+                          disabled={processingId === user.id}
                           onClick={() => handleUpdateRole(user.id, user.role)}
                           className={`flex-1 md:flex-none px-4 py-2 rounded-lg text-[8px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${
                             user.role === "admin"
@@ -265,11 +275,18 @@ const AdminPage: React.FC<AdminPageProps> = ({
                           )}
                         </button>
                         <button
-                          disabled={user.role === "admin"}
+                          disabled={
+                            user.role === "admin" || processingId === user.id
+                          }
                           onClick={() => confirmPurgeUser(user.id)}
-                          className="flex-1 md:flex-none px-4 py-2 bg-red-600/20 text-red-400 rounded-lg text-[8px] font-black uppercase tracking-widest hover:bg-red-600 hover:text-white transition-all disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                          className="flex-1 md:flex-none px-4 py-2 bg-red-600/10 text-red-400 rounded-lg text-[8px] font-black uppercase tracking-widest hover:bg-red-600 hover:text-white transition-all disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                         >
-                          <Trash2 size={12} /> Purge
+                          {processingId === user.id ? (
+                            <Loader2 className="animate-spin" size={12} />
+                          ) : (
+                            <Trash2 size={12} />
+                          )}
+                          Purge
                         </button>
                       </div>
                     </div>
