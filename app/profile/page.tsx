@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Settings,
   LogOut,
@@ -30,6 +30,7 @@ interface ProfilePageProps {
   isLoggedIn?: boolean;
   currentUserId?: string;
   onSendChatRequest?: (profile: Profile) => void;
+  initialTab?: "intel" | "settings";
 }
 
 const ProfilePage: React.FC<ProfilePageProps> = ({
@@ -41,14 +42,20 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
   isLoggedIn = false,
   currentUserId,
   onSendChatRequest,
+  initialTab = "intel",
 }) => {
-  const [activeTab, setActiveTab] = useState<"intel" | "settings">("intel");
+  const [activeTab, setActiveTab] = useState<"intel" | "settings">(initialTab);
   const [isEditing, setIsEditing] = useState(false);
   const [editData, setEditData] = useState({
     full_name: profile?.full_name || "",
     bio: profile?.bio || "",
     gender: profile?.gender || "",
   });
+
+  // Sync tab if initialTab changes externally
+  useEffect(() => {
+    setActiveTab(initialTab);
+  }, [initialTab]);
 
   if (!profile || !profile.id)
     return (

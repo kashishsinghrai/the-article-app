@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Check,
   ShieldCheck,
@@ -8,6 +8,7 @@ import {
   Globe,
 } from "lucide-react";
 import { Profile } from "../../types";
+import { supabase } from "../../lib/supabase";
 
 interface SetupProfilePageProps {
   onComplete: (data: Profile) => void;
@@ -18,6 +19,24 @@ const SetupProfilePage: React.FC<SetupProfilePageProps> = ({ onComplete }) => {
   const [username, setUsername] = useState("");
   const [gender, setGender] = useState("");
   const [bio, setBio] = useState("");
+  const [authData, setAuthData] = useState<{ email?: string; phone?: string }>(
+    {}
+  );
+
+  useEffect(() => {
+    const fetchAuth = async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (user) {
+        setAuthData({
+          email: user.email,
+          phone: user.user_metadata?.phone || user.phone,
+        });
+      }
+    };
+    fetchAuth();
+  }, []);
 
   const handleFinish = () => {
     if (!name || !username || !gender) return;
@@ -33,6 +52,8 @@ const SetupProfilePage: React.FC<SetupProfilePageProps> = ({ onComplete }) => {
       bio:
         bio ||
         "Professional correspondent for the ThE-ARTICLES Global Network.",
+      email: authData.email,
+      phone: authData.phone,
       is_online: true,
       settings: {
         notifications_enabled: true,

@@ -20,10 +20,12 @@ export interface Profile {
   role: Role;
   is_private: boolean;
   bio: string;
+  email?: string;      // Added for administrative tracking
+  phone?: string;      // Added for administrative tracking
   following?: string[];
   is_online?: boolean; 
   last_seen?: string;
-  settings?: UserSettings; // New nested settings
+  settings?: UserSettings; 
 }
 
 export interface ChatRequest {
@@ -53,5 +55,5 @@ export interface Article {
   author_serial: string;
   created_at: string;
   is_private?: boolean;
-  hashtags?: string[]; // Added hashtag support
+  hashtags?: string[]; 
 }

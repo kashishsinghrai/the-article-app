@@ -14,6 +14,7 @@ import {
   ChevronRight,
   Smartphone,
   LogOut,
+  Sliders,
 } from "lucide-react";
 import { ChatRequest, Profile } from "../types";
 import { toast } from "react-hot-toast";
@@ -138,7 +139,6 @@ const Navbar: React.FC<NavbarProps> = ({
           </div>
 
           <div className="flex items-center gap-2 md:gap-4">
-            {/* App Download Link */}
             <button
               onClick={handleDownloadApp}
               className="items-center hidden gap-2 p-2 transition-all text-slate-400 hover:text-blue-600 xs:flex"
@@ -271,6 +271,20 @@ const Navbar: React.FC<NavbarProps> = ({
               </div>
             )}
 
+            {isLoggedIn && (
+              <button
+                onClick={() => navTo("settings")}
+                className={`p-2 rounded-xl transition-all hidden md:flex ${
+                  currentPage === "settings"
+                    ? "bg-slate-100 dark:bg-slate-900 text-blue-600"
+                    : "text-slate-400 hover:text-slate-950 dark:hover:text-white"
+                }`}
+                title="Settings"
+              >
+                <Sliders size={20} />
+              </button>
+            )}
+
             {isLoggedIn ? (
               <div className="flex items-center gap-2">
                 <button
@@ -361,11 +375,25 @@ const Navbar: React.FC<NavbarProps> = ({
                 onClick={() => navTo("admin")}
               />
             )}
-            <MobileNavItem
-              label="Profile"
-              active={currentPage === "profile"}
-              onClick={() => navTo("profile")}
-            />
+            {isLoggedIn && (
+              <MobileNavItem
+                label="Profile"
+                active={currentPage === "profile"}
+                onClick={() => navTo("profile")}
+              />
+            )}
+            {isLoggedIn && (
+              <button
+                onClick={() => navTo("settings")}
+                className={`flex items-center gap-4 text-left text-2xl font-bold uppercase tracking-tighter ${
+                  currentPage === "settings"
+                    ? "text-blue-600"
+                    : "text-slate-400 dark:text-slate-600"
+                }`}
+              >
+                <Sliders size={24} /> Settings
+              </button>
+            )}
 
             <button
               onClick={handleDownloadApp}

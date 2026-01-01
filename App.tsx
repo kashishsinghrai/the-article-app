@@ -163,7 +163,6 @@ const App: React.FC = () => {
   );
 
   const handleLogout = async () => {
-    // SILENT LOGOUT: No alerts or toasts as per UX requirements
     await supabase.auth.signOut();
     setIsLoggedIn(false);
     setProfile(null);
@@ -301,25 +300,27 @@ const App: React.FC = () => {
                 onLogout={handleLogout}
               />
             )}
-            {currentPage === "profile" && (viewingProfile || profile) && (
-              <ProfilePage
-                profile={viewingProfile || profile!}
-                onLogout={handleLogout}
-                isExternal={!!viewingProfile}
-                onCloseExternal={() => {
-                  if (viewingProfile) {
-                    setViewingProfile(null);
-                    setCurrentPage("network");
-                  } else handleNavigate("home");
-                }}
-                isLoggedIn={isLoggedIn}
-                currentUserId={profile?.id}
-                onSendChatRequest={(u) => {
-                  setActiveChat(u);
-                  setChatMessages([]);
-                }}
-              />
-            )}
+            {(currentPage === "profile" || currentPage === "settings") &&
+              (viewingProfile || profile) && (
+                <ProfilePage
+                  profile={viewingProfile || profile!}
+                  onLogout={handleLogout}
+                  isExternal={!!viewingProfile}
+                  initialTab={currentPage === "settings" ? "settings" : "intel"}
+                  onCloseExternal={() => {
+                    if (viewingProfile) {
+                      setViewingProfile(null);
+                      setCurrentPage("network");
+                    } else handleNavigate("home");
+                  }}
+                  isLoggedIn={isLoggedIn}
+                  currentUserId={profile?.id}
+                  onSendChatRequest={(u) => {
+                    setActiveChat(u);
+                    setChatMessages([]);
+                  }}
+                />
+              )}
             {currentPage === "network" && (
               <NetworkPage
                 onBack={() => handleNavigate("home")}
