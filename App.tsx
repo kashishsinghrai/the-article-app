@@ -388,229 +388,211 @@ const App: React.FC = () => {
         isDarkMode ? "dark bg-slate-950" : "bg-slate-50"
       } transition-colors duration-500`}
     >
-      <Navbar
-        onNavigate={handleNavigate}
-        onLogin={() => setShowAuth("login")}
-        onSearch={setSearchQuery}
-        currentPage={currentPage}
-        isLoggedIn={isLoggedIn}
-        userRole={profile?.role || "user"}
-        isDarkMode={isDarkMode}
-        onToggleDarkMode={() => setIsDarkMode(!isDarkMode)}
-        chatRequests={chatRequests}
-        onAcceptRequest={handleAcceptHandshake}
-      />
+      {/* Auth Screen Overlay - Full Screen Immersion */}
+      {showAuth === "login" && (
+        <LoginPage
+          onBack={() => setShowAuth(null)}
+          onSuccess={(u) => {
+            setIsLoggedIn(true);
+            setShowAuth(null);
+            initApp();
+          }}
+          onGoToRegister={() => setShowAuth("register")}
+        />
+      )}
+      {showAuth === "register" && (
+        <RegisterPage
+          onBack={() => setShowAuth(null)}
+          onSuccess={(u) => {
+            setIsLoggedIn(true);
+            setShowAuth(null);
+            initApp();
+          }}
+          onGoToLogin={() => setShowAuth("login")}
+        />
+      )}
 
-      <div className="pt-24 md:pt-32">
-        {["home", "all-posts"].includes(currentPage) && (
-          <HomePage
-            articles={visibleArticles}
-            isLoggedIn={isLoggedIn}
+      {!showAuth && (
+        <>
+          <Navbar
+            onNavigate={handleNavigate}
             onLogin={() => setShowAuth("login")}
-            userRole={profile?.role || "user"}
-            onDelete={deleteArticle}
-            onEdit={() => {}}
-            onViewProfile={(id) => {
-              const u = usersWithPresence.find((x) => x.id === id);
-              if (u) setViewingProfile(u);
-              setCurrentPage("profile");
-            }}
-            onReadArticle={setActiveArticle}
-            isArchive={currentPage === "all-posts"}
-            currentUserId={profile?.id}
-          />
-        )}
-        {currentPage === "post" && (
-          <PostPage
-            onPublish={async (data) => {
-              if (!profile) {
-                toast.error("Node identity required to publish.");
-                return;
-              }
-
-              // Generate a unique ID on the client to satisfy NOT NULL constraints
-              // if the database doesn't have a default generator.
-              const uniqueId =
-                typeof crypto !== "undefined" && crypto.randomUUID
-                  ? crypto.randomUUID()
-                  : Math.random().toString(36).substring(2, 15) +
-                    Math.random().toString(36).substring(2, 15);
-
-              const payload = {
-                id: uniqueId, // Explicit ID generation
-                title: String(data.title || "").trim(),
-                content: String(data.content || "").trim(),
-                category: String(data.category || "Investigative"),
-                image_url: String(data.image_url || ""),
-                is_private: Boolean(data.is_private),
-                author_id: profile.id,
-                author_name: String(profile.full_name || ""),
-                author_serial: String(profile.serial_id || ""),
-              };
-
-              console.log("Attempting Transmission with ID:", uniqueId);
-
-              const { error } = await supabase.from("articles").insert(payload);
-
-              if (!error) {
-                toast.success("Transmission Successful");
-                fetchArticles();
-                handleNavigate("home");
-              } else {
-                console.error("Transmission Failure Details:", error);
-
-                if (error.code === "23502") {
-                  toast.error(
-                    `Database Error: Column '${
-                      error.details?.split('"')[1] || "id"
-                    }' cannot be null. Generating local ID...`
-                  );
-                } else if (error.code === "42501") {
-                  toast.error("Access Denied: Check RLS policies in Supabase.");
-                } else {
-                  toast.error(
-                    `Transmission Failed [${error.code}]: ${error.message}`
-                  );
-                }
-              }
-            }}
-          />
-        )}
-        {currentPage === "profile" && (
-          <ProfilePage
-            profile={viewingProfile || profile || ({} as Profile)}
-            onLogout={() => {
-              (supabase.auth as any).signOut();
-              setIsLoggedIn(false);
-              setProfile(null);
-              handleNavigate("home");
-            }}
-            onUpdateProfile={handleUpdateProfile}
+            onSearch={setSearchQuery}
+            currentPage={currentPage}
             isLoggedIn={isLoggedIn}
-            onSendChatRequest={(tid, tname) => {
-              if (!profile) return;
-              const req = {
-                id: Math.random().toString(36).substr(2, 9),
-                fromId: profile.id,
-                fromName: profile.full_name,
-                toId: tid,
-                timestamp: Date.now(),
-              };
-              supabase.channel(`inbox_${tid}`).subscribe((status) => {
-                if (status === "SUBSCRIBED") {
-                  supabase
-                    .channel(`inbox_${tid}`)
-                    .send({
-                      type: "broadcast",
-                      event: "handshake",
-                      payload: req,
-                    });
-                  toast.success(`Signal sent to ${tname}`);
-                }
-              });
-            }}
-            isExternal={!!viewingProfile}
-            onCloseExternal={() => {
-              setViewingProfile(null);
-              setCurrentPage("home");
-            }}
-            currentUserId={profile?.id}
+            userRole={profile?.role || "user"}
+            isDarkMode={isDarkMode}
+            onToggleDarkMode={() => setIsDarkMode(!isDarkMode)}
+            chatRequests={chatRequests}
+            onAcceptRequest={handleAcceptHandshake}
           />
-        )}
-        {currentPage === "network" && (
-          <NetworkPage
-            users={usersWithPresence}
-            currentUserId={profile?.id}
-            onViewProfile={(u) => {
-              setViewingProfile(u);
-              setCurrentPage("profile");
-            }}
-            onChat={(u) => {
-              if (!profile) {
-                setShowAuth("login");
-                return;
-              }
-              const req = {
-                id: Math.random().toString(36).substr(2, 9),
-                fromId: profile.id,
-                fromName: profile.full_name,
-                toId: u.id,
-                timestamp: Date.now(),
-              };
-              supabase.channel(`inbox_${u.id}`).subscribe((status) => {
-                if (status === "SUBSCRIBED") {
-                  supabase
-                    .channel(`inbox_${u.id}`)
-                    .send({
-                      type: "broadcast",
-                      event: "handshake",
-                      payload: req,
-                    });
-                  toast.success(`Signal sent to ${u.full_name}`);
-                }
-              });
-            }}
-          />
-        )}
-        {currentPage === "support" && <SupportPage />}
-        {currentPage === "admin" && profile?.role === "admin" && (
-          <AdminPage
-            articles={articles}
-            users={users}
-            onDeleteArticle={deleteArticle}
-            onDeleteUser={deleteUser}
-            onRefreshData={initApp}
-          />
-        )}
-      </div>
 
-      <TrendingTicker />
-      <Footer nodeCount={nodeCount} onNavigate={handleNavigate} />
+          <div className="pt-24 md:pt-32">
+            {["home", "all-posts"].includes(currentPage) && (
+              <HomePage
+                articles={visibleArticles}
+                isLoggedIn={isLoggedIn}
+                onLogin={() => setShowAuth("login")}
+                userRole={profile?.role || "user"}
+                onDelete={deleteArticle}
+                onEdit={() => {}}
+                onViewProfile={(id) => {
+                  const u = usersWithPresence.find((x) => x.id === id);
+                  if (u) setViewingProfile(u);
+                  setCurrentPage("profile");
+                }}
+                onReadArticle={setActiveArticle}
+                isArchive={currentPage === "all-posts"}
+                currentUserId={profile?.id}
+              />
+            )}
+            {currentPage === "post" && (
+              <PostPage
+                onPublish={async (data) => {
+                  if (!profile) {
+                    toast.error("Node identity required to publish.");
+                    return;
+                  }
 
-      {showAuth && (
-        <div className="fixed inset-0 z-[500] flex items-center justify-center p-4">
-          <div
-            className="absolute inset-0 bg-slate-950/90 backdrop-blur-xl"
-            onClick={() => setShowAuth(null)}
-          />
-          {showAuth === "login" ? (
-            <LoginPage
-              onBack={() => setShowAuth(null)}
-              onSuccess={(u) => {
-                setIsLoggedIn(true);
-                setShowAuth(null);
-                initApp();
-              }}
-              onGoToRegister={() => setShowAuth("register")}
-            />
-          ) : (
-            <RegisterPage
-              onBack={() => setShowAuth(null)}
-              onSuccess={(u) => {
-                setIsLoggedIn(true);
-                setShowAuth(null);
-                initApp();
-              }}
-              onGoToLogin={() => setShowAuth("login")}
+                  const uniqueId =
+                    typeof crypto !== "undefined" && crypto.randomUUID
+                      ? crypto.randomUUID()
+                      : Math.random().toString(36).substring(2, 15) +
+                        Math.random().toString(36).substring(2, 15);
+
+                  const payload = {
+                    id: uniqueId,
+                    title: String(data.title || "").trim(),
+                    content: String(data.content || "").trim(),
+                    category: String(data.category || "Investigative"),
+                    image_url: String(data.image_url || ""),
+                    is_private: Boolean(data.is_private),
+                    author_id: profile.id,
+                    author_name: String(profile.full_name || ""),
+                    author_serial: String(profile.serial_id || ""),
+                  };
+
+                  const { error } = await supabase
+                    .from("articles")
+                    .insert(payload);
+
+                  if (!error) {
+                    toast.success("Transmission Successful");
+                    fetchArticles();
+                    handleNavigate("home");
+                  } else {
+                    toast.error(`Transmission Failed: ${error.message}`);
+                  }
+                }}
+              />
+            )}
+            {currentPage === "profile" && (
+              <ProfilePage
+                profile={viewingProfile || profile || ({} as Profile)}
+                onLogout={() => {
+                  (supabase.auth as any).signOut();
+                  setIsLoggedIn(false);
+                  setProfile(null);
+                  handleNavigate("home");
+                }}
+                onUpdateProfile={handleUpdateProfile}
+                isLoggedIn={isLoggedIn}
+                onSendChatRequest={(tid, tname) => {
+                  if (!profile) return;
+                  const req = {
+                    id: Math.random().toString(36).substr(2, 9),
+                    fromId: profile.id,
+                    fromName: profile.full_name,
+                    toId: tid,
+                    timestamp: Date.now(),
+                  };
+                  supabase.channel(`inbox_${tid}`).subscribe((status) => {
+                    if (status === "SUBSCRIBED") {
+                      supabase
+                        .channel(`inbox_${tid}`)
+                        .send({
+                          type: "broadcast",
+                          event: "handshake",
+                          payload: req,
+                        });
+                      toast.success(`Signal sent to ${tname}`);
+                    }
+                  });
+                }}
+                isExternal={!!viewingProfile}
+                onCloseExternal={() => {
+                  setViewingProfile(null);
+                  setCurrentPage("home");
+                }}
+                currentUserId={profile?.id}
+              />
+            )}
+            {currentPage === "network" && (
+              <NetworkPage
+                users={usersWithPresence}
+                currentUserId={profile?.id}
+                onViewProfile={(u) => {
+                  setViewingProfile(u);
+                  setCurrentPage("profile");
+                }}
+                onChat={(u) => {
+                  if (!profile) {
+                    setShowAuth("login");
+                    return;
+                  }
+                  const req = {
+                    id: Math.random().toString(36).substr(2, 9),
+                    fromId: profile.id,
+                    fromName: profile.full_name,
+                    toId: u.id,
+                    timestamp: Date.now(),
+                  };
+                  supabase.channel(`inbox_${u.id}`).subscribe((status) => {
+                    if (status === "SUBSCRIBED") {
+                      supabase
+                        .channel(`inbox_${u.id}`)
+                        .send({
+                          type: "broadcast",
+                          event: "handshake",
+                          payload: req,
+                        });
+                      toast.success(`Signal sent to ${u.full_name}`);
+                    }
+                  });
+                }}
+              />
+            )}
+            {currentPage === "support" && <SupportPage />}
+            {currentPage === "admin" && profile?.role === "admin" && (
+              <AdminPage
+                articles={articles}
+                users={users}
+                onDeleteArticle={deleteArticle}
+                onDeleteUser={deleteUser}
+                onRefreshData={initApp}
+              />
+            )}
+          </div>
+
+          <TrendingTicker />
+          <Footer nodeCount={nodeCount} onNavigate={handleNavigate} />
+
+          {activeArticle && (
+            <ArticleDetail
+              article={activeArticle}
+              onClose={() => setActiveArticle(null)}
             />
           )}
-        </div>
-      )}
-
-      {activeArticle && (
-        <ArticleDetail
-          article={activeArticle}
-          onClose={() => setActiveArticle(null)}
-        />
-      )}
-      {activeChat && (
-        <ChatOverlay
-          recipient={activeChat}
-          currentUserId={profile?.id || ""}
-          onClose={() => setActiveChat(null)}
-          messages={chatMessages}
-          onSendMessage={handleSendMessage}
-        />
+          {activeChat && (
+            <ChatOverlay
+              recipient={activeChat}
+              currentUserId={profile?.id || ""}
+              onClose={() => setActiveChat(null)}
+              messages={chatMessages}
+              onSendMessage={handleSendMessage}
+            />
+          )}
+        </>
       )}
       <Toaster position="bottom-right" />
     </div>
