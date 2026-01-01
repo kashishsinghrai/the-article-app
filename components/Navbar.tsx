@@ -72,13 +72,16 @@ const Navbar: React.FC<NavbarProps> = ({
   return (
     <>
       <nav className="fixed top-0 left-0 right-0 z-[150] p-4 md:p-6 pointer-events-auto">
-        <div className="max-w-6xl mx-auto flex items-center justify-between pointer-events-auto bg-white/95 dark:bg-slate-950/95 backdrop-blur-xl border border-slate-100 dark:border-slate-800 px-6 md:px-8 py-3.5 rounded-2xl shadow-sm transition-all">
+        <div className="max-w-6xl mx-auto flex items-center justify-between pointer-events-auto bg-white/95 dark:bg-slate-950/95 backdrop-blur-xl border border-slate-100 dark:border-slate-800 px-4 md:px-8 py-3.5 rounded-2xl shadow-sm transition-all">
           <div
-            className="flex items-center gap-4 cursor-pointer"
+            className="flex items-center gap-2 cursor-pointer md:gap-4 shrink-0"
             onClick={() => navTo("home")}
           >
-            <Shield size={18} className="text-slate-950 dark:text-white" />
-            <span className="hidden xs:block text-[11px] font-black uppercase tracking-[0.2em] dark:text-white italic">
+            <Shield
+              size={18}
+              className="text-slate-950 dark:text-white shrink-0"
+            />
+            <span className="text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] md:tracking-[0.2em] dark:text-white italic block">
               ThE-ARTICLES
             </span>
           </div>
@@ -110,7 +113,7 @@ const Navbar: React.FC<NavbarProps> = ({
             )}
           </div>
 
-          <div className="flex items-center gap-4 md:gap-6">
+          <div className="flex items-center gap-3 md:gap-6">
             <button
               onClick={onToggleDarkMode}
               className="transition-colors text-slate-400 hover:text-slate-950 dark:hover:text-white"
@@ -136,9 +139,9 @@ const Navbar: React.FC<NavbarProps> = ({
                   )}
                 </button>
 
-                {/* Responsive Inbox Dropdown */}
+                {/* Responsive Inbox Dropdown - Fixed position on mobile to prevent clipping */}
                 {isInboxOpen && (
-                  <div className="absolute right-[-20px] sm:right-0 mt-4 w-[calc(100vw-2rem)] sm:w-[380px] bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200 z-[200]">
+                  <div className="fixed left-4 right-4 sm:absolute sm:left-auto sm:right-0 mt-4 sm:w-[380px] bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200 z-[200]">
                     <div className="flex items-center justify-between p-5 border-b border-slate-50 dark:border-white/5 bg-slate-50 dark:bg-slate-950/50">
                       <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-400">
                         Operational Inbox
@@ -148,7 +151,7 @@ const Navbar: React.FC<NavbarProps> = ({
                       </span>
                     </div>
 
-                    <div className="max-h-[400px] overflow-y-auto custom-scrollbar">
+                    <div className="max-h-[60vh] sm:max-h-[400px] overflow-y-auto custom-scrollbar">
                       {notificationCount === 0 ? (
                         <div className="p-12 space-y-3 text-center opacity-30">
                           <Zap size={24} className="mx-auto" />
@@ -236,7 +239,7 @@ const Navbar: React.FC<NavbarProps> = ({
             {isLoggedIn ? (
               <button
                 onClick={() => navTo("profile")}
-                className={`w-10 h-10 rounded-full flex items-center justify-center border transition-all ${
+                className={`w-9 h-9 md:w-10 md:h-10 rounded-full flex items-center justify-center border transition-all ${
                   currentPage === "profile"
                     ? "bg-slate-950 dark:bg-white text-white dark:text-slate-950 border-slate-950 dark:border-white"
                     : "border-slate-200 dark:border-slate-800 text-slate-400"
@@ -247,7 +250,7 @@ const Navbar: React.FC<NavbarProps> = ({
             ) : (
               <button
                 onClick={onLogin}
-                className="bg-slate-950 dark:bg-white text-white dark:text-slate-950 px-6 py-2.5 text-[10px] font-bold uppercase tracking-widest rounded-lg hover:opacity-80 transition-all"
+                className="bg-slate-950 dark:bg-white text-white dark:text-slate-950 px-4 md:px-6 py-2 md:py-2.5 text-[9px] md:text-[10px] font-bold uppercase tracking-widest rounded-lg hover:opacity-80 transition-all"
               >
                 Login
               </button>
@@ -255,7 +258,7 @@ const Navbar: React.FC<NavbarProps> = ({
 
             <button
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              className="lg:hidden text-slate-950 dark:text-white"
+              className="p-1 lg:hidden text-slate-950 dark:text-white"
             >
               <Menu size={22} />
             </button>
