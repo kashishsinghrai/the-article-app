@@ -243,13 +243,39 @@ const App: React.FC = () => {
     }
   };
 
+  const visibleArticles = useMemo(() => {
+    return articles.filter((art) => {
+      // If article is public, show to everyone
+      if (art.is_private === false) return true;
+      // If private, only show if user is admin or the author
+      if (profile?.role === "admin") return true;
+      if (profile?.id === art.author_id) return true;
+      return false;
+    });
+  }, [articles, profile]);
+
   const usersWithPresence = useMemo(() => {
     return users.map((u) => ({
       ...u,
-      // If user has presence disabled in settings, always show offline
       is_online: u.settings?.presence_visible !== false && !!onlineUsers[u.id],
     }));
   }, [users, onlineUsers]);
+
+  const deleteArticle = async (id: string) => {
+    const { error } = await supabase.from("articles").delete().eq("id", id);
+    if (!error) {
+      fetchArticles();
+      toast.success("Article purged");
+    }
+  };
+
+  const deleteUser = async (id: string) => {
+    const { error } = await supabase.from("profiles").delete().eq("id", id);
+    if (!error) {
+      fetchUsers();
+      toast.success("User expelled");
+    }
+  };
 
   if (needsOnboarding) {
     return (
@@ -310,11 +336,11 @@ const App: React.FC = () => {
       <div className="pt-24 md:pt-32">
         {["home", "all-posts"].includes(currentPage) && (
           <HomePage
-            articles={articles}
+            articles={visibleArticles}
             isLoggedIn={isLoggedIn}
             onLogin={() => setShowAuth("login")}
             userRole={profile?.role || "user"}
-            onDelete={fetchArticles}
+            onDelete={deleteArticle}
             onEdit={() => {}}
             onViewProfile={(id) => {
               const u = usersWithPresence.find((x) => x.id === id);
@@ -323,6 +349,7 @@ const App: React.FC = () => {
             }}
             onReadArticle={setActiveArticle}
             isArchive={currentPage === "all-posts"}
+            currentUserId={profile?.id}
           />
         )}
         {currentPage === "post" && (
@@ -425,8 +452,8 @@ const App: React.FC = () => {
           <AdminPage
             articles={articles}
             users={users}
-            onDeleteArticle={fetchArticles}
-            onDeleteUser={fetchUsers}
+            onDeleteArticle={deleteArticle}
+            onDeleteUser={deleteUser}
             onRefreshData={initApp}
           />
         )}

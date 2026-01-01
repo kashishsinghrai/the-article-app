@@ -12,6 +12,8 @@ import {
   X,
   Loader2,
   ArrowLeft,
+  Lock,
+  Unlock,
 } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { Article, Category } from "../../types";
@@ -26,6 +28,7 @@ const PostPage: React.FC<PostPageProps> = ({ onPublish, editData }) => {
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [category, setCategory] = useState<Category>("Investigative");
+  const [isPublic, setIsPublic] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
   const [isEncoding, setIsEncoding] = useState(false);
   const [imageUrl, setImageUrl] = useState("");
@@ -37,6 +40,7 @@ const PostPage: React.FC<PostPageProps> = ({ onPublish, editData }) => {
       setContent(editData.content);
       setCategory(editData.category);
       setImageUrl(editData.image_url);
+      setIsPublic(editData.is_private === false);
     }
   }, [editData]);
 
@@ -69,15 +73,16 @@ const PostPage: React.FC<PostPageProps> = ({ onPublish, editData }) => {
       content: content.trim(),
       category,
       image_url: imageUrl,
+      is_private: !isPublic,
     });
   };
 
   const categories: Category[] = ["Investigative", "Economic", "Regional"];
 
   return (
-    <main className="max-w-7xl mx-auto px-4 md:px-6 py-24 md:py-32 flex flex-col lg:flex-row gap-10 md:gap-16">
+    <main className="flex flex-col gap-10 px-4 py-24 mx-auto max-w-7xl md:px-6 md:py-32 lg:flex-row md:gap-16">
       <div className="flex-1 space-y-12">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
+        <div className="flex flex-col items-start justify-between gap-6 md:flex-row md:items-end">
           <div className="space-y-4">
             <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400">
               <ShieldCheck size={16} />
@@ -85,7 +90,7 @@ const PostPage: React.FC<PostPageProps> = ({ onPublish, editData }) => {
                 Verified Correspondent Terminal
               </span>
             </div>
-            <h1 className="text-4xl md:text-6xl font-black text-slate-900 dark:text-white uppercase italic tracking-tighter leading-none transition-colors">
+            <h1 className="text-4xl italic font-black leading-none tracking-tighter uppercase transition-colors md:text-6xl text-slate-900 dark:text-white">
               {editData ? "Modify Record" : "Log New Report"}
             </h1>
           </div>
@@ -103,29 +108,59 @@ const PostPage: React.FC<PostPageProps> = ({ onPublish, editData }) => {
             <input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="w-full text-2xl md:text-5xl font-black uppercase italic tracking-tighter placeholder:text-slate-100 dark:placeholder:text-slate-800 border-none focus:ring-0 p-0 bg-transparent text-slate-900 dark:text-white transition-all"
+              className="w-full p-0 text-2xl italic font-black tracking-tighter uppercase transition-all bg-transparent border-none outline-none md:text-5xl placeholder:text-slate-100 dark:placeholder:text-slate-800 focus:ring-0 text-slate-900 dark:text-white"
               placeholder="Primary Intel Headline..."
             />
           </div>
 
-          <div className="space-y-4">
-            <label className="text-[10px] font-black text-slate-300 dark:text-slate-600 uppercase tracking-[0.3em]">
-              Select Intelligence Category
-            </label>
-            <div className="flex flex-wrap gap-2 md:gap-3">
-              {categories.map((cat) => (
+          <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
+            <div className="space-y-4">
+              <label className="text-[10px] font-black text-slate-300 dark:text-slate-600 uppercase tracking-[0.3em]">
+                Select Intelligence Category
+              </label>
+              <div className="flex flex-wrap gap-2 md:gap-3">
+                {categories.map((cat) => (
+                  <button
+                    key={cat}
+                    onClick={() => setCategory(cat)}
+                    className={`px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest border transition-all ${
+                      category === cat
+                        ? "bg-slate-900 dark:bg-white text-white dark:text-slate-900 border-slate-900 dark:border-white shadow-lg"
+                        : "bg-transparent text-slate-400 dark:text-slate-600 border-slate-100 dark:border-slate-800"
+                    }`}
+                  >
+                    {cat}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <label className="text-[10px] font-black text-slate-300 dark:text-slate-600 uppercase tracking-[0.3em]">
+                Visibility Level
+              </label>
+              <div className="flex gap-2">
                 <button
-                  key={cat}
-                  onClick={() => setCategory(cat)}
-                  className={`px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest border transition-all ${
-                    category === cat
-                      ? "bg-slate-900 dark:bg-white text-white dark:text-slate-900 border-slate-900 dark:border-white shadow-lg"
-                      : "bg-transparent text-slate-400 dark:text-slate-600 border-slate-100 dark:border-slate-800"
+                  onClick={() => setIsPublic(true)}
+                  className={`flex-1 flex items-center justify-center gap-2 px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest border transition-all ${
+                    isPublic
+                      ? "bg-emerald-600 text-white border-emerald-600 shadow-lg"
+                      : "bg-transparent text-slate-400 border-slate-100 dark:border-slate-800"
                   }`}
                 >
-                  {cat}
+                  <Unlock size={14} /> Public Record
                 </button>
-              ))}
+                <button
+                  onClick={() => setIsPublic(false)}
+                  className={`flex-1 flex items-center justify-center gap-2 px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest border transition-all ${
+                    !isPublic
+                      ? "bg-amber-600 text-white border-amber-600 shadow-lg"
+                      : "bg-transparent text-slate-400 border-slate-100 dark:border-slate-800"
+                  }`}
+                >
+                  <Lock size={14} /> Encrypted
+                </button>
+              </div>
             </div>
           </div>
 
@@ -138,25 +173,25 @@ const PostPage: React.FC<PostPageProps> = ({ onPublish, editData }) => {
               className="aspect-[16/7] md:aspect-[21/9] bg-slate-50 dark:bg-slate-950 rounded-[2rem] md:rounded-[2.5rem] border-2 border-dashed border-slate-200 dark:border-slate-800 flex flex-col items-center justify-center group cursor-pointer hover:border-blue-500 transition-all overflow-hidden relative"
             >
               {isEncoding ? (
-                <Loader2 size={32} className="animate-spin text-blue-600" />
+                <Loader2 size={32} className="text-blue-600 animate-spin" />
               ) : imageUrl ? (
                 <>
-                  <img src={imageUrl} className="w-full h-full object-cover" />
+                  <img src={imageUrl} className="object-cover w-full h-full" />
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
                       setImageUrl("");
                     }}
-                    className="absolute top-4 right-4 p-2 bg-red-600 text-white rounded-full shadow-xl"
+                    className="absolute p-2 text-white transition-transform bg-red-600 rounded-full shadow-xl top-4 right-4 hover:scale-110"
                   >
                     <X size={16} />
                   </button>
                 </>
               ) : (
-                <div className="text-center p-6">
+                <div className="p-6 text-center">
                   <Camera
                     size={32}
-                    className="mx-auto mb-3 text-slate-300 group-hover:text-blue-500 transition-colors"
+                    className="mx-auto mb-3 transition-colors text-slate-300 group-hover:text-blue-500"
                   />
                   <span className="block text-[10px] font-black uppercase tracking-widest text-slate-400">
                     Click to upload photo evidence
@@ -181,13 +216,13 @@ const PostPage: React.FC<PostPageProps> = ({ onPublish, editData }) => {
               value={content}
               onChange={(e) => setContent(e.target.value)}
               rows={10}
-              className="w-full text-base md:text-xl font-medium leading-relaxed placeholder:text-slate-100 dark:placeholder:text-slate-800 border-none focus:ring-0 p-0 bg-transparent text-slate-700 dark:text-slate-300 selection:bg-blue-100 dark:selection:bg-blue-900 transition-all"
+              className="w-full p-0 text-base font-medium leading-relaxed transition-all bg-transparent border-none outline-none md:text-xl placeholder:text-slate-100 dark:placeholder:text-slate-800 focus:ring-0 text-slate-700 dark:text-slate-300 selection:bg-blue-100 dark:selection:bg-blue-900"
               placeholder="Describe your investigative findings in detail here..."
             />
           </div>
 
-          <div className="pt-8 border-t border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-6">
-            <div className="flex items-center gap-3 bg-slate-50 dark:bg-slate-950 px-6 py-4 rounded-full w-full sm:w-auto">
+          <div className="flex flex-col items-center justify-between gap-6 pt-8 border-t border-slate-100 dark:border-slate-800 sm:flex-row">
+            <div className="flex items-center w-full gap-3 px-6 py-4 rounded-full bg-slate-50 dark:bg-slate-950 sm:w-auto">
               <Globe size={16} className="text-blue-600" />
               <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">
                 Global Node Active
@@ -198,7 +233,7 @@ const PostPage: React.FC<PostPageProps> = ({ onPublish, editData }) => {
               disabled={isSyncing || isEncoding}
               className={`w-full sm:w-auto px-10 py-5 rounded-full text-sm font-black uppercase tracking-widest shadow-2xl transition-all active:scale-95 flex items-center justify-center gap-3 ${
                 isSyncing
-                  ? "bg-slate-200 text-slate-400"
+                  ? "bg-slate-200 text-slate-400 dark:bg-slate-800"
                   : "bg-slate-900 dark:bg-white dark:text-slate-900 text-white hover:bg-blue-600 hover:text-white"
               }`}
             >
@@ -209,7 +244,7 @@ const PostPage: React.FC<PostPageProps> = ({ onPublish, editData }) => {
         </div>
       </div>
 
-      <div className="w-full lg:w-96 flex-shrink-0">
+      <div className="flex-shrink-0 w-full lg:w-96">
         <div className="lg:sticky lg:top-32">
           <AiAssistant currentHeadline={title} currentContent={content} />
         </div>
