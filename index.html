@@ -82,8 +82,35 @@
           0% { transform: translateX(0); }
           100% { transform: translateX(-50%); }
         }
-        .whatsapp-bubble-in { @apply bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-2xl rounded-tl-none shadow-sm; }
-        .whatsapp-bubble-out { @apply bg-blue-600 text-white rounded-2xl rounded-tr-none shadow-md; }
+        
+        /* Chat Visuals */
+        .pattern-whatsapp {
+          background-image: url("https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png");
+          background-blend-mode: overlay;
+        }
+        .dark .pattern-whatsapp {
+          background-blend-mode: soft-light;
+          opacity: 0.1;
+        }
+
+        .whatsapp-bubble-in { 
+          @apply bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-2xl rounded-tl-none shadow-sm relative; 
+        }
+        .whatsapp-bubble-in::before {
+          content: ''; position: absolute; top: 0; left: -8px; width: 0; height: 0;
+          border-style: solid; border-width: 0 10px 10px 0;
+          border-color: transparent white transparent transparent;
+        }
+        .dark .whatsapp-bubble-in::before { border-color: transparent #1e293b transparent transparent; }
+
+        .whatsapp-bubble-out { 
+          @apply bg-blue-600 text-white rounded-2xl rounded-tr-none shadow-md relative; 
+        }
+        .whatsapp-bubble-out::after {
+          content: ''; position: absolute; top: 0; right: -8px; width: 0; height: 0;
+          border-style: solid; border-width: 10px 10px 0 0;
+          border-color: #2563eb transparent transparent transparent;
+        }
       }
     </style>
   <script type="importmap">

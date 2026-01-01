@@ -79,14 +79,9 @@ const App: React.FC = () => {
     }
   }, []);
 
-  // Presence logic influenced by visibility settings
   useEffect(() => {
     if (!profile?.id) return;
-
-    // Check if user has disabled presence visibility
-    if (profile.settings && profile.settings.presence_visible === false) {
-      return;
-    }
+    if (profile.settings && profile.settings.presence_visible === false) return;
 
     const channel = supabase.channel("global_presence", {
       config: { presence: { key: profile.id } },
@@ -158,12 +153,21 @@ const App: React.FC = () => {
       .on("broadcast", { event: "handshake" }, (p) => {
         const req = p.payload as ChatRequest;
         setChatRequests((prev) =>
-          prev.some((r) => r.id === req.id) ? prev : [...prev, req]
+          prev.some((r) => r.fromId === req.fromId) ? prev : [...prev, req]
         );
-        toast(`Signal: ${req.fromName}`, { icon: "📡" });
+        toast(`Handshake Signal from ${req.fromName}`, {
+          icon: "📡",
+          style: {
+            borderRadius: "15px",
+            background: "#2563eb",
+            color: "#fff",
+            fontSize: "11px",
+            fontWeight: "bold",
+          },
+        });
         sendNotification(
-          "New Connection Signal",
-          `${req.fromName} wants to link with you.`
+          "Network Handshake",
+          `${req.fromName} is requesting a secure link.`
         );
       })
       .subscribe();
@@ -179,7 +183,7 @@ const App: React.FC = () => {
               setActiveChat(msg.senderProfile);
             },
           } as any);
-          sendNotification(`New Message from ${msg.senderName}`, msg.text);
+          sendNotification(`Intel from ${msg.senderName}`, msg.text);
         }
       })
       .subscribe();
@@ -201,10 +205,13 @@ const App: React.FC = () => {
         timestamp: Date.now(),
       };
       setChatMessages((prev) => [...prev, message]);
+
       const ids = [profile.id, activeChat.id].sort();
+      const roomName = `room_${ids[0]}_${ids[1]}`;
       supabase
-        .channel(`room_${ids[0]}_${ids[1]}`)
+        .channel(roomName)
         .send({ type: "broadcast", event: "message", payload: message });
+
       supabase.channel(`notify_${activeChat.id}`).subscribe((status) => {
         if (status === "SUBSCRIBED") {
           supabase
@@ -234,8 +241,7 @@ const App: React.FC = () => {
       .update(updatedData)
       .eq("id", profile.id);
     if (!error) {
-      const newProfile = { ...profile, ...updatedData };
-      setProfile(newProfile);
+      setProfile({ ...profile, ...updatedData });
       toast.success("System Configuration Updated");
       fetchUsers();
     } else {
@@ -243,11 +249,32 @@ const App: React.FC = () => {
     }
   };
 
+  const handleAcceptHandshake = async (req: ChatRequest) => {
+    let sender = users.find((u) => u.id === req.fromId);
+    if (!sender) {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", req.fromId)
+        .maybeSingle();
+      if (!error && data) {
+        sender = data;
+      }
+    }
+
+    if (sender) {
+      setActiveChat(sender);
+      setChatRequests((prev) => prev.filter((r) => r.id !== req.id));
+      setChatMessages([]);
+      toast.success(`Secure link established with ${sender.full_name}`);
+    } else {
+      toast.error("Node identity missing from registry.");
+    }
+  };
+
   const visibleArticles = useMemo(() => {
     return articles.filter((art) => {
-      // If article is public, show to everyone
       if (art.is_private === false) return true;
-      // If private, only show if user is admin or the author
       if (profile?.role === "admin") return true;
       if (profile?.id === art.author_id) return true;
       return false;
@@ -265,16 +292,16 @@ const App: React.FC = () => {
     const { error } = await supabase.from("articles").delete().eq("id", id);
     if (!error) {
       fetchArticles();
-      toast.success("Article purged");
-    }
+      toast.success("Intel Expunged");
+    } else toast.error("Purge failed");
   };
 
   const deleteUser = async (id: string) => {
     const { error } = await supabase.from("profiles").delete().eq("id", id);
     if (!error) {
       fetchUsers();
-      toast.success("User expelled");
-    }
+      toast.success("Node Terminated");
+    } else toast.error("Expulsion failed");
   };
 
   if (needsOnboarding) {
@@ -323,14 +350,7 @@ const App: React.FC = () => {
         isDarkMode={isDarkMode}
         onToggleDarkMode={() => setIsDarkMode(!isDarkMode)}
         chatRequests={chatRequests}
-        onAcceptRequest={(req) => {
-          const sender = users.find((u) => u.id === req.fromId);
-          if (sender) {
-            setActiveChat(sender);
-            setChatRequests((prev) => prev.filter((r) => r.id !== req.id));
-            setChatMessages([]);
-          }
-        }}
+        onAcceptRequest={handleAcceptHandshake}
       />
 
       <div className="pt-24 md:pt-32">
@@ -364,10 +384,10 @@ const App: React.FC = () => {
               };
               const { error } = await supabase.from("articles").insert(payload);
               if (!error) {
-                toast.success("Sync Successful");
+                toast.success("Transmission Successful");
                 fetchArticles();
                 handleNavigate("home");
-              }
+              } else toast.error("Network sync failed");
             }}
           />
         )}
