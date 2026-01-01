@@ -170,6 +170,27 @@ const App: React.FC = () => {
           `${req.fromName} is requesting a secure link.`
         );
       })
+      .on("broadcast", { event: "handshake_accepted" }, async (p) => {
+        // This is triggered when SOMEONE ELSE accepts your request
+        const { acceptorId, acceptorName } = p.payload;
+        const acceptorProfile = users.find((u) => u.id === acceptorId);
+
+        if (acceptorProfile) {
+          setActiveChat(acceptorProfile);
+          setChatMessages([]);
+          toast.success(`Secure link established with ${acceptorName}`, {
+            icon: "⚡",
+          });
+        } else {
+          // Fetch profile if not in cache
+          const { data } = await supabase
+            .from("profiles")
+            .select("*")
+            .eq("id", acceptorId)
+            .maybeSingle();
+          if (data) setActiveChat(data);
+        }
+      })
       .subscribe();
 
     const notifyChannel = supabase.channel(`notify_${profile.id}`);
@@ -192,7 +213,7 @@ const App: React.FC = () => {
       supabase.removeChannel(inboxChannel);
       supabase.removeChannel(notifyChannel);
     };
-  }, [profile?.id, profile?.settings?.notifications_enabled]);
+  }, [profile?.id, profile?.settings?.notifications_enabled, users]);
 
   const handleSendMessage = useCallback(
     (text: string) => {
@@ -212,6 +233,7 @@ const App: React.FC = () => {
         .channel(roomName)
         .send({ type: "broadcast", event: "message", payload: message });
 
+      // Also notify active status
       supabase.channel(`notify_${activeChat.id}`).subscribe((status) => {
         if (status === "SUBSCRIBED") {
           supabase
@@ -250,23 +272,39 @@ const App: React.FC = () => {
   };
 
   const handleAcceptHandshake = async (req: ChatRequest) => {
+    if (!profile) return;
+
     let sender = users.find((u) => u.id === req.fromId);
     if (!sender) {
-      const { data, error } = await supabase
+      const { data } = await supabase
         .from("profiles")
         .select("*")
         .eq("id", req.fromId)
         .maybeSingle();
-      if (!error && data) {
-        sender = data;
-      }
+      if (data) sender = data;
     }
 
     if (sender) {
+      // 1. Open chat for local user
       setActiveChat(sender);
       setChatRequests((prev) => prev.filter((r) => r.id !== req.id));
       setChatMessages([]);
       toast.success(`Secure link established with ${sender.full_name}`);
+
+      // 2. Broadcast acceptance to the sender's inbox channel
+      const senderInbox = supabase.channel(`inbox_${req.fromId}`);
+      senderInbox.subscribe((status) => {
+        if (status === "SUBSCRIBED") {
+          senderInbox.send({
+            type: "broadcast",
+            event: "handshake_accepted",
+            payload: {
+              acceptorId: profile.id,
+              acceptorName: profile.full_name,
+            },
+          });
+        }
+      });
     } else {
       toast.error("Node identity missing from registry.");
     }

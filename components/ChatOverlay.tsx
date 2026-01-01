@@ -8,6 +8,7 @@ import {
   Phone,
   Video,
   Info,
+  ChevronLeft,
 } from "lucide-react";
 import { LiveMessage, Profile } from "../types";
 import { supabase } from "../lib/supabase";
@@ -77,43 +78,51 @@ const ChatOverlay: React.FC<ChatOverlayProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 md:inset-auto md:bottom-8 md:right-8 z-[200] flex flex-col md:w-96 md:h-[600px] animate-in slide-in-from-bottom-10 duration-500">
-      <div className="flex-grow flex flex-col bg-white dark:bg-slate-950 md:rounded-[2.5rem] shadow-2xl border-none md:border md:border-white/20 dark:md:border-slate-800 overflow-hidden">
+    <div className="fixed inset-0 md:inset-auto md:bottom-8 md:right-8 z-[200] flex flex-col md:w-96 md:h-[600px] animate-in slide-in-from-bottom-10 md:slide-in-from-right-10 duration-500">
+      {/* Container - Full screen on mobile, floating box on desktop */}
+      <div className="flex-grow flex flex-col bg-white dark:bg-slate-950 md:rounded-[2.5rem] shadow-2xl border-none md:border md:border-white/20 dark:md:border-slate-800 overflow-hidden h-full">
         {/* Modern Header */}
         <div className="px-4 py-3 md:px-6 md:py-4 bg-[#075e54] dark:bg-slate-900 text-white flex justify-between items-center shadow-lg relative z-10">
-          <div className="flex items-center gap-3">
-            <button onClick={onClose} className="p-1 mr-1 md:hidden">
-              <X size={20} />
+          <div className="flex items-center gap-2 md:gap-3">
+            {/* Mobile Back Button */}
+            <button
+              onClick={onClose}
+              className="p-2 -ml-2 transition-colors rounded-full hover:bg-white/10"
+            >
+              <ChevronLeft size={24} />
             </button>
+
             <div className="relative">
-              <div className="w-10 h-10 overflow-hidden border rounded-full md:w-11 md:h-11 bg-white/10 border-white/20">
+              <div className="overflow-hidden border rounded-full w-9 h-9 md:w-11 md:h-11 bg-white/10 border-white/20">
                 <img
                   src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${recipient.username}`}
                   className="object-cover w-full h-full"
                   alt={recipient.username}
                 />
               </div>
-              <div className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-400 rounded-full border-2 border-[#075e54] dark:border-slate-900" />
+              <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-400 rounded-full border-2 border-[#075e54] dark:border-slate-900" />
             </div>
-            <div className="cursor-pointer">
-              <h4 className="w-24 text-sm font-bold truncate md:w-40">
+
+            <div className="cursor-pointer max-w-[120px] xs:max-w-none">
+              <h4 className="text-[14px] md:text-sm font-bold truncate">
                 {recipient.full_name}
               </h4>
               <p className="text-[10px] text-emerald-300 font-medium">
-                Verified Active
+                Verified Online
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-4 opacity-80">
+
+          <div className="flex items-center gap-2 md:gap-4 opacity-80">
             <span
               title="Phase 3 Release"
-              className="hidden cursor-not-allowed sm:block text-slate-400"
+              className="hidden cursor-not-allowed xs:block text-slate-400/50"
             >
               <Video size={18} />
             </span>
             <span
               title="Phase 3 Release"
-              className="hidden cursor-not-allowed sm:block text-slate-400"
+              className="hidden cursor-not-allowed xs:block text-slate-400/50"
             >
               <Phone size={16} />
             </span>
@@ -144,7 +153,7 @@ const ChatOverlay: React.FC<ChatOverlayProps> = ({
             <div className="flex flex-col items-center justify-center py-10 space-y-4 text-center opacity-40">
               <div className="p-4 border shadow-sm bg-amber-100 dark:bg-amber-900/20 rounded-2xl border-amber-200 dark:border-amber-900/30">
                 <p className="text-[10px] font-black uppercase tracking-widest text-amber-700 dark:text-amber-500 max-w-[200px]">
-                  Secure P2P Tunnel Established. Begin intelligence exchange.
+                  Secure Handshake Established. Begin exchange.
                 </p>
               </div>
             </div>
@@ -159,14 +168,18 @@ const ChatOverlay: React.FC<ChatOverlayProps> = ({
                 } animate-in fade-in slide-in-from-bottom-1 duration-300`}
               >
                 <div
-                  className={`relative max-w-[85%] px-4 py-2 shadow-sm ${
+                  className={`relative max-w-[85%] px-3 py-1.5 md:px-4 md:py-2 shadow-sm ${
                     isMe ? "whatsapp-bubble-out" : "whatsapp-bubble-in"
                   }`}
                 >
-                  <p className="text-[14px] leading-relaxed break-words">
+                  <p className="text-[14px] md:text-[15px] leading-relaxed break-words">
                     {msg.text}
                   </p>
-                  <div className="flex items-center justify-end gap-1 mt-1 opacity-60">
+                  <div
+                    className={`flex items-center justify-end gap-1 mt-1 ${
+                      isMe ? "text-white/60" : "text-slate-400"
+                    }`}
+                  >
                     <span className="text-[9px] font-bold uppercase tracking-tighter">
                       {formatTime(msg.timestamp)}
                     </span>
@@ -178,14 +191,14 @@ const ChatOverlay: React.FC<ChatOverlayProps> = ({
           })}
         </div>
 
-        {/* Footer */}
+        {/* Footer / Input Area */}
         <form
           onSubmit={handleSend}
-          className="p-3 md:p-4 bg-[#f0f2f5] dark:bg-slate-900 flex items-center gap-3 relative z-10"
+          className="p-3 md:p-4 bg-[#f0f2f5] dark:bg-slate-900 flex items-center gap-2 md:gap-3 relative z-10 pb-[env(safe-area-inset-bottom)] md:pb-4"
         >
           <button
             type="button"
-            className="hidden p-2 transition-colors text-slate-500 hover:text-blue-600 sm:block"
+            className="hidden p-2 transition-colors text-slate-500 hover:text-blue-600 xs:block"
           >
             <Info size={20} />
           </button>
@@ -195,18 +208,22 @@ const ChatOverlay: React.FC<ChatOverlayProps> = ({
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder="Type a message..."
-            className="flex-grow bg-white dark:bg-slate-800 border-none rounded-xl px-4 py-2 text-[14px] focus:ring-2 focus:ring-blue-600 transition-all dark:text-white shadow-sm"
+            className="flex-grow bg-white dark:bg-slate-800 border-none rounded-2xl px-4 py-3 md:py-2 text-[15px] md:text-[14px] focus:ring-2 focus:ring-blue-600 transition-all dark:text-white shadow-sm"
           />
           <button
             type="submit"
             disabled={!input.trim()}
-            className={`w-11 h-11 rounded-full flex items-center justify-center transition-all shadow-lg active:scale-90 ${
+            className={`w-12 h-12 md:w-11 md:h-11 rounded-full flex items-center justify-center transition-all shadow-lg active:scale-90 flex-shrink-0 ${
               input.trim()
                 ? "bg-[#00a884] text-white"
                 : "bg-slate-300 dark:bg-slate-700 text-slate-400"
             }`}
           >
-            <Send size={18} fill={input.trim() ? "white" : "transparent"} />
+            <Send
+              size={20}
+              className="ml-1"
+              fill={input.trim() ? "white" : "transparent"}
+            />
           </button>
         </form>
       </div>
