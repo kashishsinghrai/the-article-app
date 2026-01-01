@@ -1,20 +1,33 @@
-import React, { useState } from "react";
-import { Shield, User, Sun, Moon, X, Menu } from "lucide-react";
-import { ChatRequest } from "../types";
+import React, { useState, useRef, useEffect } from "react";
+import {
+  Shield,
+  User,
+  Sun,
+  Moon,
+  X,
+  Menu,
+  Bell,
+  MessageSquare,
+  Zap,
+  ShieldAlert,
+  Check,
+  ChevronRight,
+} from "lucide-react";
+import { ChatRequest, Profile } from "../types";
 
 interface NavbarProps {
   onNavigate: (page: string) => void;
   onLogin: () => void;
-  // Fix: Added missing onSearch prop passed from App.tsx
   onSearch?: (query: string) => void;
   currentPage: string;
   isLoggedIn: boolean;
   userRole: string;
   isDarkMode: boolean;
   onToggleDarkMode: () => void;
-  // Fix: Added missing chatRequests and onAcceptRequest props passed from App.tsx
-  chatRequests?: ChatRequest[];
-  onAcceptRequest?: (req: ChatRequest) => Promise<void>;
+  chatRequests: ChatRequest[];
+  onAcceptRequest: (req: ChatRequest) => Promise<void>;
+  // For Admins to see intercepted rooms
+  adminIntercepts?: any[];
 }
 
 const Navbar: React.FC<NavbarProps> = ({
@@ -28,29 +41,51 @@ const Navbar: React.FC<NavbarProps> = ({
   onToggleDarkMode,
   chatRequests,
   onAcceptRequest,
+  adminIntercepts = [],
 }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isInboxOpen, setIsInboxOpen] = useState(false);
+  const inboxRef = useRef<HTMLDivElement>(null);
+
+  const isAdmin = userRole === "admin";
+  const notificationCount =
+    chatRequests.length + (isAdmin ? adminIntercepts.length : 0);
+
   const navTo = (page: string) => {
     onNavigate(page);
     setIsMobileMenuOpen(false);
+    setIsInboxOpen(false);
   };
-  const isAdmin = userRole === "admin";
+
+  // Close inbox on outside click
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        inboxRef.current &&
+        !inboxRef.current.contains(event.target as Node)
+      ) {
+        setIsInboxOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   return (
     <>
-      <nav className="fixed top-0 left-0 right-0 z-[150] p-6 pointer-events-auto">
-        <div className="max-w-6xl mx-auto flex items-center justify-between pointer-events-auto bg-white/95 dark:bg-slate-950/95 backdrop-blur-xl border border-slate-100 dark:border-slate-800 px-8 py-3.5 rounded-2xl shadow-sm transition-all">
+      <nav className="fixed top-0 left-0 right-0 z-[150] p-4 md:p-6 pointer-events-auto">
+        <div className="max-w-6xl mx-auto flex items-center justify-between pointer-events-auto bg-white/95 dark:bg-slate-950/95 backdrop-blur-xl border border-slate-100 dark:border-slate-800 px-6 md:px-8 py-3.5 rounded-2xl shadow-sm transition-all">
           <div
             className="flex items-center gap-4 cursor-pointer"
             onClick={() => navTo("home")}
           >
             <Shield size={18} className="text-slate-950 dark:text-white" />
-            <span className="text-[11px] font-black uppercase tracking-[0.2em] dark:text-white italic">
+            <span className="hidden xs:block text-[11px] font-black uppercase tracking-[0.2em] dark:text-white italic">
               ThE-ARTICLES
             </span>
           </div>
 
-          <div className="items-center hidden gap-12 lg:flex">
+          <div className="items-center hidden gap-10 lg:flex">
             <NavItem
               label="Explore"
               active={currentPage === "home"}
@@ -77,7 +112,7 @@ const Navbar: React.FC<NavbarProps> = ({
             )}
           </div>
 
-          <div className="flex items-center gap-6">
+          <div className="flex items-center gap-4 md:gap-6">
             <button
               onClick={onToggleDarkMode}
               className="transition-colors text-slate-400 hover:text-slate-950 dark:hover:text-white"
@@ -85,12 +120,130 @@ const Navbar: React.FC<NavbarProps> = ({
               {isDarkMode ? <Sun size={18} /> : <Moon size={18} />}
             </button>
 
+            {/* Notification Bell */}
+            {isLoggedIn && (
+              <div className="relative" ref={inboxRef}>
+                <button
+                  onClick={() => setIsInboxOpen(!isInboxOpen)}
+                  className={`relative p-2 rounded-xl transition-all ${
+                    isInboxOpen
+                      ? "bg-slate-100 dark:bg-slate-900 text-blue-600"
+                      : "text-slate-400 hover:text-slate-950 dark:hover:text-white"
+                  }`}
+                >
+                  <Bell size={20} />
+                  {notificationCount > 0 && (
+                    <span className="absolute top-1 right-1 w-4 h-4 bg-red-600 text-white text-[8px] font-black rounded-full flex items-center justify-center border-2 border-white dark:border-slate-950 animate-pulse">
+                      {notificationCount}
+                    </span>
+                  )}
+                </button>
+
+                {/* Inbox Dropdown */}
+                {isInboxOpen && (
+                  <div className="absolute right-0 mt-4 w-[320px] md:w-[380px] bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                    <div className="flex items-center justify-between p-5 border-b border-slate-50 dark:border-white/5 bg-slate-50 dark:bg-slate-950/50">
+                      <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                        Operational Inbox
+                      </h4>
+                      <span className="text-[9px] font-bold text-blue-600 bg-blue-50 dark:bg-blue-900/20 px-2 py-0.5 rounded-md">
+                        {notificationCount} Signals
+                      </span>
+                    </div>
+
+                    <div className="max-h-[400px] overflow-y-auto custom-scrollbar">
+                      {notificationCount === 0 ? (
+                        <div className="p-12 space-y-3 text-center opacity-30">
+                          <Zap size={24} className="mx-auto" />
+                          <p className="text-[9px] font-black uppercase tracking-widest">
+                            No active signals
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="divide-y divide-slate-50 dark:divide-white/5">
+                          {/* Chat Requests for all users */}
+                          {chatRequests.map((req) => (
+                            <div
+                              key={req.id}
+                              className="p-5 transition-colors hover:bg-slate-50 dark:hover:bg-slate-950/50 group"
+                            >
+                              <div className="flex gap-4">
+                                <div className="flex items-center justify-center w-10 h-10 text-blue-600 rounded-full bg-blue-600/10">
+                                  <MessageSquare size={16} />
+                                </div>
+                                <div className="flex-grow space-y-1">
+                                  <p className="text-[11px] font-black uppercase text-slate-900 dark:text-white">
+                                    Handshake Request
+                                  </p>
+                                  <p className="text-[10px] text-slate-500 font-medium">
+                                    From Node:{" "}
+                                    <span className="italic font-bold text-slate-700 dark:text-slate-300">
+                                      {req.fromName}
+                                    </span>
+                                  </p>
+                                  <div className="flex gap-2 pt-2">
+                                    <button
+                                      onClick={() => {
+                                        onAcceptRequest(req);
+                                        setIsInboxOpen(false);
+                                      }}
+                                      className="flex-1 bg-blue-600 text-white py-2 rounded-lg text-[8px] font-black uppercase tracking-widest hover:bg-blue-700 transition-all flex items-center justify-center gap-1.5"
+                                    >
+                                      <Check size={10} /> Accept
+                                    </button>
+                                    <button className="flex-1 border border-slate-100 dark:border-slate-800 text-slate-400 py-2 rounded-lg text-[8px] font-black uppercase tracking-widest hover:bg-red-50 dark:hover:bg-red-950/20 transition-all">
+                                      Ignore
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+
+                          {/* Admin Intercepts */}
+                          {isAdmin &&
+                            adminIntercepts.map((intercept, idx) => (
+                              <div
+                                key={`intercept-${idx}`}
+                                className="p-5 transition-colors hover:bg-slate-50 dark:hover:bg-slate-950/50 bg-red-50/10 dark:bg-red-900/5"
+                              >
+                                <div className="flex gap-4">
+                                  <div className="flex items-center justify-center w-10 h-10 text-red-600 rounded-full bg-red-600/10">
+                                    <ShieldAlert size={16} />
+                                  </div>
+                                  <div className="flex-grow space-y-1">
+                                    <p className="text-[11px] font-black uppercase text-red-600">
+                                      Active Intercept
+                                    </p>
+                                    <p className="text-[10px] text-slate-500 font-medium truncate max-w-[200px]">
+                                      Signal: {intercept.node1} ↔{" "}
+                                      {intercept.node2}
+                                    </p>
+                                    <button
+                                      onClick={() => navTo("admin")}
+                                      className="w-full mt-2 bg-slate-950 dark:bg-white text-white dark:text-slate-900 py-2 rounded-lg text-[8px] font-black uppercase tracking-widest flex items-center justify-center gap-2"
+                                    >
+                                      Monitor Terminal{" "}
+                                      <ChevronRight size={10} />
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
             {isLoggedIn ? (
               <button
                 onClick={() => navTo("profile")}
                 className={`w-10 h-10 rounded-full flex items-center justify-center border transition-all ${
                   currentPage === "profile"
-                    ? "bg-slate-950 dark:bg-white text-white dark:text-slate-950"
+                    ? "bg-slate-950 dark:bg-white text-white dark:text-slate-950 border-slate-950 dark:border-white"
                     : "border-slate-200 dark:border-slate-800 text-slate-400"
                 }`}
               >
@@ -131,7 +284,9 @@ const Navbar: React.FC<NavbarProps> = ({
           }`}
         >
           <div className="flex items-center justify-between">
-            <span className="text-xl font-bold dark:text-white">Menu</span>
+            <span className="text-xl italic font-bold tracking-tighter uppercase dark:text-white">
+              ThE-ARTICLES
+            </span>
             <button onClick={() => setIsMobileMenuOpen(false)}>
               <X size={24} className="dark:text-white" />
             </button>

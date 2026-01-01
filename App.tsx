@@ -43,6 +43,7 @@ const App: React.FC = () => {
   const [chatRequests, setChatRequests] = useState<ChatRequest[]>([]);
   const [activeChat, setActiveChat] = useState<Profile | null>(null);
   const [chatMessages, setChatMessages] = useState<LiveMessage[]>([]);
+  const [adminIntercepts, setAdminIntercepts] = useState<any[]>([]);
 
   const [profile, setProfile] = useState<Profile | null>(null);
   const [articles, setArticles] = useState<Article[]>([]);
@@ -189,6 +190,13 @@ const App: React.FC = () => {
       const adminMonitor = supabase.channel("admin_oversight");
       adminMonitor
         .on("broadcast", { event: "intercept_pulse" }, (p) => {
+          // Track unique intercepts for the navbar badge
+          setAdminIntercepts((prev) => {
+            const exists = prev.some((i) => i.room === p.payload.room);
+            if (exists) return prev;
+            return [...prev, p.payload];
+          });
+
           toast(
             `Live Chat Intercepted: ${p.payload.node1} <-> ${p.payload.node2}`,
             {
@@ -335,6 +343,7 @@ const App: React.FC = () => {
             onToggleDarkMode={() => setIsDarkMode(!isDarkMode)}
             chatRequests={chatRequests}
             onAcceptRequest={handleAcceptHandshake}
+            adminIntercepts={adminIntercepts}
           />
 
           <div className="pt-24">
@@ -379,7 +388,6 @@ const App: React.FC = () => {
                 currentUserId={profile.id}
               />
             )}
-            {/* Fix: Added missing props (isExternal, onCloseExternal, currentUserId, onSendChatRequest) to ProfilePage */}
             {currentPage === "profile" && (viewingProfile || profile) && (
               <ProfilePage
                 profile={viewingProfile || profile!}
