@@ -79,36 +79,36 @@ const HomePage: React.FC<HomePageProps> = ({
   if (!isLoggedIn && !isArchive) {
     return (
       <main className="flex flex-col">
-        <section className="min-h-[70vh] flex flex-col items-center justify-center py-20 px-4 max-w-7xl mx-auto text-center">
+        <section className="min-h-[70vh] flex flex-col items-center justify-center py-16 md:py-20 px-4 max-w-7xl mx-auto text-center">
           <div className="inline-flex items-center gap-2 mb-6 px-4 py-2 rounded-full bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800/30 text-blue-600 dark:text-blue-400">
             <Zap size={14} className="animate-pulse" />
-            <span className="text-[8px] md:text-[10px] font-black uppercase tracking-[0.3em]">
-              Decentralized Journalism Network
+            <span className="text-[8px] md:text-[10px] font-black uppercase tracking-[0.2em] md:tracking-[0.3em]">
+              Decentralized News Network
             </span>
           </div>
-          <h1 className="text-4xl sm:text-6xl md:text-8xl lg:text-[10rem] font-black text-slate-900 dark:text-white tracking-[-0.07em] mb-8 uppercase italic leading-[0.85] transition-all">
+          <h1 className="text-4xl sm:text-6xl md:text-8xl lg:text-[10rem] font-black text-slate-900 dark:text-white tracking-[-0.05em] md:tracking-[-0.07em] mb-6 md:mb-8 uppercase italic leading-[0.9] md:leading-[0.85] transition-all">
             Uncover <br className="hidden md:block" />{" "}
-            <span className="text-blue-600">The News</span>
+            <span className="text-blue-600">Truth</span>
           </h1>
-          <p className="max-w-xl mx-auto text-slate-500 dark:text-slate-400 text-sm md:text-base mb-12 font-medium italic">
-            Global network of verified nodes delivering transparent,
-            peer-to-peer verified reporting.
+          <p className="max-w-md md:max-w-xl mx-auto text-slate-500 dark:text-slate-400 text-sm md:text-base mb-10 md:mb-12 font-medium italic px-4">
+            A global network of verified nodes delivering transparent,
+            peer-to-peer authenticated reporting.
           </p>
           <button
             onClick={onLogin}
-            className="group relative inline-flex items-center gap-4 bg-slate-900 dark:bg-white dark:text-slate-900 text-white px-8 md:px-14 py-4 md:py-6 rounded-full text-sm md:text-lg font-black uppercase tracking-[0.2em] hover:bg-blue-600 hover:text-white transition-all shadow-2xl active:scale-95"
+            className="group relative inline-flex items-center gap-3 md:gap-4 bg-slate-900 dark:bg-white dark:text-slate-900 text-white px-8 md:px-14 py-4 md:py-6 rounded-full text-sm md:text-lg font-black uppercase tracking-[0.2em] hover:bg-blue-600 hover:text-white transition-all shadow-xl active:scale-95"
           >
             Access Network Terminal
             <ArrowRight
-              size={20}
-              className="group-hover:translate-x-2 transition-transform"
+              size={18}
+              className="md:w-5 md:h-5 group-hover:translate-x-2 transition-transform"
             />
           </button>
         </section>
 
-        <section className="max-w-7xl mx-auto px-4 md:px-6 mb-32 space-y-20 md:space-y-32">
+        <section className="max-w-7xl mx-auto px-4 md:px-6 mb-24 md:mb-32 space-y-16 md:space-y-32">
           <NewsTerminal />
-          <div className="border-t border-slate-100 dark:border-white/5 pt-20">
+          <div className="border-t border-slate-100 dark:border-white/5 pt-16 md:pt-20">
             <TrendingTopics />
           </div>
         </section>
@@ -117,23 +117,23 @@ const HomePage: React.FC<HomePageProps> = ({
   }
 
   return (
-    <main className="max-w-7xl mx-auto px-4 md:px-6 py-24 md:py-32 space-y-20 md:space-y-32">
+    <main className="max-w-7xl mx-auto px-4 md:px-6 py-16 md:py-32 space-y-16 md:space-y-32">
       <NewsTerminal />
 
-      <div id="global-wire">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-8 mb-16 md:mb-24 border-b border-slate-100 dark:border-white/5 pb-12">
-          <div className="space-y-3">
+      <div id="global-wire" className="scroll-mt-32">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 md:gap-8 mb-12 md:mb-24 border-b border-slate-100 dark:border-white/5 pb-8 md:pb-12">
+          <div className="space-y-2 md:space-y-3">
             <div className="flex items-center gap-2 text-blue-600">
               <TrendingUp size={16} />
-              <span className="text-[10px] font-black uppercase tracking-widest">
-                Global Dispatch Feed
+              <span className="text-[8px] md:text-[10px] font-black uppercase tracking-widest">
+                Dispatch Feed
               </span>
             </div>
-            <h2 className="text-4xl md:text-7xl font-black text-slate-900 dark:text-white uppercase italic tracking-tighter leading-none">
-              {isArchive ? "Network Archive" : "Live Global Wire"}
+            <h2 className="text-3xl md:text-7xl font-black text-slate-900 dark:text-white uppercase italic tracking-tighter leading-none">
+              {isArchive ? "Archive" : "Global Wire"}
             </h2>
           </div>
-          <div className="flex gap-2 flex-wrap">
+          <div className="flex gap-1.5 md:gap-2 flex-wrap">
             <FilterTag
               label="All"
               active={selectedCategory === "All"}
@@ -145,11 +145,6 @@ const HomePage: React.FC<HomePageProps> = ({
               onClick={() => setSelectedCategory("Investigative")}
             />
             <FilterTag
-              label="Economic"
-              active={selectedCategory === "Economic"}
-              onClick={() => setSelectedCategory("Economic")}
-            />
-            <FilterTag
               label="Regional"
               active={selectedCategory === "Regional"}
               onClick={() => setSelectedCategory("Regional")}
@@ -158,49 +153,52 @@ const HomePage: React.FC<HomePageProps> = ({
         </div>
 
         {filteredArticles.length === 0 ? (
-          <div className="py-24 md:py-40 text-center opacity-30">
-            <Globe size={48} className="mx-auto mb-6 text-slate-300" />
-            <p className="text-xl md:text-2xl font-black uppercase italic tracking-widest text-slate-400">
-              Awaiting Node Dispatch
+          <div className="py-20 md:py-40 text-center opacity-30">
+            <Globe
+              size={40}
+              className="md:w-12 md:h-12 mx-auto mb-6 text-slate-300"
+            />
+            <p className="text-lg md:text-2xl font-black uppercase italic tracking-widest text-slate-400">
+              Awaiting Dispatch
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-16">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 md:gap-16">
             {filteredArticles.map((article) => (
               <div
                 key={article.id}
-                className="group cursor-pointer bg-white dark:bg-white/5 p-4 md:p-8 rounded-[2rem] md:rounded-[3rem] border border-slate-100 dark:border-white/5 hover:border-blue-600 dark:hover:border-blue-600 transition-all duration-500 relative flex flex-col"
+                className="group cursor-pointer bg-white dark:bg-slate-900/40 p-3 md:p-8 rounded-3xl md:rounded-[3rem] border border-slate-100 dark:border-white/5 hover:border-blue-600 dark:hover:border-blue-600 transition-all duration-500 relative flex flex-col"
                 onClick={() => onReadArticle?.(article)}
               >
-                <div className="aspect-[16/10] rounded-[1.5rem] md:rounded-[2.5rem] overflow-hidden mb-6 md:mb-8 relative shadow-sm">
+                <div className="aspect-[16/10] rounded-2xl md:rounded-[2.5rem] overflow-hidden mb-5 md:mb-8 relative shadow-sm">
                   <img
                     src={
                       article.image_url ||
                       "https://images.unsplash.com/photo-1585829365234-781fcd04c83e?auto=format&fit=crop&q=80&w=800"
                     }
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-1000 grayscale group-hover:grayscale-0"
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-1000 grayscale md:group-hover:grayscale-0"
                     alt={article.title}
                   />
 
-                  <div className="absolute top-4 left-4 md:top-6 md:left-6">
+                  <div className="absolute top-3 left-3 md:top-6 md:left-6">
                     <div
                       className={`${getCategoryColor(
                         article.category
-                      )} text-white px-4 py-1.5 rounded-full text-[8px] md:text-[10px] font-black uppercase tracking-widest flex items-center gap-2 shadow-xl`}
+                      )} text-white px-3 py-1 md:py-1.5 rounded-full text-[7px] md:text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 md:gap-2 shadow-lg`}
                     >
-                      {getCategoryIcon(article.category)} {article.category}
+                      {getCategoryIcon(article.category, 10)} {article.category}
                     </div>
                   </div>
 
                   <div className="absolute inset-0 bg-slate-900/0 group-hover:bg-slate-900/20 transition-colors flex items-center justify-center">
-                    <div className="bg-white text-slate-900 w-12 h-12 md:w-16 md:h-16 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 scale-90 group-hover:scale-100 transition-all shadow-2xl">
-                      <BookOpen size={20} />
+                    <div className="bg-white text-slate-900 w-10 h-10 md:w-16 md:h-16 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 scale-90 group-hover:scale-100 transition-all shadow-2xl">
+                      <BookOpen size={18} className="md:w-5 md:h-5" />
                     </div>
                   </div>
                 </div>
 
-                <div className="space-y-4 flex-grow flex flex-col">
-                  <div className="flex justify-between items-center text-[8px] md:text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">
+                <div className="space-y-3 md:space-y-4 flex-grow flex flex-col px-1 md:px-0">
+                  <div className="flex justify-between items-center text-[7px] md:text-[9px] font-black uppercase tracking-widest text-slate-400">
                     <span
                       onClick={(e) => {
                         e.stopPropagation();
@@ -214,7 +212,7 @@ const HomePage: React.FC<HomePageProps> = ({
                       {new Date(article.created_at).toLocaleDateString()}
                     </span>
                   </div>
-                  <h3 className="text-xl md:text-3xl font-black text-slate-900 dark:text-white leading-[1.1] uppercase italic tracking-tighter group-hover:text-blue-600 transition-colors line-clamp-2">
+                  <h3 className="text-lg md:text-3xl font-black text-slate-900 dark:text-white leading-[1.2] md:leading-[1.1] uppercase italic tracking-tighter group-hover:text-blue-600 transition-colors line-clamp-2">
                     {article.title}
                   </h3>
                   <p className="text-slate-500 dark:text-slate-400 font-medium text-xs md:text-sm line-clamp-2 italic leading-relaxed">
@@ -228,9 +226,9 @@ const HomePage: React.FC<HomePageProps> = ({
                       e.stopPropagation();
                       if (confirm("Purge this record?")) onDelete(article.id);
                     }}
-                    className="absolute bottom-6 right-6 p-3 bg-red-600/10 text-red-600 rounded-2xl hover:bg-red-600 hover:text-white transition-all opacity-0 group-hover:opacity-100 z-10"
+                    className="absolute bottom-4 right-4 md:bottom-6 md:right-6 p-2 md:p-3 bg-red-600/10 text-red-600 rounded-xl md:rounded-2xl hover:bg-red-600 hover:text-white transition-all opacity-0 group-hover:opacity-100 z-10"
                   >
-                    <Trash2 size={16} />
+                    <Trash2 size={14} className="md:w-4 md:h-4" />
                   </button>
                 )}
               </div>
@@ -253,7 +251,7 @@ const FilterTag = ({
 }) => (
   <button
     onClick={onClick}
-    className={`px-5 py-2 md:px-8 md:py-3 rounded-full text-[8px] md:text-[10px] font-black uppercase tracking-widest border transition-all ${
+    className={`px-4 py-2 md:px-8 md:py-3 rounded-full text-[7px] md:text-[10px] font-black uppercase tracking-widest border transition-all ${
       active
         ? "bg-slate-900 dark:bg-white text-white dark:text-slate-900 border-slate-900 dark:border-white shadow-lg"
         : "bg-transparent text-slate-400 dark:text-slate-600 border-slate-100 dark:border-slate-800 hover:border-slate-900 dark:hover:border-white hover:text-slate-900 dark:hover:text-white"

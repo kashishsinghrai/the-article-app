@@ -43,7 +43,6 @@ const App: React.FC = () => {
   const [users, setUsers] = useState<Profile[]>([]);
   const initializationInProgress = useRef(false);
 
-  // Use a ref for the active chat ID to access it inside real-time callbacks correctly
   const activeChatIdRef = useRef<string | null>(null);
   useEffect(() => {
     activeChatIdRef.current = activeChat?.id || null;
@@ -111,9 +110,9 @@ const App: React.FC = () => {
     return () => clearInterval(ticker);
   }, [fetchArticles, fetchUsers]);
 
-  // LIVE HANDSHAKE LISTENER
   useEffect(() => {
     if (!profile?.id) return;
+
     const inboxChannel = supabase.channel(`inbox_${profile.id}`);
     inboxChannel
       .on("broadcast", { event: "handshake" }, (p) => {
@@ -124,16 +123,36 @@ const App: React.FC = () => {
         toast(`New Link Request: ${req.fromName}`, { icon: "📡" });
       })
       .subscribe();
+
+    const notifyChannel = supabase.channel(`notify_${profile.id}`);
+    notifyChannel
+      .on("broadcast", { event: "new_message" }, (p) => {
+        const msg = p.payload as LiveMessage & { senderProfile: Profile };
+        if (activeChatIdRef.current !== msg.senderId) {
+          toast(
+            `Message from ${msg.senderName}: "${msg.text.substring(0, 20)}..."`,
+            {
+              icon: "💬",
+              duration: 4000,
+              onClick: () => {
+                setActiveChat(msg.senderProfile);
+                setChatMessages((prev) => [...prev, msg]);
+              },
+            } as any
+          );
+        }
+      })
+      .subscribe();
+
     return () => {
       supabase.removeChannel(inboxChannel);
+      supabase.removeChannel(notifyChannel);
     };
-  }, [profile?.id]);
+  }, [profile?.id, users]);
 
-  // P2P REALTIME MESSAGE LISTENER (SHARED CHANNEL)
   useEffect(() => {
     if (!profile?.id || !activeChat?.id) return;
 
-    // Create a unique room ID by sorting user IDs
     const ids = [profile.id, activeChat.id].sort();
     const roomName = `room_${ids[0]}_${ids[1]}`;
 
@@ -165,16 +184,24 @@ const App: React.FC = () => {
         timestamp: Date.now(),
       };
 
-      // Update own UI
       setChatMessages((prev) => [...prev, message]);
 
-      // Send to shared room
       const ids = [profile.id, activeChat.id].sort();
       const roomName = `room_${ids[0]}_${ids[1]}`;
       supabase.channel(roomName).send({
         type: "broadcast",
         event: "message",
         payload: message,
+      });
+
+      supabase.channel(`notify_${activeChat.id}`).subscribe((status) => {
+        if (status === "SUBSCRIBED") {
+          supabase.channel(`notify_${activeChat.id}`).send({
+            type: "broadcast",
+            event: "new_message",
+            payload: { ...message, senderProfile: profile },
+          });
+        }
       });
     },
     [profile, activeChat]
@@ -218,7 +245,6 @@ const App: React.FC = () => {
     [users]
   );
 
-  // Navigation and UI handlers
   const handleNavigate = (page: string) => {
     setViewingProfile(null);
     setSearchQuery("");
@@ -334,6 +360,7 @@ const App: React.FC = () => {
             onSendChatRequest={handleSendChatRequest}
             isExternal={!!viewingProfile}
             onCloseExternal={() => setViewingProfile(null)}
+            currentUserId={profile.id}
           />
         )}
         {currentPage === "network" && (
@@ -360,32 +387,28 @@ const App: React.FC = () => {
       <TrendingTicker />
       <Footer nodeCount={nodeCount} onNavigate={handleNavigate} />
 
-      {showAuth === "login" && (
-        <div className="fixed inset-0 z-[500] flex items-center justify-center p-6">
+      {showAuth && (
+        <div className="fixed inset-0 z-[500] flex items-center justify-center p-4 md:p-6 overflow-hidden">
           <div
-            className="absolute inset-0 bg-slate-950/80 backdrop-blur-xl"
+            className="absolute inset-0 bg-slate-950/90 backdrop-blur-xl"
             onClick={() => setShowAuth(null)}
           />
-          <LoginPage
-            onBack={() => setShowAuth(null)}
-            onSuccess={handleAuthSuccess}
-            onGoToRegister={() => setShowAuth("register")}
-          />
+          {showAuth === "login" ? (
+            <LoginPage
+              onBack={() => setShowAuth(null)}
+              onSuccess={handleAuthSuccess}
+              onGoToRegister={() => setShowAuth("register")}
+            />
+          ) : (
+            <RegisterPage
+              onBack={() => setShowAuth(null)}
+              onSuccess={handleAuthSuccess}
+              onGoToLogin={() => setShowAuth("login")}
+            />
+          )}
         </div>
       )}
-      {showAuth === "register" && (
-        <div className="fixed inset-0 z-[500] flex items-center justify-center p-6">
-          <div
-            className="absolute inset-0 bg-slate-950/80 backdrop-blur-xl"
-            onClick={() => setShowAuth(null)}
-          />
-          <RegisterPage
-            onBack={() => setShowAuth(null)}
-            onSuccess={handleAuthSuccess}
-            onGoToLogin={() => setShowAuth("login")}
-          />
-        </div>
-      )}
+
       {activeArticle && (
         <ArticleDetail
           article={activeArticle}

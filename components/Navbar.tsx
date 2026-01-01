@@ -12,6 +12,9 @@ import {
   FileText,
   Network,
   LogIn,
+  TrendingUp,
+  Info,
+  LayoutDashboard,
 } from "lucide-react";
 import { ChatRequest } from "../types";
 
@@ -69,7 +72,8 @@ const Navbar: React.FC<NavbarProps> = ({
             <div className="bg-blue-600 p-2 md:p-2.5 rounded-xl text-white group-hover:rotate-12 transition-transform shadow-lg shadow-blue-600/20">
               <Shield size={18} strokeWidth={2.5} />
             </div>
-            <span className="text-base md:text-xl font-black tracking-[-0.05em] text-slate-900 dark:text-white uppercase hidden xs:block">
+            {/* Re-enabled platform name with safe block rendering */}
+            <span className="text-[14px] xs:text-base md:text-xl font-black tracking-[-0.05em] text-slate-900 dark:text-white uppercase block">
               ThE-ARTICLES
             </span>
           </div>
@@ -92,6 +96,18 @@ const Navbar: React.FC<NavbarProps> = ({
                 onClick={() => navTo("post")}
               />
             )}
+            <NavItem
+              label="Support"
+              active={currentPage === "support"}
+              onClick={() => navTo("support")}
+            />
+            {isLoggedIn && userRole === "admin" && (
+              <NavItem
+                label="Admin"
+                active={currentPage === "admin"}
+                onClick={() => navTo("admin")}
+              />
+            )}
           </div>
 
           <div className="flex items-center gap-1.5 md:gap-4">
@@ -108,22 +124,22 @@ const Navbar: React.FC<NavbarProps> = ({
                   <MessageSquare size={16} />
                 </button>
                 {showRequests && (
-                  <div className="fixed sm:absolute top-[80px] sm:top-14 left-4 right-4 sm:left-auto sm:right-0 sm:w-80 glass dark:bg-slate-900 rounded-[2.5rem] shadow-2xl border border-slate-100 dark:border-white/10 p-5 md:p-6 space-y-4 animate-in fade-in slide-in-from-top-4 z-[200]">
+                  <div className="fixed sm:absolute top-[75px] sm:top-14 left-4 right-4 sm:left-auto sm:right-0 sm:w-80 glass dark:bg-slate-900 rounded-[2rem] md:rounded-[2.5rem] shadow-2xl border border-slate-100 dark:border-white/10 p-5 md:p-6 space-y-4 animate-in fade-in slide-in-from-top-4 z-[200]">
                     <div className="flex justify-between items-center pb-2 border-b border-slate-100 dark:border-white/5">
                       <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">
                         Handshake Signals
                       </span>
                       <button
                         onClick={() => setShowRequests(false)}
-                        className="text-slate-300 hover:text-red-500 p-1"
+                        className="text-slate-300 hover:text-red-500 p-1 transition-colors"
                       >
                         <X size={16} />
                       </button>
                     </div>
-                    <div className="space-y-3 max-h-60 overflow-y-auto custom-scrollbar">
+                    <div className="space-y-3 max-h-60 overflow-y-auto custom-scrollbar pr-1">
                       {chatRequests.length === 0 ? (
                         <p className="text-[9px] text-center font-black uppercase tracking-[0.2em] text-slate-300 py-6">
-                          No active signals found
+                          No signals detected
                         </p>
                       ) : (
                         chatRequests.map((req) => (
@@ -151,7 +167,7 @@ const Navbar: React.FC<NavbarProps> = ({
                               </button>
                               <button
                                 onClick={() => setShowRequests(false)}
-                                className="p-2 bg-slate-200 dark:bg-slate-800 text-slate-400 rounded-lg"
+                                className="p-2 bg-slate-200 dark:bg-slate-800 text-slate-400 rounded-lg hover:text-red-500 transition-colors"
                               >
                                 <X size={14} />
                               </button>
@@ -194,7 +210,7 @@ const Navbar: React.FC<NavbarProps> = ({
 
             <button
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              className="lg:hidden w-9 h-9 md:w-10 md:h-10 flex items-center justify-center text-slate-900 dark:text-white bg-slate-100 dark:bg-slate-800 rounded-full"
+              className="lg:hidden w-9 h-9 md:w-10 md:h-10 flex items-center justify-center text-slate-900 dark:text-white bg-slate-100 dark:bg-slate-800 rounded-full active:scale-90 transition-transform"
             >
               {isMobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
             </button>
@@ -202,6 +218,7 @@ const Navbar: React.FC<NavbarProps> = ({
         </div>
       </nav>
 
+      {/* Mobile Menu with all options */}
       <div
         className={`fixed inset-0 z-[200] lg:hidden transition-all duration-500 ${
           isMobileMenuOpen
@@ -220,7 +237,7 @@ const Navbar: React.FC<NavbarProps> = ({
         >
           <div className="flex justify-between items-center pb-4 border-b border-slate-100 dark:border-white/5">
             <span className="text-xl font-black uppercase italic tracking-tighter">
-              Terminal Menu
+              Menu
             </span>
             <button
               onClick={() => setIsMobileMenuOpen(false)}
@@ -230,7 +247,13 @@ const Navbar: React.FC<NavbarProps> = ({
             </button>
           </div>
 
-          <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-3 overflow-y-auto custom-scrollbar pr-2">
+            <MobileNavItem
+              icon={<TrendingUp size={18} />}
+              label="Wire Feed"
+              active={currentPage === "home"}
+              onClick={() => navTo("home")}
+            />
             <MobileNavItem
               icon={<Network size={18} />}
               label="The Network"
@@ -251,6 +274,20 @@ const Navbar: React.FC<NavbarProps> = ({
               active={currentPage === "profile"}
               onClick={() => navTo("profile")}
             />
+            <MobileNavItem
+              icon={<Info size={18} />}
+              label="Support Terminal"
+              active={currentPage === "support"}
+              onClick={() => navTo("support")}
+            />
+            {isLoggedIn && userRole === "admin" && (
+              <MobileNavItem
+                icon={<LayoutDashboard size={18} />}
+                label="Admin Database"
+                active={currentPage === "admin"}
+                onClick={() => navTo("admin")}
+              />
+            )}
           </div>
 
           <div className="mt-auto space-y-4">
@@ -260,8 +297,8 @@ const Navbar: React.FC<NavbarProps> = ({
                 onChange={(e) => handleTranslate(e.target.value)}
                 className="bg-transparent border-none text-[10px] font-black uppercase tracking-widest w-full dark:text-white focus:ring-0"
               >
-                <option value="en">English (Global)</option>
-                <option value="hi">हिन्दी (India)</option>
+                <option value="en">English</option>
+                <option value="hi">हिन्दी</option>
                 <option value="es">Español</option>
                 <option value="bn">বাংলা</option>
               </select>
@@ -274,7 +311,8 @@ const Navbar: React.FC<NavbarProps> = ({
                 }}
                 className="w-full py-4 bg-blue-600 text-white rounded-2xl font-black uppercase tracking-widest flex items-center justify-center gap-3 shadow-xl"
               >
-                <LogIn size={18} /> Establish Identity
+                Establish Identity
+                <LogIn size={18} />
               </button>
             )}
           </div>
@@ -306,7 +344,7 @@ const MobileNavItem = ({ icon, label, active, onClick }: any) => (
     className={`flex items-center gap-4 p-4 rounded-2xl transition-all border ${
       active
         ? "bg-blue-600 text-white border-blue-500 shadow-lg"
-        : "bg-slate-50 dark:bg-slate-900 text-slate-500 border-transparent hover:text-slate-900"
+        : "bg-slate-50 dark:bg-slate-900 text-slate-500 border-transparent hover:text-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800"
     }`}
   >
     {icon}
