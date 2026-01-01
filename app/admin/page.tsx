@@ -7,12 +7,13 @@ import {
   FileText,
   Users,
   Fingerprint,
-  TrendingUp,
   ShieldCheck,
-  UserMinus,
-  UserPlus,
   Coins,
   Loader2,
+  Activity,
+  Zap,
+  MessageCircle,
+  ArrowLeft,
 } from "lucide-react";
 import { Article, Profile } from "../../types";
 import { supabase } from "../../lib/supabase";
@@ -33,7 +34,9 @@ const AdminPage: React.FC<AdminPageProps> = ({
   onDeleteUser,
   onRefreshData,
 }) => {
-  const [activeTab, setActiveTab] = useState<"articles" | "users">("articles");
+  const [activeTab, setActiveTab] = useState<"articles" | "users" | "monitor">(
+    "articles"
+  );
   const [searchTerm, setSearchTerm] = useState("");
   const [processingId, setProcessingId] = useState<string | null>(null);
 
@@ -45,10 +48,8 @@ const AdminPage: React.FC<AdminPageProps> = ({
       .update({ role: newRole })
       .eq("id", userId);
     if (!error) {
-      toast.success(`Node status: ${newRole.toUpperCase()}`);
+      toast.success(`Role updated to ${newRole.toUpperCase()}`);
       onRefreshData?.();
-    } else {
-      toast.error("Privilege update failed");
     }
     setProcessingId(null);
   };
@@ -64,34 +65,10 @@ const AdminPage: React.FC<AdminPageProps> = ({
       .update({ budget: currentBudget + amount })
       .eq("id", userId);
     if (!error) {
-      toast.success(`Reputation Adjusted: ${amount > 0 ? "+" : ""}${amount}`);
+      toast.success(`Budget adjusted: ${amount}`);
       onRefreshData?.();
-    } else {
-      toast.error("Sync failed");
     }
     setProcessingId(null);
-  };
-
-  const confirmPurgeArticle = async (id: string) => {
-    if (
-      window.confirm("CRITICAL: Purge this intelligence record permanently?")
-    ) {
-      setProcessingId(id);
-      await onDeleteArticle(id);
-      setProcessingId(null);
-    }
-  };
-
-  const confirmPurgeUser = async (id: string) => {
-    if (
-      window.confirm(
-        "CRITICAL: Expel this node from the network? This requires RLS permissions."
-      )
-    ) {
-      setProcessingId(id);
-      await onDeleteUser(id);
-      setProcessingId(null);
-    }
   };
 
   const filteredArticles = articles.filter(
@@ -103,223 +80,214 @@ const AdminPage: React.FC<AdminPageProps> = ({
   const filteredUsers = users.filter(
     (u) =>
       u.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      u.serial_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      u.username.toLowerCase().includes(searchTerm.toLowerCase())
+      u.serial_id.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
-    <main className="px-4 py-24 mx-auto max-w-7xl md:px-6 md:py-32">
-      <div className="bg-slate-900 rounded-[2rem] md:rounded-[3.5rem] p-6 md:p-16 text-white shadow-[0_64px_128px_-24px_rgba(15,23,42,0.4)] relative overflow-hidden min-h-[700px]">
-        <ShieldAlert
-          size={400}
-          className="absolute -bottom-20 -right-20 text-white/[0.03] rotate-12 hidden lg:block"
-        />
-
-        <div className="relative z-10 space-y-8 md:space-y-12">
-          <div className="flex flex-col items-start justify-between gap-6 xl:flex-row xl:items-end md:gap-10">
-            <div className="space-y-4">
-              <div className="flex items-center gap-3 text-red-500">
-                <AlertCircle size={20} />
-                <span className="text-[9px] md:text-[11px] font-black uppercase tracking-[0.4em] italic">
-                  Authority Command Center
-                </span>
-              </div>
-              <h1 className="text-4xl italic font-black leading-none tracking-tighter uppercase transition-all md:text-7xl">
-                Network <br />
-                Database
-              </h1>
-            </div>
-
-            <div className="flex flex-wrap gap-2 md:gap-4">
-              <TabButton
-                active={activeTab === "articles"}
-                onClick={() => setActiveTab("articles")}
-                icon={<FileText size={14} />}
-                label="Intel Reports"
-                count={articles.length}
-              />
-              <TabButton
-                active={activeTab === "users"}
-                onClick={() => setActiveTab("users")}
-                icon={<Users size={14} />}
-                label="Node Manifest"
-                count={users.length}
-              />
-            </div>
+    <main className="max-w-6xl px-6 py-24 mx-auto space-y-12 md:py-32">
+      <div className="flex flex-col items-start justify-between gap-8 md:flex-row md:items-end">
+        <div className="space-y-2">
+          <div className="flex items-center gap-2 text-red-600">
+            <ShieldAlert size={18} />
+            <span className="text-[10px] font-black uppercase tracking-[0.3em]">
+              Authority Control
+            </span>
           </div>
+          <h1 className="text-4xl font-black leading-none tracking-tighter uppercase md:text-7xl text-slate-900 dark:text-white">
+            Terminal
+          </h1>
+        </div>
+        <div className="flex gap-2 p-1.5 bg-slate-50 dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800">
+          <TabButton
+            active={activeTab === "monitor"}
+            onClick={() => setActiveTab("monitor")}
+            icon={<Activity size={14} />}
+            label="Pulse"
+          />
+          <TabButton
+            active={activeTab === "articles"}
+            onClick={() => setActiveTab("articles")}
+            icon={<FileText size={14} />}
+            label="Intel"
+          />
+          <TabButton
+            active={activeTab === "users"}
+            onClick={() => setActiveTab("users")}
+            icon={<Users size={14} />}
+            label="Nodes"
+          />
+        </div>
+      </div>
 
-          <div className="bg-white/5 backdrop-blur-3xl rounded-[1.5rem] md:rounded-[2.5rem] p-6 md:p-10 border border-white/10 space-y-6 md:space-y-8">
-            <div className="flex items-center gap-4 px-5 py-3 border rounded-full md:gap-6 bg-slate-950/50 md:px-8 md:py-4 border-white/5">
-              <Search size={18} className="text-slate-500" />
-              <input
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full text-xs font-medium text-white bg-transparent border-none outline-none focus:ring-0 md:text-sm"
-                placeholder={`Locate ${
-                  activeTab === "articles" ? "Reports" : "Nodes"
-                }...`}
-              />
-            </div>
+      <div className="bg-white dark:bg-slate-950 p-8 rounded-[3rem] border border-slate-200 dark:border-slate-800 shadow-sm min-h-[500px]">
+        {activeTab !== "monitor" && (
+          <div className="flex items-center gap-4 px-6 py-4 mb-8 border bg-slate-50 dark:bg-slate-900 rounded-2xl border-slate-100 dark:border-slate-800">
+            <Search size={18} className="text-slate-400" />
+            <input
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full text-sm font-bold bg-transparent border-none outline-none focus:ring-0 text-slate-900 dark:text-white"
+              placeholder={`Search ${
+                activeTab === "articles" ? "Reports" : "Profiles"
+              }...`}
+            />
+          </div>
+        )}
 
-            <div className="grid grid-cols-1 gap-4 max-h-[500px] overflow-y-auto custom-scrollbar pr-2 md:pr-4">
-              {activeTab === "articles" ? (
-                filteredArticles.length === 0 ? (
-                  <div className="py-20 text-center opacity-20">
-                    <p className="text-2xl italic font-black tracking-tighter uppercase md:text-4xl">
-                      No Records Detected
-                    </p>
-                  </div>
-                ) : (
-                  filteredArticles.map((article) => (
-                    <div
-                      key={article.id}
-                      className="flex flex-col items-center justify-between gap-4 p-4 transition-all border md:flex-row md:p-6 bg-white/5 rounded-2xl md:rounded-3xl border-white/5 hover:border-red-500 group"
-                    >
-                      <div className="flex items-center w-full gap-4 overflow-hidden md:gap-6">
-                        <img
-                          src={article.image_url}
-                          className="flex-shrink-0 object-cover w-12 h-12 transition-all md:w-16 md:h-16 rounded-xl md:rounded-2xl grayscale group-hover:grayscale-0"
-                        />
-                        <div className="flex-grow truncate">
-                          <h4 className="text-sm italic font-bold tracking-tight uppercase truncate md:text-lg">
-                            {article.title}
-                          </h4>
-                          <p className="text-[8px] md:text-[10px] font-black uppercase tracking-widest text-slate-500 truncate">
-                            Source: {article.author_name} •{" "}
-                            {article.author_serial}
-                          </p>
-                        </div>
-                      </div>
-                      <button
-                        disabled={processingId === article.id}
-                        onClick={() => confirmPurgeArticle(article.id)}
-                        className="w-full md:w-auto flex items-center justify-center gap-2 px-6 md:px-8 py-3 bg-red-600/10 text-red-400 rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-red-600 hover:text-white transition-all whitespace-nowrap"
-                      >
-                        {processingId === article.id ? (
-                          <Loader2 className="animate-spin" size={14} />
-                        ) : (
-                          <Trash2 size={14} />
-                        )}
-                        Purge Intel
-                      </button>
-                    </div>
-                  ))
-                )
-              ) : filteredUsers.length === 0 ? (
-                <div className="py-20 text-center opacity-20">
-                  <p className="text-2xl italic font-black tracking-tighter uppercase md:text-4xl">
-                    No Identity Nodes Found
+        <div className="space-y-4">
+          {activeTab === "monitor" && (
+            <div className="space-y-12 duration-500 animate-in fade-in">
+              <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+                <StatCard
+                  label="Live Conversations"
+                  value="12"
+                  icon={
+                    <MessageCircle size={20} className="text-emerald-500" />
+                  }
+                />
+                <StatCard
+                  label="Pending Syncs"
+                  value="04"
+                  icon={<Zap size={20} className="text-blue-500" />}
+                />
+                <StatCard
+                  label="Authority Nodes"
+                  value={users.filter((u) => u.role === "admin").length}
+                  icon={
+                    <ShieldCheck
+                      size={20}
+                      className="text-slate-900 dark:text-white"
+                    />
+                  }
+                />
+              </div>
+
+              <div className="space-y-4">
+                <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                  Recent Transmission Logs
+                </h3>
+                <div className="bg-slate-50 dark:bg-slate-900/50 p-6 rounded-2xl space-y-3 font-mono text-[11px] text-slate-500 border border-slate-100 dark:border-slate-800">
+                  <p>
+                    [{new Date().toLocaleTimeString()}] P2P HANDSHAKE: #ART-1049
+                    CONNECTED TO #ART-9902
+                  </p>
+                  <p>
+                    [{new Date().toLocaleTimeString()}] INTEL BROADCAST: "NEW
+                    REGIONAL UPDATE" BY #ROOT-ADMIN
+                  </p>
+                  <p>
+                    [{new Date().toLocaleTimeString()}] SECURITY: AES-256
+                    ROTATION COMPLETED
+                  </p>
+                  <p className="animate-pulse">
+                    _ LISTENING FOR NEW PACKETS...
                   </p>
                 </div>
-              ) : (
-                filteredUsers.map((user) => (
-                  <div
-                    key={user.id}
-                    className="flex flex-col p-4 space-y-4 transition-all border md:p-6 bg-white/5 rounded-2xl md:rounded-3xl border-white/5 group hover:bg-white/10"
-                  >
-                    <div className="flex flex-col items-start justify-between gap-4 md:flex-row md:items-center">
-                      <div className="flex items-center w-full gap-4 overflow-hidden md:gap-6">
-                        <div className="relative flex items-center justify-center flex-shrink-0 w-12 h-12 text-blue-400 md:w-16 md:h-16 rounded-xl md:rounded-2xl bg-white/10">
-                          {processingId === user.id ? (
-                            <Loader2 className="animate-spin" />
-                          ) : (
-                            <Fingerprint size={28} />
-                          )}
-                        </div>
-                        <div className="flex-grow truncate">
-                          <div className="flex items-center gap-2">
-                            <h4 className="text-sm italic font-bold tracking-tight uppercase truncate md:text-lg">
-                              {user.full_name}
-                            </h4>
-                            {user.role === "admin" && (
-                              <ShieldCheck
-                                size={14}
-                                className="text-blue-500"
-                              />
-                            )}
-                          </div>
-                          <p className="text-[8px] md:text-[10px] font-black uppercase tracking-widest text-slate-500 truncate">
-                            Serial: {user.serial_id} • Rep: {user.budget} • @
-                            {user.username}
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="flex flex-wrap w-full gap-2 md:w-auto">
-                        <button
-                          disabled={processingId === user.id}
-                          onClick={() =>
-                            handleAdjustBudget(user.id, user.budget, 100)
-                          }
-                          className="flex-1 md:flex-none px-4 py-2 bg-emerald-600/20 text-emerald-400 rounded-lg text-[8px] font-black uppercase tracking-widest hover:bg-emerald-600 hover:text-white transition-all flex items-center justify-center gap-2"
-                        >
-                          <Coins size={12} /> Reward
-                        </button>
-                        <button
-                          disabled={processingId === user.id}
-                          onClick={() => handleUpdateRole(user.id, user.role)}
-                          className={`flex-1 md:flex-none px-4 py-2 rounded-lg text-[8px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${
-                            user.role === "admin"
-                              ? "bg-amber-600/20 text-amber-400 hover:bg-amber-600"
-                              : "bg-blue-600/20 text-blue-400 hover:bg-blue-600"
-                          } hover:text-white`}
-                        >
-                          {user.role === "admin" ? (
-                            <>
-                              <UserMinus size={12} /> Demote
-                            </>
-                          ) : (
-                            <>
-                              <UserPlus size={12} /> Promote
-                            </>
-                          )}
-                        </button>
-                        <button
-                          disabled={
-                            user.role === "admin" || processingId === user.id
-                          }
-                          onClick={() => confirmPurgeUser(user.id)}
-                          className="flex-1 md:flex-none px-4 py-2 bg-red-600/10 text-red-400 rounded-lg text-[8px] font-black uppercase tracking-widest hover:bg-red-600 hover:text-white transition-all disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                        >
-                          {processingId === user.id ? (
-                            <Loader2 className="animate-spin" size={12} />
-                          ) : (
-                            <Trash2 size={12} />
-                          )}
-                          Purge
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ))
-              )}
+              </div>
             </div>
-          </div>
+          )}
+
+          {activeTab === "articles" &&
+            filteredArticles.map((article) => (
+              <div
+                key={article.id}
+                className="flex flex-col items-center justify-between gap-4 p-5 transition-all border border-transparent md:flex-row bg-slate-50 dark:bg-slate-900 rounded-2xl hover:border-slate-200 dark:hover:border-slate-700 group"
+              >
+                <div className="flex items-center flex-grow gap-4 truncate">
+                  <div className="flex-shrink-0 w-12 h-12 rounded-xl bg-slate-200 dark:bg-slate-800" />
+                  <div className="truncate">
+                    <h4 className="text-sm italic font-black tracking-tight uppercase truncate">
+                      {article.title}
+                    </h4>
+                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">
+                      {article.author_name} • {article.author_serial}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => onDeleteArticle(article.id)}
+                  className="px-6 py-3 bg-red-50 text-red-600 rounded-xl text-[9px] font-black uppercase hover:bg-red-600 hover:text-white transition-all whitespace-nowrap"
+                >
+                  Delete
+                </button>
+              </div>
+            ))}
+
+          {activeTab === "users" &&
+            filteredUsers.map((user) => (
+              <div
+                key={user.id}
+                className="flex flex-col items-center justify-between gap-4 p-5 transition-all border border-transparent md:flex-row bg-slate-50 dark:bg-slate-900 rounded-2xl hover:border-slate-200"
+              >
+                <div className="flex items-center flex-grow gap-4 truncate">
+                  <div className="flex items-center justify-center flex-shrink-0 w-12 h-12 rounded-xl bg-slate-200 dark:bg-slate-800 text-slate-400">
+                    <Fingerprint size={24} />
+                  </div>
+                  <div className="truncate">
+                    <h4 className="text-sm italic font-black tracking-tight uppercase truncate">
+                      {user.full_name}
+                    </h4>
+                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">
+                      {user.serial_id} • {user.role.toUpperCase()}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() =>
+                      handleAdjustBudget(user.id, user.budget, 100)
+                    }
+                    className="px-4 py-2 bg-slate-200 dark:bg-slate-800 rounded-lg text-[8px] font-black uppercase"
+                  >
+                    Reward
+                  </button>
+                  <button
+                    onClick={() => handleUpdateRole(user.id, user.role)}
+                    className="px-4 py-2 bg-slate-200 dark:bg-slate-800 rounded-lg text-[8px] font-black uppercase"
+                  >
+                    Role
+                  </button>
+                  <button
+                    onClick={() => onDeleteUser(user.id)}
+                    className="px-4 py-2 bg-red-50 text-red-600 rounded-lg text-[8px] font-black uppercase hover:bg-red-600 hover:text-white"
+                  >
+                    Expel
+                  </button>
+                </div>
+              </div>
+            ))}
         </div>
       </div>
     </main>
   );
 };
 
-const TabButton = ({ active, onClick, icon, label, count }: any) => (
+const StatCard = ({ label, value, icon }: any) => (
+  <div className="p-8 rounded-[2rem] bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 space-y-3">
+    <div className="flex items-center justify-between">
+      {icon}
+      <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
+        {label}
+      </span>
+    </div>
+    <p className="text-4xl font-black text-slate-900 dark:text-white">
+      {value}
+    </p>
+  </div>
+);
+
+const TabButton = ({ active, onClick, icon, label }: any) => (
   <button
     onClick={onClick}
-    className={`flex-1 sm:flex-none flex items-center justify-center gap-2 md:gap-3 px-4 md:px-6 py-2.5 md:py-4 rounded-xl md:rounded-3xl transition-all border ${
+    className={`flex items-center gap-2 px-6 py-2.5 rounded-xl transition-all ${
       active
-        ? "bg-white text-slate-900 border-white"
-        : "bg-white/5 text-slate-400 border-white/10 hover:bg-white/10"
+        ? "bg-white dark:bg-slate-800 text-blue-600 shadow-sm border border-slate-100 dark:border-slate-700"
+        : "text-slate-400 hover:text-slate-600"
     }`}
   >
     {icon}
-    <span className="text-[8px] md:text-[10px] font-black uppercase tracking-widest">
+    <span className="text-[10px] font-black uppercase tracking-widest">
       {label}
-    </span>
-    <span
-      className={`text-[8px] md:text-[10px] font-black ml-1 md:ml-2 ${
-        active ? "text-blue-600" : "text-slate-600"
-      }`}
-    >
-      ({count})
     </span>
   </button>
 );
