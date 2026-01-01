@@ -118,6 +118,7 @@ const App: React.FC = () => {
     inboxChannel
       .on("broadcast", { event: "handshake" }, (p) => {
         const req = p.payload as ChatRequest;
+        // Don't duplicate requests from the same user
         setChatRequests((prev) =>
           prev.some((r) => r.fromId === req.fromId) ? prev : [...prev, req]
         );
@@ -141,6 +142,43 @@ const App: React.FC = () => {
     };
   }, [profile?.id, users]);
 
+  const handleAcceptRequest = useCallback(
+    async (req: ChatRequest) => {
+      if (!profile) return;
+
+      const senderProfile = users.find((u) => u.id === req.fromId);
+      if (senderProfile) {
+        // 1. Open chat for the acceptor (current user)
+        setActiveChat(senderProfile);
+        setChatMessages([]);
+
+        // 2. Notify the sender that the request was accepted
+        const channel = supabase.channel(`inbox_${req.fromId}`);
+        channel.subscribe((status) => {
+          if (status === "SUBSCRIBED") {
+            channel.send({
+              type: "broadcast",
+              event: "handshake_accepted",
+              payload: {
+                acceptorId: profile.id,
+                acceptorName: profile.full_name,
+              },
+            });
+            // Temporary channel used only for confirmation, close it after a delay
+            setTimeout(() => supabase.removeChannel(channel), 1000);
+          }
+        });
+
+        // 3. Remove the request from the notification list
+        setChatRequests((prev) => prev.filter((r) => r.id !== req.id));
+        toast.success(
+          `Handshake complete. Terminal open with ${senderProfile.full_name}.`
+        );
+      }
+    },
+    [profile, users]
+  );
+
   const handleSendMessage = useCallback(
     (text: string) => {
       if (!profile || !activeChat) return;
@@ -158,6 +196,18 @@ const App: React.FC = () => {
       supabase
         .channel(roomName)
         .send({ type: "broadcast", event: "message", payload: message });
+
+      // Send intercept pulse for admin monitoring
+      supabase.channel("admin_oversight").send({
+        type: "broadcast",
+        event: "intercept_pulse",
+        payload: {
+          room: roomName,
+          node1: profile.full_name,
+          node2: activeChat.full_name,
+          ...message,
+        },
+      });
     },
     [profile, activeChat]
   );
@@ -253,7 +303,8 @@ const App: React.FC = () => {
             isDarkMode={isDarkMode}
             onToggleDarkMode={() => setIsDarkMode(!isDarkMode)}
             chatRequests={chatRequests}
-            onAcceptRequest={async (req) => {}}
+            onAcceptRequest={handleAcceptRequest}
+            adminIntercepts={adminIntercepts}
           />
 
           <div className="pt-24">
