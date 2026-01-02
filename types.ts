@@ -1,4 +1,3 @@
-
 export type Role = 'user' | 'admin';
 export type Category = 'Investigative' | 'Economic' | 'Regional' | 'All';
 
@@ -8,7 +7,7 @@ export interface UserSettings {
   data_sharing: boolean;
   ai_briefings: boolean;
   secure_mode: boolean;
-  // Hardware Permissions
+  // Hardware/System Permissions
   camera_access: boolean;
   mic_access: boolean;
   location_access: boolean;
@@ -38,7 +37,7 @@ export interface Profile {
   avatar_url?: string;
   email?: string;
   phone?: string;
-  following?: string[]; // IDs of users this person follows
+  following?: string[]; // Array of IDs
   followers_count?: number;
   following_count?: number;
   is_online?: boolean; 
@@ -46,20 +45,25 @@ export interface Profile {
   settings?: UserSettings; 
 }
 
+// Combine snake_case for DB and camelCase for UI compatibility
 export interface ChatRequest {
   id: string;
-  fromId: string;
-  fromName: string;
-  toId: string;
-  timestamp: number;
+  from_id: string;
+  to_id: string;
+  from_name?: string; 
+  status: 'pending' | 'accepted' | 'rejected';
+  timestamp: number; // For UI sorting
+  created_at: string; // For DB consistency
 }
 
 export interface LiveMessage {
   id: string;
-  senderId: string;
-  senderName?: string; 
+  sender_id: string;
+  sender_name?: string; 
+  recipient_id?: string;
   text: string;
   timestamp: number;
+  created_at: string;
 }
 
 export interface Article {
