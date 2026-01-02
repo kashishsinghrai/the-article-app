@@ -53,11 +53,9 @@ const App: React.FC = () => {
       if (error) throw error;
       if (arts) {
         setArticles([...arts]);
-        localStorage.setItem("the_articles_cache", JSON.stringify(arts));
       }
     } catch (e: any) {
-      const cached = localStorage.getItem("the_articles_cache");
-      if (cached) setArticles(JSON.parse(cached));
+      console.error("Article fetch failed");
     }
   }, []);
 
@@ -93,7 +91,7 @@ const App: React.FC = () => {
           setProfile(prof);
           setIsSettingUp(false);
         } else {
-          // No profile found for active session user
+          // Check if session just created, give time or force setup
           setIsSettingUp(true);
         }
       } else {
@@ -114,14 +112,26 @@ const App: React.FC = () => {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === "SIGNED_IN") {
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === "SIGNED_IN" && session) {
         setIsLoggedIn(true);
-        initApp();
+        // Direct profile check on login
+        const { data: prof } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("id", session.user.id)
+          .maybeSingle();
+        if (prof) {
+          setProfile(prof);
+          setIsSettingUp(false);
+        } else {
+          setIsSettingUp(true);
+        }
       } else if (event === "SIGNED_OUT") {
         setIsLoggedIn(false);
         setProfile(null);
         setCurrentPage("home");
+        setIsSettingUp(false);
       }
     });
 
@@ -151,29 +161,10 @@ const App: React.FC = () => {
       })
       .subscribe();
 
-    let adminChannel: any = null;
-    if (profile.role === "admin") {
-      adminChannel = supabase.channel("admin_oversight");
-      adminChannel
-        .on("broadcast", { event: "intercept_pulse" }, (p: any) => {
-          setAdminIntercepts((prev) => {
-            const exists = prev.find((i) => i.room === p.payload.room);
-            if (!exists) return [...prev, p.payload];
-            return prev.map((i) =>
-              i.room === p.payload.room
-                ? { ...i, timestamp: Date.now(), lastText: p.payload.text }
-                : i
-            );
-          });
-        })
-        .subscribe();
-    }
-
     return () => {
       supabase.removeChannel(inboxChannel);
-      if (adminChannel) supabase.removeChannel(adminChannel);
     };
-  }, [profile?.id, profile?.role, users]);
+  }, [profile?.id, users]);
 
   const handleAcceptRequest = useCallback(
     async (req: ChatRequest) => {
@@ -228,6 +219,7 @@ const App: React.FC = () => {
     setProfile(null);
     setCurrentPage("home");
     setIsSettingUp(false);
+    toast.success("Identity disconnected.");
   };
 
   const handleNavigate = (page: string) => {
@@ -242,22 +234,24 @@ const App: React.FC = () => {
         data: { session },
       } = await supabase.auth.getSession();
       if (!session?.user) {
-        toast.error("Session expired. Please login again.");
+        toast.error("Auth expired. Please login again.");
         return;
       }
 
       const finalProfile = { ...profileData, id: session.user.id };
-      const { error } = await supabase.from("profiles").upsert(finalProfile);
+      const { error } = await supabase
+        .from("profiles")
+        .upsert(finalProfile, { onConflict: "id" });
 
       if (error) throw error;
 
       setProfile(finalProfile);
       setIsSettingUp(false);
       handleNavigate("home");
-      toast.success("Operational Node Activated.");
+      toast.success("Identity Forge Complete. Node Active.");
       fetchUsers();
     } catch (err: any) {
-      toast.error(err.message || "Failed to sync profile.");
+      toast.error("Registry sync failed: " + err.message);
     }
   };
 

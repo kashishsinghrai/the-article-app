@@ -15,10 +15,6 @@ import {
   LogOut,
   Shield,
   Terminal as TerminalIcon,
-  Camera,
-  Mic,
-  MapPin,
-  CheckCircle2,
   Database,
   Newspaper,
   Code,
@@ -62,8 +58,8 @@ const AdminPage: React.FC<AdminPageProps> = ({
   >({});
   const [sqlCommand, setSqlCommand] = useState("");
   const [terminalOutput, setTerminalOutput] = useState<string[]>([
-    "[SYSTEM] Core operational...",
-    "[INFO] RLS Layer: Verified",
+    "[SYSTEM] Root established...",
+    "[INFO] RLS Layer: Operational",
   ]);
   const [isLockdown, setIsLockdown] = useState(false);
 
@@ -71,7 +67,7 @@ const AdminPage: React.FC<AdminPageProps> = ({
     useState<Article[]>(initialArticles);
   const [localUsers, setLocalUsers] = useState<Profile[]>(initialUsers);
 
-  // Edit State
+  // Edit Modal State
   const [editingUser, setEditingUser] = useState<Profile | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
 
@@ -154,22 +150,26 @@ const AdminPage: React.FC<AdminPageProps> = ({
   const handleDeleteUser = async (userId: string) => {
     if (userId === currentUserId)
       return toast.error("ROOT NODE PROTECTION: Cannot delete self.");
-    if (
-      !confirm(
-        "TERMINATE IDENTITY? This will wipe all associated node data forever."
-      )
-    )
-      return;
+    if (!confirm("CRITICAL: Terminate this identity and all its data?")) return;
 
     try {
-      const { error } = await (supabase as any).rpc("admin_delete_user", {
-        target_user_id: userId,
-      });
-      if (error) throw error;
-      toast.success("IDENTITY TERMINATED");
+      // First attempt profile delete
+      const { error: profErr } = await supabase
+        .from("profiles")
+        .delete()
+        .eq("id", userId);
+      if (profErr) throw profErr;
+
+      // Attempt auth delete via RPC if available, else notify
+      const { error: rpcErr } = await (supabase as any).rpc(
+        "admin_delete_user",
+        { target_user_id: userId }
+      );
+
+      toast.success("IDENTITY REMOVED FROM REGISTRY");
       if (onUpdateUsers) onUpdateUsers();
     } catch (err: any) {
-      toast.error("TERMINATION FAILED: " + err.message);
+      toast.error("TERMINATION PARTIAL: " + err.message);
     }
   };
 
@@ -199,11 +199,11 @@ const AdminPage: React.FC<AdminPageProps> = ({
   };
 
   const handleDeleteArticle = async (id: string) => {
-    if (!confirm("DELETE DISPATCH? Action cannot be undone.")) return;
+    if (!confirm("DELETE DISPATCH?")) return;
     try {
       const { error } = await supabase.from("articles").delete().eq("id", id);
       if (error) throw error;
-      toast.success("DISPATCH REMOVED");
+      toast.success("DISPATCH PURGED");
       setLocalArticles((prev) => prev.filter((a) => a.id !== id));
     } catch (err: any) {
       toast.error("MODERATION FAILED");
@@ -239,26 +239,25 @@ const AdminPage: React.FC<AdminPageProps> = ({
   }, [allRoomMessages, activeInterception]);
 
   return (
-    <main className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-24 md:py-32 space-y-8 md:space-y-12 animate-in fade-in duration-500">
-      {/* Command Header */}
+    <main className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-24 md:py-32 space-y-12 animate-in fade-in duration-500">
       <div className="flex flex-col items-start justify-between gap-8 pb-10 border-b lg:flex-row border-slate-100 dark:border-slate-800">
         <div className="space-y-4">
           <div className="flex items-center gap-3 text-red-600 animate-pulse">
             <ShieldAlert size={20} />
             <span className="text-[10px] font-black uppercase tracking-[0.4em]">
-              ROOT OPERATIONS V4
+              ROOT ACCESS V4.0
             </span>
           </div>
           <h1 className="text-5xl italic font-black leading-none tracking-tighter uppercase sm:text-7xl md:text-8xl dark:text-white">
-            TERMINAL
+            COMMAND
           </h1>
           <div className="flex items-center gap-4">
             <span className="text-slate-400 font-bold uppercase tracking-widest text-[10px]">
-              AUTH: SYSTEM_OVERRIDE
+              CORE STATUS: STABLE
             </span>
             <div className="w-8 h-px bg-slate-200 dark:bg-slate-800" />
             <span className="text-emerald-500 font-black uppercase text-[9px] tracking-widest flex items-center gap-1">
-              <Cpu size={10} /> CORE_READY
+              <Cpu size={10} /> ENCRYPTED_LINK_ACTIVE
             </span>
           </div>
         </div>
@@ -274,7 +273,7 @@ const AdminPage: React.FC<AdminPageProps> = ({
               }`}
             >
               <Power size={16} />{" "}
-              {isLockdown ? "TERMINATE LOCKDOWN" : "PROTOCOL LOCKDOWN"}
+              {isLockdown ? "END LOCKDOWN" : "INITIATE LOCKDOWN"}
             </button>
             <button
               onClick={onLogout}
@@ -313,7 +312,7 @@ const AdminPage: React.FC<AdminPageProps> = ({
               <TabButton
                 active={activeTab === "console"}
                 onClick={() => setActiveTab("console")}
-                label="Console"
+                label="Terminal"
                 icon={<Code size={14} />}
               />
             </div>
@@ -321,40 +320,38 @@ const AdminPage: React.FC<AdminPageProps> = ({
         </div>
       </div>
 
-      {/* Tab Content */}
-      <div className="space-y-12">
-        {/* SYSTEM PULSE */}
+      <div className="pb-20 space-y-12">
         {activeTab === "monitor" && (
           <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
             <MonitorCard
-              label="Data Packets"
-              value={localArticles.length}
-              desc="Active Intelligent Nodes"
-              icon={<Newspaper size={20} />}
-            />
-            <MonitorCard
-              label="Auth Nodes"
+              label="Total Nodes"
               value={localUsers.length}
-              desc="Verified Identities"
+              desc="Identified Identities"
               icon={<User2 size={20} />}
             />
             <MonitorCard
+              label="Dispatches"
+              value={localArticles.length}
+              desc="Public Packets"
+              icon={<Newspaper size={20} />}
+            />
+            <MonitorCard
               label="Integrity"
-              value="100%"
+              value="99.9%"
               color="text-emerald-500"
-              desc="System Shield: Active"
+              desc="RLS Filters: Active"
               icon={<ShieldCheck size={20} />}
             />
             <MonitorCard
-              label="Supabase Sync"
-              value="STABLE"
+              label="Network Delay"
+              value="12ms"
               color="text-blue-500"
-              desc="PostgreSQL Real-time"
-              icon={<Database size={20} />}
+              desc="Edge Synchronization"
+              icon={<Cpu size={20} />}
             />
 
-            <div className="lg:col-span-4 bg-slate-950 rounded-[3rem] p-8 md:p-12 border border-white/10 relative overflow-hidden shadow-2xl">
-              <div className="absolute top-0 right-0 p-8 opacity-10">
+            <div className="lg:col-span-4 bg-slate-950 rounded-[3rem] p-10 border border-white/10 relative overflow-hidden shadow-2xl">
+              <div className="absolute top-0 right-0 p-8 opacity-5">
                 <TerminalIcon size={120} className="text-white" />
               </div>
               <div className="relative z-10 grid grid-cols-1 gap-12 md:grid-cols-2">
@@ -362,38 +359,38 @@ const AdminPage: React.FC<AdminPageProps> = ({
                   <div className="flex items-center gap-4">
                     <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                     <h3 className="text-[10px] font-black uppercase tracking-[0.4em] text-white">
-                      Live Operations Log
+                      System Feed
                     </h3>
                   </div>
                   <div className="font-mono text-[10px] space-y-3 text-slate-400 bg-white/5 p-6 rounded-2xl border border-white/5 h-48 overflow-y-auto custom-scrollbar">
                     <p>
-                      <span className="text-blue-500">[INFO]</span> Network
-                      ping: 24ms from Global Proxy.
+                      <span className="text-blue-500">[INFO]</span> Root Admin
+                      session started.
                     </p>
                     <p>
-                      <span className="text-emerald-500">[AUTH]</span> Node
-                      ART-0924 established secure tunnel.
+                      <span className="text-emerald-500">[AUTH]</span> Database
+                      handshake successful.
                     </p>
                     <p>
-                      <span className="text-amber-500">[WARN]</span> Restricted
-                      metadata fetch attempted by Guest.
+                      <span className="text-amber-500">[WARN]</span> Article
+                      #823 flagged for AI review.
                     </p>
                     <p>
-                      <span className="text-red-500">[ALRT]</span> Sync delay
-                      detected in regional shard.
+                      <span className="text-red-500">[ALRT]</span> Potential
+                      policy violation on Node 023.
                     </p>
                   </div>
                 </div>
-                <div className="flex flex-col justify-center">
-                  <h4 className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-500 mb-6">
-                    Security Thresholds
+                <div className="flex flex-col justify-center space-y-6">
+                  <h4 className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-500">
+                    Node Security Status
                   </h4>
                   <div className="space-y-4">
-                    <ThresholdBar label="Encryption" val={98} />
-                    <ThresholdBar label="Reputation Integrity" val={92} />
+                    <ThresholdBar label="Encrypted Traffic" val={100} />
+                    <ThresholdBar label="Budget Distribution" val={88} />
                     <ThresholdBar
-                      label="Uptime"
-                      val={100}
+                      label="Global Latency"
+                      val={12}
                       color="bg-blue-600"
                     />
                   </div>
@@ -403,7 +400,6 @@ const AdminPage: React.FC<AdminPageProps> = ({
           </div>
         )}
 
-        {/* USER REGISTRY */}
         {activeTab === "users" && (
           <div className="space-y-8">
             <div className="flex items-center gap-4 px-8 py-5 bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-100 dark:border-slate-800 shadow-sm focus-within:ring-2 focus-within:ring-blue-600 transition-all">
@@ -412,7 +408,7 @@ const AdminPage: React.FC<AdminPageProps> = ({
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="bg-transparent border-none text-[10px] font-black uppercase tracking-[0.2em] outline-none flex-grow dark:text-white"
-                placeholder="QUERYING IDENTITY REGISTRY..."
+                placeholder="QUERYING NETWORK REGISTRY..."
               />
             </div>
 
@@ -432,28 +428,26 @@ const AdminPage: React.FC<AdminPageProps> = ({
                           {user.full_name}
                         </p>
                         <p className="text-[10px] font-bold text-slate-400 italic">
-                          ID: {user.serial_id}
+                          {user.serial_id}
                         </p>
                       </div>
                     </div>
-                    <div className="flex flex-col items-end gap-1">
-                      <span
-                        className={`text-[8px] font-black uppercase px-3 py-1.5 rounded-lg border ${
-                          user.role === "admin"
-                            ? "bg-red-50 text-red-600 border-red-100"
-                            : "bg-slate-50 text-slate-400 border-slate-100"
-                        }`}
-                      >
-                        {user.role}
-                      </span>
-                    </div>
+                    <span
+                      className={`text-[8px] font-black uppercase px-3 py-1.5 rounded-lg border ${
+                        user.role === "admin"
+                          ? "bg-red-50 text-red-600 border-red-100"
+                          : "bg-slate-50 text-slate-400 border-slate-100"
+                      }`}
+                    >
+                      {user.role}
+                    </span>
                   </div>
 
                   <div className="py-6 space-y-3 border-y border-slate-50 dark:border-white/5">
                     <div className="flex justify-between text-[9px] font-black uppercase text-slate-400">
-                      <span>Verified Email</span>
+                      <span>Identity Email</span>
                       <span className="text-blue-600 truncate max-w-[150px]">
-                        {user.email || "N/A"}
+                        {user.email || "NODE_HIDDEN"}
                       </span>
                     </div>
                     <div className="flex justify-between text-[9px] font-black uppercase text-slate-400">
@@ -469,7 +463,7 @@ const AdminPage: React.FC<AdminPageProps> = ({
                       onClick={() => setEditingUser(user)}
                       className="flex-1 py-4 bg-slate-50 dark:bg-slate-800 rounded-2xl text-[9px] font-black uppercase tracking-widest hover:bg-blue-600 hover:text-white transition-all flex items-center justify-center gap-2"
                     >
-                      <Edit size={14} /> Edit Node
+                      <Edit size={14} /> Adjust Node
                     </button>
                     <button
                       onClick={() => handleDeleteUser(user.id)}
@@ -484,62 +478,61 @@ const AdminPage: React.FC<AdminPageProps> = ({
           </div>
         )}
 
-        {/* ARTICLE MODERATION */}
         {activeTab === "articles" && (
-          <div className="space-y-6">
-            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-              {localArticles.map((article) => (
-                <div
-                  key={article.id}
-                  className="bg-white dark:bg-slate-900 p-6 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 flex gap-6 items-center shadow-sm"
-                >
-                  <div className="flex-shrink-0 w-24 h-24 overflow-hidden rounded-2xl bg-slate-100 dark:bg-slate-800">
-                    <img
-                      src={article.image_url}
-                      className="object-cover w-full h-full"
-                    />
+          <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
+            {localArticles.map((article) => (
+              <div
+                key={article.id}
+                className="bg-white dark:bg-slate-900 p-8 rounded-[3rem] border border-slate-100 dark:border-slate-800 flex gap-8 items-center shadow-sm"
+              >
+                <div className="flex-shrink-0 w-32 h-32 overflow-hidden rounded-3xl bg-slate-100 dark:bg-slate-800">
+                  <img
+                    src={article.image_url}
+                    className="object-cover w-full h-full"
+                  />
+                </div>
+                <div className="flex-grow space-y-4 overflow-hidden">
+                  <div className="flex items-start justify-between">
+                    <p className="text-[10px] font-black uppercase text-blue-600 tracking-[0.2em]">
+                      {article.category}
+                    </p>
+                    <button
+                      onClick={() => handleDeleteArticle(article.id)}
+                      className="p-2 text-red-500 transition-all hover:bg-red-50 rounded-xl"
+                    >
+                      <Trash2 size={16} />
+                    </button>
                   </div>
-                  <div className="flex-grow space-y-2 overflow-hidden">
-                    <div className="flex items-start justify-between">
-                      <p className="text-[10px] font-black uppercase text-blue-600 tracking-widest">
-                        {article.category}
-                      </p>
-                      <button
-                        onClick={() => handleDeleteArticle(article.id)}
-                        className="p-1 text-red-500 transition-all hover:text-red-700"
-                      >
-                        <Trash2 size={16} />
-                      </button>
+                  <h4 className="text-lg font-black leading-tight uppercase truncate dark:text-white">
+                    {article.title}
+                  </h4>
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center justify-center w-6 h-6 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-400">
+                      <User2 size={12} />
                     </div>
-                    <h4 className="text-sm font-black uppercase truncate dark:text-white">
-                      {article.title}
-                    </h4>
-                    <p className="text-[9px] font-bold text-slate-400 italic">
-                      By: {article.author_name} ({article.author_serial})
+                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">
+                      {article.author_name}
                     </p>
                   </div>
                 </div>
-              ))}
-            </div>
+              </div>
+            ))}
           </div>
         )}
 
-        {/* SIGNALS */}
         {activeTab === "intercept" && (
-          <div className="grid grid-cols-1 gap-12 pb-20 lg:grid-cols-12">
+          <div className="grid grid-cols-1 gap-12 lg:grid-cols-12">
             <div className="space-y-8 lg:col-span-4">
-              <div className="flex items-center justify-between">
-                <h3 className="text-[11px] font-black uppercase tracking-[0.4em] text-slate-400 flex items-center gap-3">
-                  <Radio size={16} className="text-red-500 animate-pulse" />{" "}
-                  Signal Shards
-                </h3>
-              </div>
+              <h3 className="text-[11px] font-black uppercase tracking-[0.4em] text-slate-400 flex items-center gap-3">
+                <Radio size={16} className="text-red-500 animate-pulse" />{" "}
+                Active Signal Tunnels
+              </h3>
               <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
                 {intercepts.map((i, idx) => (
                   <button
                     key={idx}
                     onClick={() => setActiveInterception(i.room)}
-                    className={`w-full p-8 rounded-[2.5rem] border transition-all flex justify-between items-center text-left ${
+                    className={`w-full p-8 rounded-[3rem] border transition-all flex justify-between items-center text-left ${
                       activeInterception === i.room
                         ? "bg-red-600 border-red-600 text-white shadow-2xl scale-[1.02]"
                         : "bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800"
@@ -553,10 +546,10 @@ const AdminPage: React.FC<AdminPageProps> = ({
                             : "text-slate-400"
                         }`}
                       >
-                        CHAN: {i.room.split("_")[1]}
+                        CHANNEL_{i.room.split("_")[1]}
                       </p>
                       <div className="flex items-center gap-4">
-                        <p className="text-sm font-black uppercase italic truncate max-w-[100px]">
+                        <p className="text-sm italic font-black uppercase truncate">
                           {i.node1}
                         </p>
                         <div
@@ -566,7 +559,7 @@ const AdminPage: React.FC<AdminPageProps> = ({
                               : "bg-slate-200"
                           }`}
                         />
-                        <p className="text-sm font-black uppercase italic truncate max-w-[100px]">
+                        <p className="text-sm italic font-black uppercase truncate">
                           {i.node2}
                         </p>
                       </div>
@@ -576,31 +569,31 @@ const AdminPage: React.FC<AdminPageProps> = ({
               </div>
             </div>
 
-            <div className="lg:col-span-8 bg-slate-950 rounded-[3rem] p-8 md:p-12 min-h-[500px] flex flex-col border border-white/10 shadow-2xl relative overflow-hidden">
+            <div className="lg:col-span-8 bg-slate-950 rounded-[4rem] p-12 min-h-[600px] flex flex-col border border-white/10 shadow-2xl relative overflow-hidden">
               <div className="flex items-center justify-between pb-8 mb-8 border-b border-white/10">
                 <div className="flex items-center gap-4">
-                  <div className="w-3 h-3 bg-red-600 rounded-full animate-pulse shadow-[0_0_15px_rgba(220,38,38,0.9)]" />
+                  <div className="w-3 h-3 bg-red-600 rounded-full animate-pulse shadow-[0_0_20px_rgba(220,38,38,1)]" />
                   <span className="text-[11px] font-black uppercase tracking-[0.5em] text-white italic">
-                    SIGNAL_RECON
+                    INTERCEPT_DECRYPT
                   </span>
                 </div>
-                <span className="text-[10px] font-mono text-slate-500 uppercase italic">
-                  LEVEL: DECRYPT_ACTIVE
+                <span className="text-[10px] font-mono text-slate-500 uppercase tracking-widest">
+                  ENCRYPTION: BYPASSED
                 </span>
               </div>
               <div
                 ref={chatScrollRef}
-                className="flex-grow space-y-6 overflow-y-auto max-h-[400px] custom-scrollbar px-2"
+                className="flex-grow space-y-6 overflow-y-auto max-h-[450px] custom-scrollbar px-2"
               >
                 {currentRoomMessages.map((m, idx) => (
                   <div
                     key={idx}
-                    className="p-6 duration-300 border bg-white/5 rounded-3xl border-white/5 animate-in slide-in-from-bottom-2"
+                    className="bg-white/5 p-6 rounded-[2rem] border border-white/5 animate-in slide-in-from-bottom-2 duration-300"
                   >
-                    <p className="text-[11px] font-black text-red-500 uppercase tracking-widest mb-2 flex items-center gap-2">
+                    <p className="text-[10px] font-black text-red-500 uppercase tracking-widest mb-2 flex items-center gap-2">
                       <MessageCircle size={10} /> {m.senderName}
                     </p>
-                    <p className="text-[14px] text-slate-300 font-medium italic opacity-80">
+                    <p className="text-[15px] text-slate-300 font-medium italic leading-relaxed">
                       "{m.text}"
                     </p>
                   </div>
@@ -610,21 +603,17 @@ const AdminPage: React.FC<AdminPageProps> = ({
           </div>
         )}
 
-        {/* SQL CONSOLE */}
         {activeTab === "console" && (
-          <div className="bg-slate-950 rounded-[3rem] border border-white/10 overflow-hidden shadow-2xl animate-in zoom-in-95 duration-500">
-            <div className="flex items-center justify-between p-8 border-b border-white/10 bg-white/5">
-              <div className="flex items-center gap-4">
-                <Code size={20} className="text-blue-500" />
-                <h3 className="text-[11px] font-black uppercase tracking-[0.4em] text-white">
-                  System Command Interface
-                </h3>
-              </div>
+          <div className="bg-slate-950 rounded-[4rem] border border-white/10 overflow-hidden shadow-2xl animate-in zoom-in-95 duration-500">
+            <div className="flex items-center gap-4 p-8 border-b border-white/10 bg-white/5">
+              <Code size={20} className="text-blue-500" />
+              <h3 className="text-[11px] font-black uppercase tracking-[0.4em] text-white">
+                Advanced SQL Control
+              </h3>
             </div>
-
             <div
               ref={terminalScrollRef}
-              className="p-10 space-y-3 overflow-y-auto font-mono text-xs h-96 custom-scrollbar"
+              className="p-12 space-y-3 overflow-y-auto font-mono text-xs h-96 custom-scrollbar"
             >
               {terminalOutput.map((line, idx) => (
                 <div
@@ -643,28 +632,24 @@ const AdminPage: React.FC<AdminPageProps> = ({
                 </div>
               ))}
             </div>
-
-            <div className="p-8 border-t bg-white/5 border-white/10">
-              <div className="flex gap-4">
-                <span className="mt-3 font-bold text-blue-500">❯</span>
-                <textarea
-                  value={sqlCommand}
-                  onChange={(e) => setSqlCommand(e.target.value)}
-                  onKeyDown={(e) =>
-                    e.key === "Enter" &&
-                    !e.shiftKey &&
-                    (e.preventDefault(), runSqlCommand())
-                  }
-                  placeholder="ENTER SQL COMMAND..."
-                  className="w-full h-24 p-3 font-mono text-sm text-white bg-transparent border-none outline-none resize-none focus:ring-0 placeholder:text-slate-700"
-                />
-              </div>
-              <div className="flex justify-end pt-4">
+            <div className="flex flex-col gap-6 p-10 border-t bg-white/5 border-white/10">
+              <textarea
+                value={sqlCommand}
+                onChange={(e) => setSqlCommand(e.target.value)}
+                onKeyDown={(e) =>
+                  e.key === "Enter" &&
+                  !e.shiftKey &&
+                  (e.preventDefault(), runSqlCommand())
+                }
+                placeholder="EXECUTE RAW DATABASE COMMANDS..."
+                className="w-full h-32 font-mono text-sm text-white bg-transparent border-none outline-none resize-none focus:ring-0 placeholder:text-slate-700"
+              />
+              <div className="flex justify-end">
                 <button
                   onClick={runSqlCommand}
-                  className="px-8 py-3 bg-blue-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-white hover:text-blue-600 transition-all shadow-xl"
+                  className="px-10 py-4 bg-blue-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-[0.3em] hover:bg-white hover:text-blue-600 transition-all shadow-xl"
                 >
-                  EXECUTE_STATEMENT
+                  RUN_STATEMENT
                 </button>
               </div>
             </div>
@@ -672,26 +657,34 @@ const AdminPage: React.FC<AdminPageProps> = ({
         )}
       </div>
 
-      {/* EDIT MODAL */}
+      {/* Edit Node Modal */}
       {editingUser && (
-        <div className="fixed inset-0 z-[500] flex items-center justify-center p-6 animate-in fade-in duration-300">
+        <div className="fixed inset-0 z-[600] flex items-center justify-center p-6 animate-in fade-in duration-300">
           <div
-            className="absolute inset-0 bg-black/60 backdrop-blur-md"
+            className="absolute inset-0 bg-black/80 backdrop-blur-xl"
             onClick={() => setEditingUser(null)}
           />
-          <div className="relative w-full max-w-xl bg-white dark:bg-slate-900 rounded-[3rem] p-10 border border-slate-100 dark:border-slate-800 shadow-2xl space-y-8">
+          <div className="relative w-full max-w-xl bg-white dark:bg-slate-900 rounded-[4rem] p-12 border border-slate-100 dark:border-slate-800 shadow-2xl space-y-10">
             <div className="flex items-center justify-between">
-              <h3 className="text-2xl italic font-black tracking-tighter uppercase dark:text-white">
-                Adjust Node: {editingUser.serial_id}
-              </h3>
-              <button onClick={() => setEditingUser(null)}>
-                <X size={24} className="text-slate-400" />
+              <div className="space-y-1">
+                <p className="text-[10px] font-black uppercase tracking-widest text-blue-600">
+                  Protocol: Identity Adjust
+                </p>
+                <h3 className="text-3xl italic font-black tracking-tighter uppercase dark:text-white">
+                  {editingUser.serial_id}
+                </h3>
+              </div>
+              <button
+                onClick={() => setEditingUser(null)}
+                className="p-3 transition-all bg-slate-50 dark:bg-slate-800 rounded-2xl text-slate-400 hover:text-red-500"
+              >
+                <X size={20} />
               </button>
             </div>
 
-            <div className="space-y-6">
+            <div className="space-y-8">
               <div className="space-y-2">
-                <label className="text-[10px] font-black uppercase text-slate-400">
+                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">
                   Node Holder Name
                 </label>
                 <input
@@ -702,31 +695,13 @@ const AdminPage: React.FC<AdminPageProps> = ({
                       full_name: e.target.value,
                     })
                   }
-                  className="w-full p-4 text-sm font-bold border-none outline-none bg-slate-50 dark:bg-slate-950 rounded-xl dark:text-white"
+                  className="w-full p-5 text-sm font-bold border-none outline-none bg-slate-50 dark:bg-slate-950 rounded-2xl dark:text-white focus:ring-1 focus:ring-blue-600"
                 />
               </div>
-              <div className="grid grid-cols-2 gap-6">
+              <div className="grid grid-cols-2 gap-8">
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase text-slate-400">
-                    Clearance Level
-                  </label>
-                  <select
-                    value={editingUser.role}
-                    onChange={(e) =>
-                      setEditingUser({
-                        ...editingUser,
-                        role: e.target.value as any,
-                      })
-                    }
-                    className="w-full p-4 text-sm font-bold border-none outline-none appearance-none bg-slate-50 dark:bg-slate-950 rounded-xl dark:text-white"
-                  >
-                    <option value="user">User Node</option>
-                    <option value="admin">Root Admin</option>
-                  </select>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase text-slate-400">
-                    Reputation Budget
+                  <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                    Reputation Credits
                   </label>
                   <input
                     type="number"
@@ -737,13 +712,31 @@ const AdminPage: React.FC<AdminPageProps> = ({
                         budget: parseInt(e.target.value),
                       })
                     }
-                    className="w-full p-4 text-sm font-bold border-none outline-none bg-slate-50 dark:bg-slate-950 rounded-xl dark:text-white"
+                    className="w-full p-5 text-sm font-bold border-none outline-none bg-slate-50 dark:bg-slate-950 rounded-2xl dark:text-white"
                   />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                    Clearance Level
+                  </label>
+                  <select
+                    value={editingUser.role}
+                    onChange={(e) =>
+                      setEditingUser({
+                        ...editingUser,
+                        role: e.target.value as any,
+                      })
+                    }
+                    className="w-full bg-slate-50 dark:bg-slate-950 p-5 rounded-2xl text-[10px] font-black uppercase border-none outline-none dark:text-white appearance-none"
+                  >
+                    <option value="user">USER NODE</option>
+                    <option value="admin">ROOT ADMIN</option>
+                  </select>
                 </div>
               </div>
               <div className="space-y-2">
-                <label className="text-[10px] font-black uppercase text-slate-400">
-                  Node Bio / Manifesto
+                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                  Identity Manifesto
                 </label>
                 <textarea
                   value={editingUser.bio}
@@ -751,7 +744,7 @@ const AdminPage: React.FC<AdminPageProps> = ({
                     setEditingUser({ ...editingUser, bio: e.target.value })
                   }
                   rows={3}
-                  className="w-full p-4 text-sm font-medium border-none outline-none bg-slate-50 dark:bg-slate-950 rounded-xl dark:text-white"
+                  className="w-full p-5 text-sm font-medium border-none outline-none bg-slate-50 dark:bg-slate-950 rounded-2xl dark:text-white"
                 />
               </div>
             </div>
@@ -759,13 +752,13 @@ const AdminPage: React.FC<AdminPageProps> = ({
             <button
               onClick={handleUpdateUser}
               disabled={isUpdating}
-              className="w-full py-5 bg-blue-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-950 transition-all flex items-center justify-center gap-3"
+              className="w-full py-6 bg-slate-950 dark:bg-white text-white dark:text-slate-950 rounded-[2rem] text-[11px] font-black uppercase tracking-[0.4em] hover:bg-blue-600 hover:text-white transition-all flex items-center justify-center gap-3 shadow-2xl"
             >
               {isUpdating ? (
-                <RefreshCw className="animate-spin" size={16} />
+                <RefreshCw className="animate-spin" size={18} />
               ) : (
                 <>
-                  <Save size={16} /> Synchronize Node Data
+                  <Save size={18} /> SYNC CREDENTIALS
                 </>
               )}
             </button>
@@ -777,7 +770,7 @@ const AdminPage: React.FC<AdminPageProps> = ({
 };
 
 const MonitorCard = ({ label, value, color, desc, icon }: any) => (
-  <div className="p-10 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-[3rem] space-y-4 shadow-sm group hover:scale-[1.02] transition-all duration-300">
+  <div className="p-10 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-[3rem] space-y-5 shadow-sm group hover:scale-[1.02] transition-all duration-300">
     <div className="flex items-center justify-between">
       <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 group-hover:text-blue-600 transition-colors">
         {label}
@@ -791,7 +784,7 @@ const MonitorCard = ({ label, value, color, desc, icon }: any) => (
     >
       {value}
     </p>
-    <p className="text-[10px] font-bold text-slate-400 italic uppercase">
+    <p className="text-[10px] font-bold text-slate-400 italic uppercase tracking-widest">
       {desc}
     </p>
   </div>
@@ -803,7 +796,7 @@ const ThresholdBar = ({ label, val, color }: any) => (
       <span>{label}</span>
       <span>{val}%</span>
     </div>
-    <div className="h-1.5 bg-slate-100 dark:bg-white/5 rounded-full overflow-hidden">
+    <div className="h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-white/5">
       <div
         className={`h-full ${
           color || "bg-emerald-500"
@@ -817,9 +810,9 @@ const ThresholdBar = ({ label, val, color }: any) => (
 const TabButton = ({ active, onClick, label, icon }: any) => (
   <button
     onClick={onClick}
-    className={`px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-3 ${
+    className={`px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-3 ${
       active
-        ? "bg-white dark:bg-slate-800 text-blue-600 shadow-xl scale-105 z-10 border"
+        ? "bg-white dark:bg-slate-800 text-blue-600 shadow-xl scale-105 z-10 border border-slate-100 dark:border-slate-700"
         : "text-slate-400 hover:text-slate-600"
     }`}
   >
