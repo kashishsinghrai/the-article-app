@@ -9,6 +9,9 @@ import {
   Fingerprint,
   Network as NetworkIcon,
   ArrowLeft,
+  RefreshCcw,
+  UserPlus,
+  UserMinus,
 } from "lucide-react";
 import { Profile } from "../../types";
 import { supabase } from "../../lib/supabase";
@@ -21,6 +24,8 @@ interface NetworkPageProps {
   onChat: (user: Profile) => void;
   onBack: () => void;
   currentUserProfile?: Profile | null;
+  onRefresh?: () => void;
+  onFollow?: (id: string) => void;
 }
 
 const NetworkPage: React.FC<NetworkPageProps> = ({
@@ -30,56 +35,27 @@ const NetworkPage: React.FC<NetworkPageProps> = ({
   onChat,
   onBack,
   currentUserProfile,
+  onRefresh,
+  onFollow,
 }) => {
   const [searchTerm, setSearchTerm] = useState("");
-
-  const currentUser = useMemo(
-    () => users.find((u) => u.id === currentUserId),
-    [users, currentUserId]
-  );
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const filteredUsers = useMemo(() => {
     return users.filter((u) => {
-      const canSeeAdmin = currentUser?.role === "admin";
-      const isVisibleByRole = canSeeAdmin || u.role !== "admin";
-
       const matchesSearch =
         u.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         u.serial_id.toLowerCase().includes(searchTerm.toLowerCase());
-
-      return matchesSearch && isVisibleByRole;
+      return matchesSearch;
     });
-  }, [users, searchTerm, currentUser]);
+  }, [users, searchTerm]);
 
-  const initiateHandshake = async (targetUser: Profile) => {
-    if (!currentUserProfile) {
-      toast.error("Establish identity first.");
-      return;
+  const handleRefresh = async () => {
+    if (onRefresh) {
+      setIsRefreshing(true);
+      await onRefresh();
+      setTimeout(() => setIsRefreshing(false), 800);
     }
-
-    toast.loading(`Requesting Link with ${targetUser.full_name}...`, {
-      id: "handshake",
-    });
-
-    const payload = {
-      id: Math.random().toString(36).substr(2, 9),
-      fromId: currentUserProfile.id,
-      fromName: currentUserProfile.full_name,
-      toId: targetUser.id,
-      timestamp: Date.now(),
-    };
-
-    const channel = supabase.channel(`inbox_${targetUser.id}`);
-    channel.subscribe((status) => {
-      if (status === "SUBSCRIBED") {
-        channel.send({
-          type: "broadcast",
-          event: "handshake",
-          payload: payload,
-        });
-        toast.success("Request Broadcasted.", { id: "handshake" });
-      }
-    });
   };
 
   return (
@@ -89,35 +65,38 @@ const NetworkPage: React.FC<NetworkPageProps> = ({
           onClick={onBack}
           className="flex items-center gap-2 text-slate-400 hover:text-slate-900 dark:hover:text-white font-bold uppercase text-[10px] tracking-widest transition-all"
         >
-          <ArrowLeft size={16} /> Back
+          <ArrowLeft size={16} /> Exit Registry
         </button>
 
         <div className="flex flex-col items-start justify-between gap-8 md:flex-row md:items-end">
           <div className="space-y-2">
-            <h1 className="text-4xl font-black leading-none tracking-tighter uppercase md:text-7xl text-slate-900 dark:text-white">
-              Network
+            <h1 className="text-4xl italic font-black tracking-tighter uppercase md:text-7xl text-slate-900 dark:text-white">
+              Registry
             </h1>
             <p className="text-slate-400 font-bold uppercase tracking-widest text-[10px]">
-              Registry of Verified Correspondents
+              Verified Correspondents Network
             </p>
           </div>
-          <div className="flex gap-4">
-            <div className="text-right">
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                Active Members
-              </p>
-              <p className="text-2xl font-black text-slate-900 dark:text-white">
-                {filteredUsers.length}
-              </p>
-            </div>
-          </div>
+          <button
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+            className="flex items-center justify-center gap-2 p-4 border shadow-sm bg-slate-50 dark:bg-slate-900 rounded-2xl border-slate-100 dark:border-slate-800 text-slate-600 dark:text-white"
+          >
+            <RefreshCcw
+              size={16}
+              className={isRefreshing ? "animate-spin" : ""}
+            />
+            <span className="text-[10px] font-black uppercase tracking-widest">
+              {isRefreshing ? "Syncing..." : "Refresh Registry"}
+            </span>
+          </button>
         </div>
 
         <div className="flex items-center gap-4 px-6 py-4 border bg-slate-50 dark:bg-slate-900 rounded-2xl border-slate-100 dark:border-slate-800">
           <Search size={18} className="text-slate-400" />
           <input
             type="text"
-            placeholder="Locate members..."
+            placeholder="Locate by Name or Serial ID..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full text-sm font-bold bg-transparent border-none outline-none focus:ring-0 text-slate-900 dark:text-white"
@@ -126,35 +105,57 @@ const NetworkPage: React.FC<NetworkPageProps> = ({
       </section>
 
       <section className="grid grid-cols-1 gap-8 pb-20 sm:grid-cols-2 lg:grid-cols-3">
-        {filteredUsers.length === 0 ? (
-          <div className="py-24 text-center col-span-full opacity-30">
-            <p className="text-xl font-black tracking-widest uppercase text-slate-400">
-              Searching Registry...
-            </p>
-          </div>
-        ) : (
-          filteredUsers.map((user) => (
+        {filteredUsers.map((user) => {
+          const isFollowing = currentUserProfile?.following?.includes(user.id);
+          const isMe = user.id === currentUserId;
+          return (
             <div
               key={user.id}
-              className="group bg-white dark:bg-slate-950 p-6 rounded-[2rem] border border-slate-200 dark:border-slate-800 hover:border-blue-600 transition-all flex flex-col justify-between"
+              className="group bg-white dark:bg-slate-950 p-6 rounded-[2rem] border border-slate-200 dark:border-slate-800 hover:border-blue-600 transition-all shadow-sm"
             >
               <div className="space-y-6">
                 <div className="flex items-start justify-between">
-                  <div className="flex items-center justify-center w-12 h-12 border rounded-xl bg-slate-50 dark:bg-slate-900 text-slate-400 border-slate-100 dark:border-slate-800">
-                    <Fingerprint size={24} />
+                  <div className="w-16 h-16 overflow-hidden border shadow-inner rounded-2xl bg-slate-50 dark:bg-slate-900 border-slate-100 dark:border-slate-800">
+                    {user.avatar_url ? (
+                      <img
+                        src={user.avatar_url}
+                        className="object-cover w-full h-full"
+                      />
+                    ) : (
+                      <Fingerprint size={28} className="m-4 text-slate-300" />
+                    )}
                   </div>
                   {user.is_online && (
-                    <div className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-pulse shadow-sm" />
+                    <div className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-pulse" />
                   )}
                 </div>
 
                 <div className="space-y-1">
                   <h3 className="text-xl font-black uppercase truncate text-slate-900 dark:text-white">
-                    {user.full_name} {user.id === currentUserId && "(You)"}
+                    {user.full_name} {isMe && "(Self)"}
                   </h3>
                   <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
                     {user.serial_id}
                   </p>
+                </div>
+
+                <div className="flex gap-6 py-4 border-y border-slate-50 dark:border-white/5">
+                  <div className="text-center">
+                    <p className="text-[8px] font-black text-slate-400 uppercase">
+                      Followers
+                    </p>
+                    <p className="text-sm font-black dark:text-white">
+                      {user.followers_count || 0}
+                    </p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-[8px] font-black text-slate-400 uppercase">
+                      Following
+                    </p>
+                    <p className="text-sm font-black dark:text-white">
+                      {user.following_count || user.following?.length || 0}
+                    </p>
+                  </div>
                 </div>
 
                 <p className="h-8 text-xs italic font-medium leading-relaxed text-slate-500 line-clamp-2">
@@ -162,24 +163,45 @@ const NetworkPage: React.FC<NetworkPageProps> = ({
                 </p>
               </div>
 
-              <div className="flex gap-2 pt-6 mt-8 border-t border-slate-50 dark:border-white/5">
+              <div className="flex flex-wrap gap-2 pt-6 mt-8 border-t border-slate-50 dark:border-white/5">
                 <button
                   onClick={() => onViewProfile(user)}
-                  className="flex-1 py-3 rounded-xl bg-slate-50 dark:bg-slate-900 text-[10px] font-black uppercase tracking-widest text-slate-600 dark:text-white hover:bg-slate-100 transition-all"
+                  className="flex-1 py-3 rounded-xl bg-slate-50 dark:bg-slate-900 text-[10px] font-black uppercase text-slate-600 dark:text-white hover:bg-slate-100 transition-all"
                 >
-                  Profile
+                  Identity
                 </button>
-                <button
-                  onClick={() => initiateHandshake(user)}
-                  disabled={user.id === currentUserId}
-                  className="flex-1 py-3 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-[10px] font-black uppercase tracking-widest hover:bg-blue-600 hover:text-white disabled:opacity-20 transition-all flex items-center justify-center gap-2"
-                >
-                  Request Talk
-                </button>
+                {!isMe && (
+                  <>
+                    <button
+                      onClick={() => onChat(user)}
+                      className="p-3 text-blue-600 transition-all rounded-xl bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-600 hover:text-white"
+                    >
+                      <MessageSquare size={16} />
+                    </button>
+                    <button
+                      onClick={() => onFollow?.(user.id)}
+                      className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase transition-all flex items-center justify-center gap-2 ${
+                        isFollowing
+                          ? "bg-red-50 text-red-600 border border-red-100"
+                          : "bg-slate-950 dark:bg-white text-white dark:text-slate-950"
+                      }`}
+                    >
+                      {isFollowing ? (
+                        <>
+                          <UserMinus size={14} /> Sever
+                        </>
+                      ) : (
+                        <>
+                          <UserPlus size={14} /> Follow
+                        </>
+                      )}
+                    </button>
+                  </>
+                )}
               </div>
             </div>
-          ))
-        )}
+          );
+        })}
       </section>
     </main>
   );

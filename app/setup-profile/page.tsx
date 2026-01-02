@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   Check,
   ShieldCheck,
@@ -7,6 +7,7 @@ import {
   Info,
   Globe,
   Loader2,
+  Camera,
 } from "lucide-react";
 import { Profile } from "../../types";
 import { supabase } from "../../lib/supabase";
@@ -21,12 +22,15 @@ const SetupProfilePage: React.FC<SetupProfilePageProps> = ({ onComplete }) => {
   const [username, setUsername] = useState("");
   const [gender, setGender] = useState("");
   const [bio, setBio] = useState("");
+  const [avatar, setAvatar] = useState("");
   const [loading, setLoading] = useState(false);
+  const [isEncoding, setIsEncoding] = useState(false);
   const [authData, setAuthData] = useState<{
     id?: string;
     email?: string;
     phone?: string;
   }>({});
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const fetchAuth = async () => {
@@ -44,6 +48,23 @@ const SetupProfilePage: React.FC<SetupProfilePageProps> = ({ onComplete }) => {
     };
     fetchAuth();
   }, []);
+
+  const handleAvatarUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 1 * 1024 * 1024) {
+        toast.error("Identity visual too large (Max 1MB).");
+        return;
+      }
+      setIsEncoding(true);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setAvatar(reader.result as string);
+        setIsEncoding(false);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   const handleFinish = async () => {
     if (!name.trim() || !username.trim() || !gender) {
@@ -72,6 +93,7 @@ const SetupProfilePage: React.FC<SetupProfilePageProps> = ({ onComplete }) => {
         full_name: name.trim(),
         username: username.toLowerCase().trim().replace(/\s/g, "_"),
         gender: gender,
+        avatar_url: avatar,
         serial_id: `#ART-0${Math.floor(1000 + Math.random() * 9000)}-IND`,
         budget: 150,
         role: "user",
@@ -82,6 +104,9 @@ const SetupProfilePage: React.FC<SetupProfilePageProps> = ({ onComplete }) => {
         email: authData.email || "",
         phone: authData.phone || "",
         is_online: true,
+        following: [],
+        followers_count: 0,
+        following_count: 0,
         settings: {
           notifications_enabled: true,
           presence_visible: true,
@@ -110,8 +135,29 @@ const SetupProfilePage: React.FC<SetupProfilePageProps> = ({ onComplete }) => {
     <main className="min-h-[80vh] flex items-center justify-center p-6 bg-white dark:bg-slate-950">
       <div className="w-full max-w-2xl bg-white dark:bg-slate-900 rounded-[3rem] p-10 md:p-16 shadow-2xl border border-slate-100 dark:border-slate-800 animate-in zoom-in duration-500">
         <div className="mb-12 space-y-4 text-center">
-          <div className="flex items-center justify-center w-16 h-16 mx-auto mb-6 text-white bg-blue-600 shadow-xl rounded-2xl">
-            <ShieldCheck size={32} />
+          <div className="relative w-24 h-24 mx-auto mb-6">
+            <div
+              onClick={() => fileInputRef.current?.click()}
+              className="flex items-center justify-center w-full h-full overflow-hidden text-white transition-all bg-blue-600 border-2 border-white shadow-xl cursor-pointer rounded-3xl dark:border-slate-800 hover:scale-105"
+            >
+              {avatar ? (
+                <img src={avatar} className="object-cover w-full h-full" />
+              ) : (
+                <Camera size={32} />
+              )}
+              {isEncoding && (
+                <div className="absolute inset-0 flex items-center justify-center bg-black/50">
+                  <Loader2 className="animate-spin" size={20} />
+                </div>
+              )}
+            </div>
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleAvatarUpload}
+              accept="image/*"
+              className="hidden"
+            />
           </div>
           <h1 className="text-4xl italic font-black tracking-tighter uppercase text-slate-900 dark:text-white">
             Identity Forge
@@ -185,7 +231,13 @@ const SetupProfilePage: React.FC<SetupProfilePageProps> = ({ onComplete }) => {
           <div className="pt-8 border-t border-slate-50 dark:border-slate-800">
             <button
               onClick={handleFinish}
-              disabled={!name.trim() || !username.trim() || !gender || loading}
+              disabled={
+                !name.trim() ||
+                !username.trim() ||
+                !gender ||
+                loading ||
+                isEncoding
+              }
               className="w-full py-5 bg-slate-950 dark:bg-white dark:text-slate-900 text-white rounded-2xl font-black uppercase tracking-widest shadow-2xl hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-30"
             >
               {loading ? (

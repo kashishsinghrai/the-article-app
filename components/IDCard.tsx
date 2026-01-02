@@ -5,6 +5,7 @@ import {
   Globe,
   Download,
   CheckCircle2,
+  User,
 } from "lucide-react";
 import { Profile } from "../types";
 import html2canvas from "html2canvas";
@@ -41,7 +42,6 @@ const IDCard: React.FC<IDCardProps> = ({ profile }) => {
 
   return (
     <div className="flex flex-col items-center w-full gap-8 px-4 overflow-visible">
-      {/* Container that ensures scaling on mobile */}
       <div className="flex justify-center w-full p-4 overflow-visible bg-transparent">
         <div
           ref={cardRef}
@@ -76,7 +76,14 @@ const IDCard: React.FC<IDCardProps> = ({ profile }) => {
 
           <div className="relative z-10 flex items-center flex-grow gap-4 md:gap-6">
             <div className="w-16 h-16 md:w-20 md:h-20 rounded-[1.2rem] md:rounded-[1.5rem] bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 flex items-center justify-center flex-shrink-0 shadow-inner overflow-hidden">
-              <Fingerprint size={28} className="text-slate-200" />
+              {profile.avatar_url ? (
+                <img
+                  src={profile.avatar_url}
+                  className="object-cover w-full h-full"
+                />
+              ) : (
+                <Fingerprint size={28} className="text-slate-200" />
+              )}
             </div>
 
             <div className="flex-grow space-y-2 overflow-hidden md:space-y-3">

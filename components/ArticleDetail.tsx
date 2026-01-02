@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import {
   X,
   Shield,
@@ -11,18 +11,42 @@ import {
   Languages,
   Zap,
   Hash,
+  ThumbsUp,
+  ThumbsDown,
+  MessageCircle,
+  Send,
+  Loader2,
+  Fingerprint,
 } from "lucide-react";
-import { Article } from "../types";
+import { Article, Comment, Profile } from "../types";
 import { toast } from "react-hot-toast";
+import { supabase } from "../lib/supabase";
 
 interface ArticleDetailProps {
   article: Article;
   onClose: () => void;
+  isLoggedIn: boolean;
+  onInteraction?: (type: "like" | "dislike", id: string) => void;
+  currentUserId?: string;
+  currentUserProfile?: Profile | null;
+  onUpdateArticles?: () => void;
 }
 
-const ArticleDetail: React.FC<ArticleDetailProps> = ({ article, onClose }) => {
+const ArticleDetail: React.FC<ArticleDetailProps> = ({
+  article,
+  onClose,
+  isLoggedIn,
+  onInteraction,
+  currentUserId,
+  currentUserProfile,
+  onUpdateArticles,
+}) => {
   const [isDecrypted, setIsDecrypted] = useState(false);
   const [currentLang, setCurrentLang] = useState("English");
+  const [commentText, setCommentText] = useState("");
+  const [isSending, setIsSending] = useState(false);
+  const [comments, setComments] = useState<Comment[]>([]);
+  const [loadingComments, setLoadingComments] = useState(true);
 
   const langMap: Record<string, string> = {
     English: "en",
@@ -36,10 +60,23 @@ const ArticleDetail: React.FC<ArticleDetailProps> = ({ article, onClose }) => {
     Gujarati: "gu",
   };
 
+  const fetchComments = useCallback(async () => {
+    setLoadingComments(true);
+    const { data, error } = await supabase
+      .from("comments")
+      .select("*")
+      .eq("article_id", article.id)
+      .order("created_at", { ascending: false });
+
+    if (!error) setComments(data || []);
+    setLoadingComments(false);
+  }, [article.id]);
+
   useEffect(() => {
     const timer = setTimeout(() => setIsDecrypted(true), 400);
+    fetchComments();
     return () => clearTimeout(timer);
-  }, []);
+  }, [fetchComments]);
 
   const handleTranslate = (langName: string) => {
     const langCode = langMap[langName];
@@ -52,6 +89,37 @@ const ArticleDetail: React.FC<ArticleDetailProps> = ({ article, onClose }) => {
       googleCombo.value = langCode;
       googleCombo.dispatchEvent(new Event("change"));
     }
+  };
+
+  const postComment = async () => {
+    if (!isLoggedIn || !currentUserProfile)
+      return toast.error("Identity verification required to contribute.");
+    if (!commentText.trim()) return;
+
+    setIsSending(true);
+    const { error } = await supabase.from("comments").insert({
+      article_id: article.id,
+      user_id: currentUserId,
+      user_name: currentUserProfile.full_name,
+      text: commentText.trim(),
+    });
+
+    if (!error) {
+      // Update article comment count locally and globally
+      const newCount = (article.comments_count || 0) + 1;
+      await supabase
+        .from("articles")
+        .update({ comments_count: newCount })
+        .eq("id", article.id);
+
+      setCommentText("");
+      await fetchComments();
+      if (onUpdateArticles) onUpdateArticles();
+      toast.success("Contribution recorded.");
+    } else {
+      toast.error("Network conflict: Failed to post note.");
+    }
+    setIsSending(false);
   };
 
   const hasImage = article.image_url && article.image_url.trim() !== "";
@@ -89,7 +157,7 @@ const ArticleDetail: React.FC<ArticleDetailProps> = ({ article, onClose }) => {
           </div>
         </div>
 
-        <div className="flex-grow p-8 space-y-16 overflow-y-auto md:p-24">
+        <div className="flex-grow p-8 pb-40 space-y-16 overflow-y-auto custom-scrollbar md:p-24">
           <header className="max-w-3xl space-y-8">
             <div className="space-y-6">
               <p className="text-[9px] font-bold uppercase tracking-[0.4em] text-slate-300 dark:text-slate-700">
@@ -140,6 +208,33 @@ const ArticleDetail: React.FC<ArticleDetailProps> = ({ article, onClose }) => {
             </div>
           </header>
 
+          {/* Engagement Bar */}
+          <div className="flex items-center max-w-3xl gap-8 py-6 border-y border-slate-50 dark:border-slate-900">
+            <button
+              onClick={() => onInteraction?.("like", article.id)}
+              className="flex items-center gap-2 text-slate-400 hover:text-blue-600 transition-all font-black text-[10px] uppercase tracking-widest group"
+            >
+              <ThumbsUp
+                size={18}
+                className="transition-transform group-active:scale-125"
+              />{" "}
+              {article.likes_count || 0} Supports
+            </button>
+            <button
+              onClick={() => onInteraction?.("dislike", article.id)}
+              className="flex items-center gap-2 text-slate-400 hover:text-red-500 transition-all font-black text-[10px] uppercase tracking-widest group"
+            >
+              <ThumbsDown
+                size={18}
+                className="transition-transform group-active:scale-125"
+              />{" "}
+              {article.dislikes_count || 0} Conflicts
+            </button>
+            <div className="flex items-center gap-2 text-slate-400 font-black text-[10px] uppercase tracking-widest">
+              <MessageCircle size={18} /> {article.comments_count || 0} Notes
+            </div>
+          </div>
+
           {hasImage && (
             <div className="aspect-video w-full rounded-[2.5rem] overflow-hidden bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800">
               <img
@@ -169,6 +264,78 @@ const ArticleDetail: React.FC<ArticleDetailProps> = ({ article, onClose }) => {
                   Intelligence node confirmed via P2P verification. Identity
                   hashed.
                 </p>
+              </div>
+            </div>
+
+            {/* Real Comments Section */}
+            <div className="pt-20 space-y-10">
+              <div className="space-y-2">
+                <h3 className="text-[11px] font-black uppercase tracking-[0.4em] text-blue-600">
+                  Field Contributions
+                </h3>
+                <p className="text-[10px] font-bold text-slate-400 uppercase">
+                  Registry of Verified Responses
+                </p>
+              </div>
+
+              <div className="flex gap-4">
+                <input
+                  value={commentText}
+                  onChange={(e) => setCommentText(e.target.value)}
+                  className="flex-grow px-6 py-4 text-sm font-bold border outline-none bg-slate-50 dark:bg-slate-900 border-slate-100 dark:border-slate-800 rounded-2xl text-slate-900 dark:text-white focus:ring-1 focus:ring-blue-600"
+                  placeholder="Enter encrypted note..."
+                  onKeyDown={(e) => e.key === "Enter" && postComment()}
+                />
+                <button
+                  onClick={postComment}
+                  disabled={isSending}
+                  className="flex items-center justify-center text-white transition-all shadow-lg w-14 h-14 bg-slate-950 dark:bg-white dark:text-slate-950 rounded-2xl hover:scale-105 active:scale-95 disabled:opacity-50"
+                >
+                  {isSending ? (
+                    <Loader2 className="animate-spin" size={18} />
+                  ) : (
+                    <Send size={18} />
+                  )}
+                </button>
+              </div>
+
+              <div className="space-y-6">
+                {loadingComments ? (
+                  <div className="flex items-center gap-3 text-slate-400">
+                    <Loader2 className="animate-spin" size={14} />
+                    <span className="text-[9px] font-black uppercase tracking-widest">
+                      Decrypting Archive...
+                    </span>
+                  </div>
+                ) : comments.length === 0 ? (
+                  <p className="text-[10px] font-bold text-slate-400 uppercase italic">
+                    No field notes recorded yet.
+                  </p>
+                ) : (
+                  comments.map((c) => (
+                    <div
+                      key={c.id}
+                      className="p-6 space-y-3 border shadow-sm bg-slate-50 dark:bg-slate-900/50 rounded-3xl border-slate-100 dark:border-slate-800"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="flex items-center justify-center w-8 h-8 overflow-hidden border rounded-full bg-slate-100 dark:bg-slate-800 text-slate-400 border-slate-200 dark:border-slate-700">
+                            <Fingerprint size={16} />
+                          </div>
+                          <span className="text-[10px] font-black uppercase tracking-widest text-blue-600">
+                            {c.user_name}
+                          </span>
+                        </div>
+                        <span className="text-[8px] font-bold text-slate-400 uppercase">
+                          {new Date(c.created_at).toLocaleTimeString()}
+                        </span>
+                      </div>
+                      <p className="text-sm italic font-medium leading-relaxed text-slate-600 dark:text-slate-300">
+                        "{c.text}"
+                      </p>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
           </article>

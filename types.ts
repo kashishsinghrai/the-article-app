@@ -1,6 +1,6 @@
 
 export type Role = 'user' | 'admin';
-export type Category = 'Investigative' | 'Economic' | 'Regional';
+export type Category = 'Investigative' | 'Economic' | 'Regional' | 'All';
 
 export interface UserSettings {
   notifications_enabled: boolean;
@@ -16,6 +16,15 @@ export interface UserSettings {
   contacts_sync: boolean;
 }
 
+export interface Comment {
+  id: string;
+  article_id: string;
+  user_id: string;
+  user_name: string;
+  text: string;
+  created_at: string;
+}
+
 export interface Profile {
   id: string;
   username: string;
@@ -26,9 +35,12 @@ export interface Profile {
   role: Role;
   is_private: boolean;
   bio: string;
+  avatar_url?: string;
   email?: string;
   phone?: string;
-  following?: string[];
+  following?: string[]; // IDs of users this person follows
+  followers_count?: number;
+  following_count?: number;
   is_online?: boolean; 
   last_seen?: string;
   settings?: UserSettings; 
@@ -62,4 +74,7 @@ export interface Article {
   created_at: string;
   is_private?: boolean;
   hashtags?: string[]; 
+  likes_count?: number;
+  dislikes_count?: number;
+  comments_count?: number;
 }

@@ -13,7 +13,7 @@ import NetworkPage from "./app/network/page";
 import LoginPage from "./app/auth/login";
 import RegisterPage from "./app/auth/register";
 import SetupProfilePage from "./app/setup-profile/page";
-import { Profile, Article, ChatRequest, LiveMessage } from "./types";
+import { Profile, Article, ChatRequest, LiveMessage, Comment } from "./types";
 import { Toaster, toast } from "react-hot-toast";
 import { supabase } from "./lib/supabase";
 import { Loader2 } from "lucide-react";
@@ -152,7 +152,6 @@ const App: React.FC = () => {
       setEditingArticleData(null);
       setCurrentPage("home");
       toast.success("Identity Disconnected.");
-      // Force reload to clear all sensitive memory shards
       setTimeout(() => (window.location.href = "/"), 100);
     } catch (e) {
       window.location.reload();
@@ -164,6 +163,76 @@ const App: React.FC = () => {
     setEditingArticleData(null);
     setCurrentPage(page);
     window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const handleInteraction = async (
+    type: "like" | "dislike",
+    articleId: string
+  ) => {
+    if (!isLoggedIn) return toast.error("Sign in to engage.");
+
+    const art = articles.find((a) => a.id === articleId);
+    if (!art) return;
+
+    const column = type === "like" ? "likes_count" : "dislikes_count";
+    const newVal = (art[column] || 0) + 1;
+
+    const { error } = await supabase
+      .from("articles")
+      .update({ [column]: newVal })
+      .eq("id", articleId);
+
+    if (!error) {
+      setArticles((prev) =>
+        prev.map((a) => (a.id === articleId ? { ...a, [column]: newVal } : a))
+      );
+      if (activeArticle?.id === articleId) {
+        setActiveArticle({ ...activeArticle, [column]: newVal });
+      }
+      toast.success(
+        type === "like" ? "Dispatch Supported" : "Dispatch Contested"
+      );
+    }
+  };
+
+  const handleFollow = async (targetId: string) => {
+    if (!profile) return toast.error("Identity verification required.");
+    const isFollowing = profile.following?.includes(targetId);
+
+    // 1. Update Current User Following Array
+    let newFollowing = isFollowing
+      ? profile.following?.filter((id) => id !== targetId)
+      : [...(profile.following || []), targetId];
+
+    const { error: followErr } = await supabase
+      .from("profiles")
+      .update({
+        following: newFollowing,
+        following_count: newFollowing.length,
+      })
+      .eq("id", profile.id);
+
+    if (followErr) return toast.error("Sync Failure: Social Graph busy.");
+
+    // 2. Atomic Increment/Decrement for Target Followers
+    const targetUser = users.find((u) => u.id === targetId);
+    if (targetUser) {
+      const newFollowersCount = isFollowing
+        ? (targetUser.followers_count || 1) - 1
+        : (targetUser.followers_count || 0) + 1;
+      await supabase
+        .from("profiles")
+        .update({ followers_count: Math.max(0, newFollowersCount) })
+        .eq("id", targetId);
+    }
+
+    setProfile({
+      ...profile,
+      following: newFollowing,
+      following_count: newFollowing.length,
+    });
+    toast.success(isFollowing ? "Link Dissolved" : "Follower Link Locked");
+    await fetchGlobalData();
   };
 
   if (isInitializing) {
@@ -216,6 +285,7 @@ const App: React.FC = () => {
             onToggleDarkMode={() => setIsDarkMode(!isDarkMode)}
             chatRequests={chatRequests}
             onAcceptRequest={async () => {}}
+            profileAvatar={profile?.avatar_url}
           />
 
           <div className="flex-grow pt-24">
@@ -231,7 +301,7 @@ const App: React.FC = () => {
                     .delete()
                     .eq("id", id);
                   if (!error) {
-                    toast.success("Dispatch Erased");
+                    toast.success("Dispatch Purged");
                     fetchGlobalData();
                   }
                 }}
@@ -240,6 +310,8 @@ const App: React.FC = () => {
                   handleNavigate("post");
                 }}
                 onReadArticle={setActiveArticle}
+                onRefresh={fetchGlobalData}
+                onInteraction={handleInteraction}
               />
             )}
 
@@ -249,18 +321,10 @@ const App: React.FC = () => {
                 onBack={() => handleNavigate("home")}
                 onPublish={async (data) => {
                   if (!profile) {
-                    toast.error(
-                      "Identity Verification Required. Complete profile forge first."
-                    );
+                    toast.error("Forge Identity first.");
                     handleNavigate("profile");
                     return;
                   }
-
-                  const {
-                    data: { session },
-                  } = await supabase.auth.getSession();
-                  const currentUid = session?.user?.id || profile.id;
-
                   const method = editingArticleData
                     ? supabase
                         .from("articles")
@@ -268,36 +332,23 @@ const App: React.FC = () => {
                         .eq("id", editingArticleData.id)
                     : supabase.from("articles").insert({
                         ...data,
-                        author_id: currentUid,
+                        author_id: profile.id,
                         author_name: profile.full_name,
                         author_serial: profile.serial_id,
+                        likes_count: 0,
+                        dislikes_count: 0,
+                        comments_count: 0,
                       });
 
                   const { error } = await method;
                   if (!error) {
-                    toast.success("Broadcast Transmitted");
+                    toast.success("Transmission Successful");
                     await fetchGlobalData();
                     handleNavigate("home");
                   } else {
-                    console.error("Publishing Failure:", error);
-                    toast.error(
-                      `Transmission Failed: ${
-                        error.message || "Server Conflict"
-                      }`
-                    );
+                    toast.error(`Broadcast failed: ${error.message}`);
                   }
                 }}
-              />
-            )}
-
-            {currentPage === "admin" && profile?.role === "admin" && (
-              <AdminPage
-                articles={articles}
-                users={users}
-                currentUserId={profile.id}
-                onUpdateUsers={fetchGlobalData}
-                onUpdateArticles={fetchGlobalData}
-                onLogout={handleLogout}
               />
             )}
 
@@ -317,6 +368,7 @@ const App: React.FC = () => {
                     }}
                     isLoggedIn={isLoggedIn}
                     currentUserId={profile.id}
+                    currentUserProfile={profile}
                     onUpdateProfile={async (data) => {
                       const { error } = await supabase
                         .from("profiles")
@@ -328,6 +380,8 @@ const App: React.FC = () => {
                         fetchGlobalData();
                       }
                     }}
+                    onFollow={handleFollow}
+                    onChat={(u) => setActiveChat(u)}
                   />
                 ) : (
                   <SetupProfilePage
@@ -338,27 +392,18 @@ const App: React.FC = () => {
                       if (!error) {
                         setProfile(data);
                         await fetchGlobalData();
-                        toast.success("Identity Forge Complete");
-                        // Stay on profile to see the new ID card
-                      } else {
-                        console.error("Forge conflict:", error);
-                        toast.error(
-                          "Identity Forge Rejected: Check constraints."
-                        );
+                        toast.success("Identity Forged");
                       }
                     }}
                   />
                 )
               ) : (
-                <div className="flex flex-col items-center justify-center py-40 space-y-6">
-                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                    Authentication Required
-                  </p>
+                <div className="flex flex-col items-center justify-center py-40">
                   <button
                     onClick={() => setShowAuth("login")}
                     className="px-12 py-4 bg-slate-950 dark:bg-white text-white dark:text-slate-950 rounded-xl font-bold uppercase tracking-widest text-[10px]"
                   >
-                    Sign In
+                    Identify to Continue
                   </button>
                 </div>
               ))}
@@ -373,14 +418,24 @@ const App: React.FC = () => {
                   setViewingProfile(u);
                   setCurrentPage("profile");
                 }}
-                onChat={(u) => {
-                  setActiveChat(u);
-                }}
+                onChat={(u) => setActiveChat(u)}
+                onRefresh={fetchGlobalData}
+                onFollow={handleFollow}
               />
             )}
 
             {currentPage === "support" && (
               <SupportPage onBack={() => handleNavigate("home")} />
+            )}
+            {currentPage === "admin" && profile?.role === "admin" && (
+              <AdminPage
+                articles={articles}
+                users={users}
+                currentUserId={profile.id}
+                onUpdateArticles={fetchGlobalData}
+                onUpdateUsers={fetchGlobalData}
+                onLogout={handleLogout}
+              />
             )}
           </div>
 
@@ -390,6 +445,11 @@ const App: React.FC = () => {
             <ArticleDetail
               article={activeArticle}
               onClose={() => setActiveArticle(null)}
+              isLoggedIn={isLoggedIn}
+              onInteraction={handleInteraction}
+              currentUserId={profile?.id}
+              currentUserProfile={profile}
+              onUpdateArticles={fetchGlobalData}
             />
           )}
           {activeChat && (
