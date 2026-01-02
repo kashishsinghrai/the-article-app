@@ -292,6 +292,7 @@ const App: React.FC = () => {
 
             {currentPage === "post" && (
               <PostPage
+                profile={profile}
                 editData={editingArticleData}
                 onBack={() => setCurrentPage("home")}
                 onPublish={async (d) => {

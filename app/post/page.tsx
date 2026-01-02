@@ -14,16 +14,23 @@ import {
   Image as ImageIcon,
 } from "lucide-react";
 import { toast } from "react-hot-toast";
-import { Article, Category } from "../../types";
-import AiAssistant from "../../components/AiAssistant";
+import { Article, Category, Profile } from "../../types";
+import NetworkMonitor from "../../components/NetworkMonitor";
+import { supabase } from "../../lib/supabase";
 
 interface PostPageProps {
   onPublish: (data: Partial<Article>) => Promise<void>;
   editData?: Article | null;
   onBack: () => void;
+  profile: Profile | null;
 }
 
-const PostPage: React.FC<PostPageProps> = ({ onPublish, editData, onBack }) => {
+const PostPage: React.FC<PostPageProps> = ({
+  onPublish,
+  editData,
+  onBack,
+  profile,
+}) => {
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [hashtags, setHashtags] = useState("");
@@ -32,9 +39,21 @@ const PostPage: React.FC<PostPageProps> = ({ onPublish, editData, onBack }) => {
   const [isSyncing, setIsSyncing] = useState(false);
   const [isEncoding, setIsEncoding] = useState(false);
   const [imageUrl, setImageUrl] = useState("");
+  const [personalArticles, setPersonalArticles] = useState<Article[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
+    const fetchPersonalStats = async () => {
+      if (!profile) return;
+      const { data: a } = await supabase
+        .from("articles")
+        .select("*")
+        .eq("author_id", profile.id)
+        .order("created_at", { ascending: false });
+      if (a) setPersonalArticles(a);
+    };
+    fetchPersonalStats();
+
     if (editData) {
       setTitle(editData.title);
       setContent(editData.content);
@@ -43,7 +62,7 @@ const PostPage: React.FC<PostPageProps> = ({ onPublish, editData, onBack }) => {
       setHashtags(editData.hashtags?.join(", ") || "");
       setIsPublic(editData.is_private === false);
     }
-  }, [editData]);
+  }, [editData, profile]);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -56,6 +75,10 @@ const PostPage: React.FC<PostPageProps> = ({ onPublish, editData, onBack }) => {
       const reader = new FileReader();
       reader.onloadend = () => {
         setImageUrl(reader.result as string);
+        setIsEncoding(false);
+      };
+      reader.onerror = () => {
+        toast.error("Image processing failed.");
         setIsEncoding(false);
       };
       reader.readAsDataURL(file);
@@ -106,7 +129,6 @@ const PostPage: React.FC<PostPageProps> = ({ onPublish, editData, onBack }) => {
         </div>
 
         <div className="bg-white dark:bg-slate-950 p-8 md:p-14 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 space-y-12 shadow-sm">
-          {/* Headline Field */}
           <div className="space-y-4">
             <label className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 dark:text-slate-500">
               <Type size={14} /> Primary Headline
@@ -120,7 +142,6 @@ const PostPage: React.FC<PostPageProps> = ({ onPublish, editData, onBack }) => {
           </div>
 
           <div className="grid grid-cols-1 gap-10 md:grid-cols-2">
-            {/* Category Select */}
             <div className="space-y-4">
               <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 dark:text-slate-500">
                 Report Classification
@@ -142,7 +163,6 @@ const PostPage: React.FC<PostPageProps> = ({ onPublish, editData, onBack }) => {
               </div>
             </div>
 
-            {/* Visibility Toggle */}
             <div className="space-y-4">
               <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 dark:text-slate-500">
                 Access Protocol
@@ -172,7 +192,6 @@ const PostPage: React.FC<PostPageProps> = ({ onPublish, editData, onBack }) => {
             </div>
           </div>
 
-          {/* Hashtags Field */}
           <div className="space-y-4">
             <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 dark:text-slate-500 flex items-center gap-2">
               <Hash size={14} /> Search Indexing Tags
@@ -185,7 +204,6 @@ const PostPage: React.FC<PostPageProps> = ({ onPublish, editData, onBack }) => {
             />
           </div>
 
-          {/* Media Upload */}
           <div className="space-y-4">
             <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 dark:text-slate-500 flex items-center gap-2">
               <ImageIcon size={14} /> Visual Evidence (Optional)
@@ -200,6 +218,10 @@ const PostPage: React.FC<PostPageProps> = ({ onPublish, editData, onBack }) => {
                     src={imageUrl}
                     alt="Preview"
                     className="object-cover w-full h-full transition-opacity group-hover:opacity-50"
+                    onError={(e) =>
+                      (e.currentTarget.src =
+                        "https://images.unsplash.com/photo-1504711432869-efd597cdd0bf?auto=format&fit=crop&q=80&w=1000")
+                    }
                   />
                   <div className="absolute inset-0 flex items-center justify-center transition-opacity opacity-0 group-hover:opacity-100">
                     <p className="text-[10px] font-black text-white bg-black/50 px-4 py-2 rounded-full uppercase tracking-widest">
@@ -223,17 +245,8 @@ const PostPage: React.FC<PostPageProps> = ({ onPublish, editData, onBack }) => {
                 className="hidden"
               />
             </div>
-            {imageUrl && (
-              <button
-                onClick={() => setImageUrl("")}
-                className="text-[9px] font-black uppercase text-red-500 hover:underline"
-              >
-                Remove Image
-              </button>
-            )}
           </div>
 
-          {/* Content Field */}
           <div className="space-y-4">
             <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 dark:text-slate-500 flex items-center gap-2">
               <FileText size={14} /> Intelligence Narrative
@@ -243,11 +256,10 @@ const PostPage: React.FC<PostPageProps> = ({ onPublish, editData, onBack }) => {
               onChange={(e) => setContent(e.target.value)}
               rows={12}
               className="w-full p-0 text-lg font-medium leading-relaxed bg-transparent border-none outline-none placeholder:text-slate-400 dark:placeholder:text-slate-600 focus:ring-0 text-slate-600 dark:text-slate-300"
-              placeholder="Detailed report content goes here. Minimum 200 characters for AI analysis..."
+              placeholder="Detailed report content goes here..."
             />
           </div>
 
-          {/* Actions */}
           <div className="flex justify-end pt-10 border-t border-slate-50 dark:border-slate-900">
             <button
               onClick={handleSubmit}
@@ -265,7 +277,7 @@ const PostPage: React.FC<PostPageProps> = ({ onPublish, editData, onBack }) => {
       </div>
 
       <div className="flex-shrink-0 w-full lg:w-80">
-        <AiAssistant currentHeadline={title} currentContent={content} />
+        <NetworkMonitor profile={profile} personalArticles={personalArticles} />
       </div>
     </main>
   );

@@ -122,6 +122,11 @@ const ArticleDetail: React.FC<ArticleDetailProps> = ({
     setIsSending(false);
   };
 
+  const handleImgError = (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+    e.currentTarget.src =
+      "https://images.unsplash.com/photo-1504711432869-efd597cdd0bf?auto=format&fit=crop&q=80&w=1000";
+  };
+
   const hasImage = article.image_url && article.image_url.trim() !== "";
 
   return (
@@ -241,6 +246,7 @@ const ArticleDetail: React.FC<ArticleDetailProps> = ({
                 src={article.image_url}
                 alt={article.title}
                 className="object-cover w-full h-full transition-opacity duration-1000"
+                onError={handleImgError}
               />
             </div>
           )}

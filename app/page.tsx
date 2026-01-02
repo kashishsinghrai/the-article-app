@@ -66,6 +66,11 @@ const HomePage: React.FC<HomePageProps> = ({
     }
   };
 
+  const handleImgError = (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+    e.currentTarget.src =
+      "https://images.unsplash.com/photo-1504711432869-efd597cdd0bf?auto=format&fit=crop&q=80&w=1000";
+  };
+
   if (!isLoggedIn && !isArchive) {
     return (
       <main className="flex flex-col min-h-screen bg-white dark:bg-slate-950">
@@ -211,6 +216,7 @@ const HomePage: React.FC<HomePageProps> = ({
                       src={article.image_url}
                       alt={article.title}
                       className="object-cover w-full h-full transition-all duration-700 group-hover:scale-105"
+                      onError={handleImgError}
                     />
 
                     {isAdmin && (
