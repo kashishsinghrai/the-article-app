@@ -11,6 +11,8 @@ import {
   UserPlus,
   Fingerprint,
   Network as NetworkIcon,
+  Trash2,
+  Edit,
 } from "lucide-react";
 import { Article, Category, Profile } from "../types";
 import NewsTerminal from "../components/NewsTerminal";
@@ -21,13 +23,10 @@ interface HomePageProps {
   onLogin: () => void;
   userRole: string;
   onDelete: (id: string) => void;
-  onEdit: (id: string) => void;
+  onEdit: (article: Article) => void;
   onViewProfile: (id: string) => void;
   onReadArticle?: (article: Article) => void;
   isArchive?: boolean;
-  currentUserId?: string;
-  allUsers?: Profile[];
-  onChat?: (user: Profile) => void;
 }
 
 const HomePage: React.FC<HomePageProps> = ({
@@ -40,10 +39,9 @@ const HomePage: React.FC<HomePageProps> = ({
   onViewProfile,
   onReadArticle,
   isArchive = false,
-  currentUserId,
-  allUsers,
-  onChat,
 }) => {
+  const isAdmin = userRole === "admin";
+
   if (!isLoggedIn && !isArchive) {
     return (
       <main className="flex flex-col min-h-screen bg-white dark:bg-slate-950">
@@ -54,17 +52,14 @@ const HomePage: React.FC<HomePageProps> = ({
               Restoring Authority Through Presence
             </span>
           </div>
-
           <h1 className="text-6xl md:text-9xl font-bold text-slate-950 dark:text-white tracking-tight leading-[0.9]">
             The platform <br /> for{" "}
             <span className="text-slate-400">truth.</span>
           </h1>
-
           <p className="max-w-xl text-lg font-medium leading-relaxed text-slate-500 dark:text-slate-400 md:text-xl">
             A high-end, minimal space where the youth publishes perspectives and
             connects through private, secure dialogue.
           </p>
-
           <div className="flex w-full max-w-sm gap-4">
             <button
               onClick={onLogin}
@@ -85,7 +80,6 @@ const HomePage: React.FC<HomePageProps> = ({
           </div>
         </section>
 
-        {/* The Protocol Journey (Dotted Path) */}
         <section
           id="journey"
           className="px-8 py-40 overflow-hidden bg-slate-50/50 dark:bg-slate-950 border-y border-slate-100 dark:border-slate-900"
@@ -99,11 +93,7 @@ const HomePage: React.FC<HomePageProps> = ({
                 How it works
               </h3>
             </div>
-
             <div className="relative flex flex-col items-center justify-between gap-16 md:flex-row md:gap-4">
-              {/* Visual Dotted Path (Desktop) */}
-              <div className="hidden md:block absolute top-1/2 left-0 right-0 h-[2px] border-t-2 border-dashed border-slate-200 dark:border-slate-800 -translate-y-1/2 z-0" />
-
               <JourneyStep
                 num="01"
                 icon={<UserPlus size={24} />}
@@ -131,106 +121,65 @@ const HomePage: React.FC<HomePageProps> = ({
             </div>
           </div>
         </section>
-
-        <section
-          id="about"
-          className="px-8 py-40 border-t border-slate-50 dark:border-slate-900"
-        >
-          <div className="grid max-w-6xl grid-cols-1 gap-20 mx-auto md:grid-cols-3">
-            <Feature
-              icon={<PenSquare size={24} />}
-              title="Voice"
-              desc="Publish verified articles. Your narrative, unfiltered and globally indexed."
-            />
-            <Feature
-              icon={<MessageSquare size={24} />}
-              title="Connect"
-              desc="Peer-to-peer secure talk with random correspondents across the network."
-            />
-            <Feature
-              icon={<ShieldCheck size={24} />}
-              title="Secure"
-              desc="Encryption by default. Your identity and data are strictly your own."
-            />
-          </div>
-        </section>
-
-        <section className="px-8 py-40 text-center border-t border-slate-100 dark:border-slate-900">
-          <h2 className="text-xs font-bold uppercase tracking-[0.5em] text-slate-400 mb-12">
-            Verified Global Pulse
-          </h2>
-          <NewsTerminal />
-        </section>
       </main>
     );
   }
 
   return (
-    <main className="px-8 py-24 mx-auto space-y-32 max-w-7xl">
+    <main className="px-8 py-24 mx-auto space-y-24 max-w-7xl">
       <div className="pt-10">
         <NewsTerminal />
       </div>
-
       <section className="space-y-16">
         <div className="flex items-end justify-between pb-10 border-b border-slate-50 dark:border-slate-900">
           <h2 className="text-5xl font-bold tracking-tighter dark:text-white">
             Feed
           </h2>
-          <div className="flex gap-8 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-            <span className="pb-2 transition-all border-b-2 cursor-pointer text-slate-950 dark:text-white border-slate-950 dark:border-white">
-              Latest
-            </span>
-            <span className="cursor-pointer hover:text-slate-600">
-              Regional
-            </span>
-            <span className="cursor-pointer hover:text-slate-600">Reports</span>
-          </div>
         </div>
-
         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-20">
           {articles.map((article) => (
-            <div
-              key={article.id}
-              className="space-y-6 cursor-pointer group"
-              onClick={() => onReadArticle?.(article)}
-            >
-              <div className="aspect-[16/9] overflow-hidden rounded-[2.5rem] bg-slate-100 dark:bg-slate-900 border border-slate-50 dark:border-slate-800 relative">
+            <div key={article.id} className="relative space-y-6 group">
+              <div
+                className="aspect-[16/9] overflow-hidden rounded-[2.5rem] bg-slate-100 dark:bg-slate-900 border border-slate-50 dark:border-slate-800 relative cursor-pointer"
+                onClick={() => onReadArticle?.(article)}
+              >
                 <img
                   src={article.image_url}
                   className="object-cover w-full h-full transition-all duration-700 group-hover:scale-105"
                 />
 
-                {/* Kinetic Tags Overlay */}
-                {article.hashtags && article.hashtags.length > 0 && (
-                  <div className="absolute flex overflow-hidden pointer-events-none bottom-4 left-4 right-4">
-                    <div className="flex gap-4 animate-[ticker_10s_linear_infinite] whitespace-nowrap">
-                      {article.hashtags
-                        .concat(article.hashtags)
-                        .map((tag, idx) => (
-                          <span
-                            key={idx}
-                            className="bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-full text-[8px] font-black text-white uppercase tracking-widest flex items-center gap-1 border border-white/10"
-                          >
-                            <Hash size={10} className="text-blue-400" />
-                            {tag}
-                          </span>
-                        ))}
-                    </div>
+                {isAdmin && (
+                  <div
+                    className="absolute flex gap-2 top-4 right-4"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <button
+                      onClick={() => onEdit(article)}
+                      className="p-3 text-blue-600 transition-all shadow-xl bg-white/90 dark:bg-slate-950/90 rounded-2xl backdrop-blur-md hover:scale-110"
+                    >
+                      <Edit size={16} />
+                    </button>
+                    <button
+                      onClick={() => onDelete(article.id)}
+                      className="p-3 text-red-600 transition-all shadow-xl bg-white/90 dark:bg-slate-950/90 rounded-2xl backdrop-blur-md hover:scale-110"
+                    >
+                      <Trash2 size={16} />
+                    </button>
                   </div>
                 )}
               </div>
-
-              <div className="px-2 space-y-4">
+              <div
+                className="px-2 space-y-4 cursor-pointer"
+                onClick={() => onReadArticle?.(article)}
+              >
                 <div className="flex flex-wrap items-center gap-3">
                   <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">
                     {article.category}
                   </span>
-                  <span className="w-1 h-1 rounded-full bg-slate-200 dark:bg-slate-800" />
                   <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">
                     {new Date(article.created_at).toLocaleDateString()}
                   </span>
                 </div>
-
                 <h3 className="text-3xl font-bold leading-tight transition-colors dark:text-white group-hover:text-blue-600">
                   {article.title}
                 </h3>
@@ -259,18 +208,6 @@ const JourneyStep = ({ num, icon, label, desc }: any) => (
         {desc}
       </p>
     </div>
-  </div>
-);
-
-const Feature = ({ icon, title, desc }: any) => (
-  <div className="space-y-6 text-center md:text-left">
-    <div className="flex items-center justify-center w-12 h-12 mx-auto bg-white border dark:bg-slate-900 border-slate-100 dark:border-slate-800 rounded-2xl text-slate-950 dark:text-white md:mx-0">
-      {icon}
-    </div>
-    <h3 className="text-2xl font-bold dark:text-white">{title}</h3>
-    <p className="text-sm leading-relaxed text-slate-500 dark:text-slate-400">
-      {desc}
-    </p>
   </div>
 );
 

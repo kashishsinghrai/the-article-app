@@ -25,6 +25,9 @@ const App: React.FC = () => {
   const [viewingProfile, setViewingProfile] = useState<Profile | null>(null);
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [activeArticle, setActiveArticle] = useState<Article | null>(null);
+  const [editingArticleData, setEditingArticleData] = useState<Article | null>(
+    null
+  );
   const [nodeCount, setNodeCount] = useState(2540);
 
   const [chatRequests, setChatRequests] = useState<ChatRequest[]>([]);
@@ -53,18 +56,10 @@ const App: React.FC = () => {
   const fetchUsers = useCallback(async () => {
     try {
       const { data, error } = await supabase.from("profiles").select("*");
-      if (error) {
-        // If error is 500, it's a database policy issue
-        if (error.code === "PGRST301" || error.status === 500) {
-          console.error(
-            "Database Policy Error (500). Please check RLS policies."
-          );
-        }
-        throw error;
-      }
+      if (error) throw error;
       setUsers(data || []);
     } catch (e) {
-      console.error("Registry sync failed. Check database logs.");
+      console.error("Registry sync failed.");
     }
   }, []);
 
@@ -75,21 +70,15 @@ const App: React.FC = () => {
       } = await supabase.auth.getSession();
       if (session?.user) {
         setIsLoggedIn(true);
-        const { data: prof, error } = await supabase
+        const { data: prof } = await supabase
           .from("profiles")
           .select("*")
           .eq("id", session.user.id)
           .maybeSingle();
-
-        if (error && error.status !== 406) {
-          console.error("Profile Fetch Error:", error);
-        }
-
         if (prof) {
           setProfile(prof);
           setIsSettingUp(false);
         } else {
-          // No profile found, user must go through setup
           setIsSettingUp(true);
         }
       } else {
@@ -145,8 +134,26 @@ const App: React.FC = () => {
 
   const handleNavigate = (page: string) => {
     setViewingProfile(null);
+    setEditingArticleData(null);
     setCurrentPage(page);
     window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const handleDeleteArticle = async (id: string) => {
+    if (!confirm("PURGE DISPATCH? This cannot be undone.")) return;
+    try {
+      const { error } = await supabase.from("articles").delete().eq("id", id);
+      if (error) throw error;
+      toast.success("Dispatch Purged.");
+      fetchArticles();
+    } catch (e: any) {
+      toast.error("Moderation error.");
+    }
+  };
+
+  const handleEditArticle = (article: Article) => {
+    setEditingArticleData(article);
+    setCurrentPage("post");
   };
 
   const handleProfileSetupComplete = async (profileData: Profile) => {
@@ -154,8 +161,7 @@ const App: React.FC = () => {
       const {
         data: { session },
       } = await supabase.auth.getSession();
-      if (!session?.user) throw new Error("No active session");
-
+      if (!session?.user) throw new Error("No session");
       const safeData = {
         id: session.user.id,
         username: profileData.username,
@@ -168,23 +174,17 @@ const App: React.FC = () => {
         is_private: profileData.is_private || false,
         email: session.user.email,
       };
-
       const { error } = await supabase
         .from("profiles")
         .upsert(safeData, { onConflict: "id" });
-
       if (error) throw error;
-
       setProfile(profileData);
       setIsSettingUp(false);
       handleNavigate("home");
       toast.success("Identity Forge Complete.");
       fetchUsers();
     } catch (err: any) {
-      console.error("Setup Error:", err);
-      toast.error(
-        "Profile sync failed: " + (err.message || "Database Error 500")
-      );
+      toast.error("Setup Error: " + err.message);
     }
   };
 
@@ -241,14 +241,7 @@ const App: React.FC = () => {
             isDarkMode={isDarkMode}
             onToggleDarkMode={() => setIsDarkMode(!isDarkMode)}
             chatRequests={chatRequests}
-            onAcceptRequest={async (req) => {
-              const sender = users.find((u) => u.id === req.fromId);
-              if (sender) {
-                setActiveChat(sender);
-                setChatMessages([]);
-                setChatRequests((prev) => prev.filter((r) => r.id !== req.id));
-              }
-            }}
+            onAcceptRequest={async (req) => {}}
           />
 
           <div className="flex-grow pt-24">
@@ -258,27 +251,38 @@ const App: React.FC = () => {
                 isLoggedIn={isLoggedIn}
                 onLogin={() => setShowAuth("login")}
                 userRole={profile?.role || "user"}
-                onDelete={() => {}}
-                onEdit={() => {}}
+                onDelete={handleDeleteArticle}
+                onEdit={handleEditArticle}
                 onViewProfile={() => {}}
                 onReadArticle={setActiveArticle}
               />
             )}
             {currentPage === "post" && (
               <PostPage
+                editData={editingArticleData}
                 onBack={() => handleNavigate("home")}
                 onPublish={async (data) => {
                   if (!profile) return;
-                  const { error } = await supabase
-                    .from("articles")
-                    .insert({
-                      ...data,
-                      author_id: profile.id,
-                      author_name: profile.full_name,
-                      author_serial: profile.serial_id,
-                    });
+                  let error;
+                  if (editingArticleData) {
+                    const { error: err } = await supabase
+                      .from("articles")
+                      .update(data)
+                      .eq("id", editingArticleData.id);
+                    error = err;
+                  } else {
+                    const { error: err } = await supabase
+                      .from("articles")
+                      .insert({
+                        ...data,
+                        author_id: profile.id,
+                        author_name: profile.full_name,
+                        author_serial: profile.serial_id,
+                      });
+                    error = err;
+                  }
                   if (!error) {
-                    toast.success("Dispatch Published");
+                    toast.success("Dispatch Synced");
                     fetchArticles();
                     handleNavigate("home");
                   }
@@ -291,6 +295,7 @@ const App: React.FC = () => {
                 users={users}
                 currentUserId={profile.id}
                 onUpdateUsers={fetchUsers}
+                onUpdateArticles={fetchArticles}
                 onLogout={handleLogout}
               />
             )}
@@ -331,7 +336,6 @@ const App: React.FC = () => {
                 }}
                 onChat={(u) => {
                   setActiveChat(u);
-                  setChatMessages([]);
                 }}
               />
             )}
