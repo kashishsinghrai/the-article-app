@@ -175,11 +175,13 @@ const App: React.FC = () => {
 
   const handleFollow = async (targetId: string) => {
     if (!profile) return toast.error("Sign in to link identities.");
-    const isFollowing = profile.following?.includes(targetId);
 
-    // Update local state optimistically
-    const currentFollowing = profile.following || [];
-    const newFollowing = isFollowing
+    // Explicitly handle undefined/null states for strict TS compliance
+    const currentFollowing: string[] = profile.following || [];
+    const isFollowing = currentFollowing.includes(targetId);
+
+    // Create new following list with explicit typing
+    const newFollowing: string[] = isFollowing
       ? currentFollowing.filter((id) => id !== targetId)
       : [...currentFollowing, targetId];
 

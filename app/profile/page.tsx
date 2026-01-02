@@ -246,7 +246,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
                     label="Legal Name"
                     value={editData.full_name}
                     onChange={(v: string) =>
-                      setEditData({ ...editData, full_name: v })
+                      setEditData((prev) => ({ ...prev, full_name: v }))
                     }
                   />
                   <EditField
@@ -254,7 +254,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
                     label="Network Bio"
                     value={editData.bio}
                     onChange={(v: string) =>
-                      setEditData({ ...editData, bio: v })
+                      setEditData((prev) => ({ ...prev, bio: v }))
                     }
                   />
                   <div className="grid grid-cols-2 gap-4">
@@ -263,7 +263,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
                       label="Email"
                       value={editData.email}
                       onChange={(v: string) =>
-                        setEditData({ ...editData, email: v })
+                        setEditData((prev) => ({ ...prev, email: v }))
                       }
                     />
                     <EditField
@@ -271,7 +271,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
                       label="Phone"
                       value={editData.phone}
                       onChange={(v: string) =>
-                        setEditData({ ...editData, phone: v })
+                        setEditData((prev) => ({ ...prev, phone: v }))
                       }
                     />
                   </div>
@@ -328,7 +328,12 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
   );
 };
 
-const DetailBlock = ({ label, val }: any) => (
+interface DetailBlockProps {
+  label: string;
+  val: string | number;
+}
+
+const DetailBlock: React.FC<DetailBlockProps> = ({ label, val }) => (
   <div>
     <p className="text-[9px] text-slate-300 font-black uppercase mb-1">
       {label}
@@ -339,7 +344,19 @@ const DetailBlock = ({ label, val }: any) => (
   </div>
 );
 
-const EditField = ({ icon, label, value, onChange }: any) => (
+interface EditFieldProps {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+}
+
+const EditField: React.FC<EditFieldProps> = ({
+  icon,
+  label,
+  value,
+  onChange,
+}) => (
   <div className="space-y-2">
     <label className="text-[9px] font-bold uppercase text-slate-400 flex items-center gap-1.5">
       {icon} {label}
@@ -352,7 +369,12 @@ const EditField = ({ icon, label, value, onChange }: any) => (
   </div>
 );
 
-const StatCard = ({ label, value }: any) => (
+interface StatCardProps {
+  label: string;
+  value: string | number;
+}
+
+const StatCard: React.FC<StatCardProps> = ({ label, value }) => (
   <div className="bg-slate-50 dark:bg-slate-900 p-6 rounded-[1.5rem] border border-slate-100 dark:border-slate-800 space-y-1 text-center">
     <p className="text-[9px] font-black uppercase text-slate-400">{label}</p>
     <p className="text-2xl font-black tracking-tighter uppercase text-slate-900 dark:text-white">
