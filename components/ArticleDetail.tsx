@@ -54,6 +54,8 @@ const ArticleDetail: React.FC<ArticleDetailProps> = ({ article, onClose }) => {
     }
   };
 
+  const hasImage = article.image_url && article.image_url.trim() !== "";
+
   return (
     <div className="fixed inset-0 z-[300] flex items-center justify-center">
       <div
@@ -94,7 +96,7 @@ const ArticleDetail: React.FC<ArticleDetailProps> = ({ article, onClose }) => {
                 {article.author_serial} // VERIFIED_NODE
               </p>
               <h1
-                className={`text-4xl md:text-7xl font-bold text-slate-950 dark:text-white tracking-tighter leading-[1.1] transition-all duration-700 ${
+                className={`text-4xl md:text-7xl font-black text-slate-900 dark:text-white tracking-tighter leading-[1.1] transition-all duration-700 uppercase italic ${
                   isDecrypted
                     ? "opacity-100 translate-y-0"
                     : "opacity-0 translate-y-4"
@@ -109,7 +111,7 @@ const ArticleDetail: React.FC<ArticleDetailProps> = ({ article, onClose }) => {
                 {article.hashtags.map((tag, idx) => (
                   <span
                     key={idx}
-                    className="text-[10px] font-bold text-slate-400 dark:text-slate-600 uppercase flex items-center gap-1"
+                    className="text-[10px] font-bold text-blue-600 uppercase flex items-center gap-1"
                   >
                     <Hash size={12} />
                     {tag}
@@ -123,7 +125,7 @@ const ArticleDetail: React.FC<ArticleDetailProps> = ({ article, onClose }) => {
                 <p className="text-[8px] font-bold uppercase text-slate-400 tracking-widest">
                   Source
                 </p>
-                <p className="text-sm font-bold uppercase dark:text-white">
+                <p className="text-sm italic font-black uppercase dark:text-white">
                   {article.author_name}
                 </p>
               </div>
@@ -131,19 +133,22 @@ const ArticleDetail: React.FC<ArticleDetailProps> = ({ article, onClose }) => {
                 <p className="text-[8px] font-bold uppercase text-slate-400 tracking-widest">
                   Released
                 </p>
-                <p className="text-sm font-bold uppercase dark:text-white">
+                <p className="text-sm italic font-black uppercase dark:text-white">
                   {new Date(article.created_at).toLocaleDateString()}
                 </p>
               </div>
             </div>
           </header>
 
-          <div className="aspect-video w-full rounded-[2.5rem] overflow-hidden bg-slate-50 dark:bg-slate-900 border border-slate-50 dark:border-slate-800">
-            <img
-              src={article.image_url}
-              className="object-cover w-full h-full transition-opacity duration-1000"
-            />
-          </div>
+          {hasImage && (
+            <div className="aspect-video w-full rounded-[2.5rem] overflow-hidden bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800">
+              <img
+                src={article.image_url}
+                alt={article.title}
+                className="object-cover w-full h-full transition-opacity duration-1000"
+              />
+            </div>
+          )}
 
           <article className="max-w-3xl space-y-10">
             <div

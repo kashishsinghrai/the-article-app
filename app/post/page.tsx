@@ -18,7 +18,7 @@ import { Article, Category } from "../../types";
 import AiAssistant from "../../components/AiAssistant";
 
 interface PostPageProps {
-  onPublish: (data: Partial<Article>) => void;
+  onPublish: (data: Partial<Article>) => Promise<void>;
   editData?: Article | null;
   onBack: () => void;
 }
@@ -39,7 +39,7 @@ const PostPage: React.FC<PostPageProps> = ({ onPublish, editData, onBack }) => {
       setTitle(editData.title);
       setContent(editData.content);
       setCategory(editData.category);
-      setImageUrl(editData.image_url);
+      setImageUrl(editData.image_url || "");
       setHashtags(editData.hashtags?.join(", ") || "");
       setIsPublic(editData.is_private === false);
     }
@@ -62,24 +62,28 @@ const PostPage: React.FC<PostPageProps> = ({ onPublish, editData, onBack }) => {
     }
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!title.trim() || !content.trim()) {
       toast.error("Headline and content are mandatory.");
       return;
     }
     setIsSyncing(true);
-    const tagArray = hashtags
-      .split(",")
-      .map((t) => t.trim().replace(/^#/, ""))
-      .filter((t) => t.length > 0);
-    onPublish({
-      title: title.trim(),
-      content: content.trim(),
-      category,
-      image_url: imageUrl,
-      is_private: !isPublic,
-      hashtags: tagArray,
-    });
+    try {
+      const tagArray = hashtags
+        .split(",")
+        .map((t) => t.trim().replace(/^#/, ""))
+        .filter((t) => t.length > 0);
+      await onPublish({
+        title: title.trim(),
+        content: content.trim(),
+        category,
+        image_url: imageUrl,
+        is_private: !isPublic,
+        hashtags: tagArray,
+      });
+    } finally {
+      setIsSyncing(false);
+    }
   };
 
   return (
@@ -110,7 +114,7 @@ const PostPage: React.FC<PostPageProps> = ({ onPublish, editData, onBack }) => {
             <input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="w-full p-0 text-3xl font-black tracking-tight bg-transparent border-none outline-none md:text-5xl placeholder:text-slate-300 dark:placeholder:text-slate-700 focus:ring-0 text-slate-950 dark:text-white"
+              className="w-full p-0 text-3xl italic font-black tracking-tight bg-transparent border-none outline-none md:text-5xl placeholder:text-slate-300 dark:placeholder:text-slate-700 focus:ring-0 text-slate-950 dark:text-white"
               placeholder="ENTER BROADCAST TITLE..."
             />
           </div>
@@ -184,16 +188,17 @@ const PostPage: React.FC<PostPageProps> = ({ onPublish, editData, onBack }) => {
           {/* Media Upload */}
           <div className="space-y-4">
             <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 dark:text-slate-500 flex items-center gap-2">
-              <ImageIcon size={14} /> Visual Evidence
+              <ImageIcon size={14} /> Visual Evidence (Optional)
             </label>
             <div
               onClick={() => fileInputRef.current?.click()}
               className="aspect-[16/6] bg-slate-50 dark:bg-slate-900 rounded-[2.5rem] border-2 border-dashed border-slate-100 dark:border-slate-800 flex flex-col items-center justify-center cursor-pointer hover:border-slate-300 transition-all overflow-hidden relative group"
             >
-              {imageUrl ? (
+              {imageUrl && imageUrl.trim() !== "" ? (
                 <>
                   <img
                     src={imageUrl}
+                    alt="Preview"
                     className="object-cover w-full h-full transition-opacity group-hover:opacity-50"
                   />
                   <div className="absolute inset-0 flex items-center justify-center transition-opacity opacity-0 group-hover:opacity-100">
@@ -218,6 +223,14 @@ const PostPage: React.FC<PostPageProps> = ({ onPublish, editData, onBack }) => {
                 className="hidden"
               />
             </div>
+            {imageUrl && (
+              <button
+                onClick={() => setImageUrl("")}
+                className="text-[9px] font-black uppercase text-red-500 hover:underline"
+              >
+                Remove Image
+              </button>
+            )}
           </div>
 
           {/* Content Field */}

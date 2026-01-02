@@ -13,7 +13,7 @@ import { supabase } from "../../lib/supabase";
 import { toast } from "react-hot-toast";
 
 interface SetupProfilePageProps {
-  onComplete: (data: Profile) => void;
+  onComplete: (data: Profile) => Promise<void>;
 }
 
 const SetupProfilePage: React.FC<SetupProfilePageProps> = ({ onComplete }) => {
@@ -51,45 +51,63 @@ const SetupProfilePage: React.FC<SetupProfilePageProps> = ({ onComplete }) => {
       return;
     }
 
-    // Check if we have the ID, if not try to get it again
-    let currentId = authData.id;
-    if (!currentId) {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      currentId = session?.user?.id;
-    }
-
-    if (!currentId) {
-      toast.error("Auth session lost. Please re-login.");
-      return;
-    }
-
     setLoading(true);
-    const profile: Profile = {
-      id: currentId,
-      full_name: name.trim(),
-      username: username.toLowerCase().trim().replace(/\s/g, "_"),
-      gender: gender,
-      serial_id: `#ART-0${Math.floor(1000 + Math.random() * 9000)}-IND`,
-      budget: 150,
-      role: "user",
-      is_private: false,
-      bio:
-        bio.trim() ||
-        "Professional correspondent for the ThE-ARTICLES Global Network.",
-      email: authData.email || "",
-      phone: authData.phone || "",
-      is_online: true,
-    };
+    try {
+      let currentId = authData.id;
+      if (!currentId) {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+        currentId = session?.user?.id;
+      }
 
-    onComplete(profile);
+      if (!currentId) {
+        toast.error("Auth session expired.");
+        setLoading(false);
+        return;
+      }
+
+      const profile: Profile = {
+        id: currentId,
+        full_name: name.trim(),
+        username: username.toLowerCase().trim().replace(/\s/g, "_"),
+        gender: gender,
+        serial_id: `#ART-0${Math.floor(1000 + Math.random() * 9000)}-IND`,
+        budget: 150,
+        role: "user",
+        is_private: false,
+        bio:
+          bio.trim() ||
+          "Professional correspondent for the ThE-ARTICLES Global Network.",
+        email: authData.email || "",
+        phone: authData.phone || "",
+        is_online: true,
+        settings: {
+          notifications_enabled: true,
+          presence_visible: true,
+          data_sharing: true,
+          ai_briefings: true,
+          secure_mode: false,
+          camera_access: false,
+          mic_access: false,
+          location_access: false,
+          storage_access: false,
+          contacts_sync: false,
+        },
+      };
+
+      await onComplete(profile);
+    } catch (err) {
+      toast.error("Critical failure in identity forge.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const genders = ["Male", "Female", "Non-Binary", "Prefer not to say"];
 
   return (
-    <main className="flex items-center justify-center min-h-screen p-6 bg-white dark:bg-slate-950">
+    <main className="min-h-[80vh] flex items-center justify-center p-6 bg-white dark:bg-slate-950">
       <div className="w-full max-w-2xl bg-white dark:bg-slate-900 rounded-[3rem] p-10 md:p-16 shadow-2xl border border-slate-100 dark:border-slate-800 animate-in zoom-in duration-500">
         <div className="mb-12 space-y-4 text-center">
           <div className="flex items-center justify-center w-16 h-16 mx-auto mb-6 text-white bg-blue-600 shadow-xl rounded-2xl">
@@ -99,7 +117,7 @@ const SetupProfilePage: React.FC<SetupProfilePageProps> = ({ onComplete }) => {
             Identity Forge
           </h1>
           <p className="text-slate-400 font-black uppercase tracking-[0.3em] text-[10px]">
-            Step 02: Establishing Global Credentials
+            Establishing Global Press Credentials
           </p>
         </div>
 
@@ -113,7 +131,7 @@ const SetupProfilePage: React.FC<SetupProfilePageProps> = ({ onComplete }) => {
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 className="w-full bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 rounded-xl px-5 py-3.5 text-sm font-bold dark:text-white outline-none focus:ring-1 focus:ring-blue-600"
-                placeholder="Alexander Pierce"
+                placeholder="Full Name"
               />
             </div>
             <div className="space-y-2">
@@ -137,6 +155,7 @@ const SetupProfilePage: React.FC<SetupProfilePageProps> = ({ onComplete }) => {
               {genders.map((g) => (
                 <button
                   key={g}
+                  type="button"
                   onClick={() => setGender(g)}
                   className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest border transition-all ${
                     gender === g
@@ -172,7 +191,7 @@ const SetupProfilePage: React.FC<SetupProfilePageProps> = ({ onComplete }) => {
               {loading ? (
                 <Loader2 className="animate-spin" size={20} />
               ) : (
-                "Sync with Global Network"
+                "Establish Dispatcher Node"
               )}
               {!loading && <Check size={20} />}
             </button>

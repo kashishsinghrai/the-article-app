@@ -22,7 +22,6 @@ const App: React.FC = () => {
   const [currentPage, setCurrentPage] = useState("home");
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [showAuth, setShowAuth] = useState<"login" | "register" | null>(null);
-  const [isSettingUp, setIsSettingUp] = useState(false);
   const [isInitializing, setIsInitializing] = useState(true);
   const [viewingProfile, setViewingProfile] = useState<Profile | null>(null);
   const [isDarkMode, setIsDarkMode] = useState(false);
@@ -41,104 +40,61 @@ const App: React.FC = () => {
   const [users, setUsers] = useState<Profile[]>([]);
 
   const initializationInProgress = useRef(false);
+  const isFetchingProfile = useRef(false);
 
-  const fetchArticles = useCallback(async () => {
+  const fetchGlobalData = useCallback(async () => {
     try {
-      const { data, error } = await supabase
+      const { data: artData, error: artErr } = await supabase
         .from("articles")
         .select("*")
         .order("created_at", { ascending: false });
-      if (error) throw error;
-      setArticles(data || []);
-    } catch (e) {
-      console.error("Articles fetch failed");
-    }
-  }, []);
-
-  const fetchUsers = useCallback(async () => {
-    try {
-      const { data, error } = await supabase.from("profiles").select("*");
-      if (error) throw error;
-      setUsers(data || []);
-      setNodeCount(data?.length ? 2500 + data.length : 2540);
-    } catch (e) {
-      console.error("Registry sync failed.");
-    }
-  }, []);
-
-  const syncAdminProfile = useCallback(
-    async (user: any) => {
-      const adminProfile: Profile = {
-        id: user.id,
-        username: "root_" + user.id.substring(0, 5),
-        full_name: "Root Administrator",
-        gender: "System",
-        serial_id: `#ART-ROOT-${user.id.substring(0, 4)}`,
-        budget: 9999,
-        role: "admin",
-        is_private: true,
-        bio: "Global Operations Controller. Access Level: Level 5.",
-        email: user.email,
-        is_online: true,
-      };
-      // Upsert to ensure record exists in DB for other components to see
-      const { error } = await supabase
+      const { data: userData, error: userErr } = await supabase
         .from("profiles")
-        .upsert(adminProfile, { onConflict: "id" });
-      setProfile(adminProfile);
-      await fetchUsers();
-      return adminProfile;
-    },
-    [fetchUsers]
-  );
+        .select("*");
 
-  const checkUserStatus = useCallback(
-    async (user: any) => {
-      if (!user) {
-        setIsLoggedIn(false);
-        setProfile(null);
-        setIsSettingUp(false);
-        return;
+      if (!artErr) setArticles(artData || []);
+      if (!userErr) {
+        setUsers(userData || []);
+        setNodeCount(userData?.length ? 2500 + userData.length : 2540);
       }
+    } catch (e) {
+      console.error("Hydration Error:", e);
+    }
+  }, []);
 
-      setIsLoggedIn(true);
-      // RESTORED ADMIN SHORTCUT: Any email ending in @the-articles.admin is root admin
-      const isAdmin =
-        user.email?.endsWith("@the-articles.admin") ||
-        user.user_metadata?.role === "admin";
+  const checkUserStatus = useCallback(async (user: any) => {
+    if (!user) {
+      setIsLoggedIn(false);
+      setProfile(null);
+      return;
+    }
 
-      if (isAdmin) {
-        // ADMIN BYPASS: Never show setup
-        setIsSettingUp(false);
-        const { data: prof } = await supabase
-          .from("profiles")
-          .select("*")
-          .eq("id", user.id)
-          .maybeSingle();
-        if (prof) {
-          setProfile({ ...prof, role: "admin" });
-        } else {
-          await syncAdminProfile(user);
-        }
-        toast.success("Terminal Access Authorized.");
+    setIsLoggedIn(true);
+
+    if (isFetchingProfile.current) return;
+    isFetchingProfile.current = true;
+
+    try {
+      const { data: prof, error } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", user.id)
+        .maybeSingle();
+
+      if (prof) {
+        const isAdmin =
+          user.user_metadata?.role === "admin" ||
+          user.email?.endsWith("@the-articles.admin");
+        setProfile({ ...prof, role: isAdmin ? "admin" : prof.role });
       } else {
-        // REGULAR USER LOGIC
-        const { data: prof } = await supabase
-          .from("profiles")
-          .select("*")
-          .eq("id", user.id)
-          .maybeSingle();
-        if (prof) {
-          setProfile(prof);
-          setIsSettingUp(false);
-        } else {
-          // If login is successful but profile is missing, it's a new user
-          setIsSettingUp(true);
-        }
+        setProfile(null);
       }
-    },
-    [syncAdminProfile]
-  );
+    } catch (err) {
+      console.error("Identity check failure.");
+    } finally {
+      isFetchingProfile.current = false;
+    }
+  }, []);
 
   const initApp = useCallback(async () => {
     setIsInitializing(true);
@@ -146,15 +102,16 @@ const App: React.FC = () => {
       const {
         data: { session },
       } = await supabase.auth.getSession();
-      await checkUserStatus(session?.user);
-      await fetchArticles();
-      await fetchUsers();
+      if (session?.user) {
+        await checkUserStatus(session.user);
+      }
+      await fetchGlobalData();
     } catch (e) {
-      console.error("Auth init failure.");
+      console.error("Boot failure");
     } finally {
       setIsInitializing(false);
     }
-  }, [fetchArticles, fetchUsers, checkUserStatus]);
+  }, [fetchGlobalData, checkUserStatus]);
 
   useEffect(() => {
     if (initializationInProgress.current) return;
@@ -167,24 +124,39 @@ const App: React.FC = () => {
       if (event === "SIGNED_IN" || event === "USER_UPDATED") {
         if (session?.user) {
           await checkUserStatus(session.user);
+          await fetchGlobalData();
         }
       } else if (event === "SIGNED_OUT") {
         setIsLoggedIn(false);
         setProfile(null);
+        setViewingProfile(null);
         setCurrentPage("home");
-        setIsSettingUp(false);
       }
     });
 
+    return () => subscription.unsubscribe();
+  }, [initApp, checkUserStatus, fetchGlobalData]);
+
+  useEffect(() => {
     if (isDarkMode) document.documentElement.classList.add("dark");
     else document.documentElement.classList.remove("dark");
-
-    return () => subscription.unsubscribe();
-  }, [initApp, isDarkMode, checkUserStatus]);
+  }, [isDarkMode]);
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
-    toast.success("Identity disconnected.");
+    try {
+      await supabase.auth.signOut();
+      setIsLoggedIn(false);
+      setProfile(null);
+      setViewingProfile(null);
+      setActiveArticle(null);
+      setEditingArticleData(null);
+      setCurrentPage("home");
+      toast.success("Identity Disconnected.");
+      // Force reload to clear all sensitive memory shards
+      setTimeout(() => (window.location.href = "/"), 100);
+    } catch (e) {
+      window.location.reload();
+    }
   };
 
   const handleNavigate = (page: string) => {
@@ -194,76 +166,10 @@ const App: React.FC = () => {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  const handleDeleteArticle = async (id: string) => {
-    if (!confirm("PURGE DISPATCH? This cannot be undone.")) return;
-    try {
-      const { error } = await supabase.from("articles").delete().eq("id", id);
-      if (error) throw error;
-      toast.success("Dispatch Purged.");
-      fetchArticles();
-    } catch (e: any) {
-      toast.error("Moderation error.");
-    }
-  };
-
-  const handleEditArticle = (article: Article) => {
-    setEditingArticleData(article);
-    setCurrentPage("post");
-  };
-
-  const handleProfileSetupComplete = async (profileData: Profile) => {
-    try {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      if (!session?.user) throw new Error("No session");
-
-      const { error } = await supabase.from("profiles").upsert({
-        ...profileData,
-        id: session.user.id,
-        email: session.user.email,
-      });
-      if (error) throw error;
-
-      await supabase.auth.updateUser({
-        data: { setup_complete: true },
-      });
-
-      setProfile(profileData);
-      setIsSettingUp(false);
-      handleNavigate("home");
-      toast.success("Identity Forge Complete.");
-      fetchUsers();
-    } catch (err: any) {
-      toast.error("Setup Error: " + err.message);
-    }
-  };
-
-  const handleLoginSuccess = async (user: any) => {
-    setShowAuth(null);
-    await checkUserStatus(user);
-    await fetchArticles();
-    await fetchUsers();
-  };
-
   if (isInitializing) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-white dark:bg-slate-950">
-        <Loader2 className="text-blue-600 animate-spin" size={40} />
-      </div>
-    );
-  }
-
-  // Setup page ONLY shows if user is logged in, needs setup, and is NOT admin
-  if (isSettingUp && isLoggedIn && profile?.role !== "admin" && !showAuth) {
-    return (
-      <div
-        className={`min-h-screen ${
-          isDarkMode ? "dark bg-slate-950" : "bg-slate-50"
-        }`}
-      >
-        <Toaster position="bottom-center" />
-        <SetupProfilePage onComplete={handleProfileSetupComplete} />
+        <Loader2 className="text-blue-600 animate-spin" size={32} />
       </div>
     );
   }
@@ -271,21 +177,28 @@ const App: React.FC = () => {
   return (
     <div
       className={`min-h-screen ${
-        isDarkMode ? "dark bg-slate-950" : "bg-slate-50"
+        isDarkMode ? "dark bg-slate-950" : "bg-white"
       } transition-colors duration-500`}
     >
       <Toaster position="bottom-center" />
+
       {showAuth === "login" && (
         <LoginPage
           onBack={() => setShowAuth(null)}
-          onSuccess={handleLoginSuccess}
+          onSuccess={(u) => {
+            setShowAuth(null);
+            checkUserStatus(u);
+          }}
           onGoToRegister={() => setShowAuth("register")}
         />
       )}
       {showAuth === "register" && (
         <RegisterPage
           onBack={() => setShowAuth(null)}
-          onSuccess={handleLoginSuccess}
+          onSuccess={(u) => {
+            setShowAuth(null);
+            checkUserStatus(u);
+          }}
           onGoToLogin={() => setShowAuth("login")}
         />
       )}
@@ -302,7 +215,7 @@ const App: React.FC = () => {
             isDarkMode={isDarkMode}
             onToggleDarkMode={() => setIsDarkMode(!isDarkMode)}
             chatRequests={chatRequests}
-            onAcceptRequest={async (req) => {}}
+            onAcceptRequest={async () => {}}
           />
 
           <div className="flex-grow pt-24">
@@ -312,79 +225,144 @@ const App: React.FC = () => {
                 isLoggedIn={isLoggedIn}
                 onLogin={() => setShowAuth("login")}
                 userRole={profile?.role || "user"}
-                onDelete={handleDeleteArticle}
-                onEdit={handleEditArticle}
-                onViewProfile={() => {}}
+                onDelete={async (id) => {
+                  const { error } = await supabase
+                    .from("articles")
+                    .delete()
+                    .eq("id", id);
+                  if (!error) {
+                    toast.success("Dispatch Erased");
+                    fetchGlobalData();
+                  }
+                }}
+                onEdit={(a) => {
+                  setEditingArticleData(a);
+                  handleNavigate("post");
+                }}
                 onReadArticle={setActiveArticle}
               />
             )}
+
             {currentPage === "post" && (
               <PostPage
                 editData={editingArticleData}
                 onBack={() => handleNavigate("home")}
                 onPublish={async (data) => {
-                  if (!profile) return;
-                  let error;
-                  if (editingArticleData) {
-                    const { error: err } = await supabase
-                      .from("articles")
-                      .update(data)
-                      .eq("id", editingArticleData.id);
-                    error = err;
-                  } else {
-                    const { error: err } = await supabase
-                      .from("articles")
-                      .insert({
+                  if (!profile) {
+                    toast.error(
+                      "Identity Verification Required. Complete profile forge first."
+                    );
+                    handleNavigate("profile");
+                    return;
+                  }
+
+                  const {
+                    data: { session },
+                  } = await supabase.auth.getSession();
+                  const currentUid = session?.user?.id || profile.id;
+
+                  const method = editingArticleData
+                    ? supabase
+                        .from("articles")
+                        .update(data)
+                        .eq("id", editingArticleData.id)
+                    : supabase.from("articles").insert({
                         ...data,
-                        author_id: profile.id,
+                        author_id: currentUid,
                         author_name: profile.full_name,
                         author_serial: profile.serial_id,
                       });
-                    error = err;
-                  }
+
+                  const { error } = await method;
                   if (!error) {
-                    toast.success("Dispatch Synced");
-                    fetchArticles();
+                    toast.success("Broadcast Transmitted");
+                    await fetchGlobalData();
                     handleNavigate("home");
+                  } else {
+                    console.error("Publishing Failure:", error);
+                    toast.error(
+                      `Transmission Failed: ${
+                        error.message || "Server Conflict"
+                      }`
+                    );
                   }
                 }}
               />
             )}
+
             {currentPage === "admin" && profile?.role === "admin" && (
               <AdminPage
                 articles={articles}
                 users={users}
                 currentUserId={profile.id}
-                onUpdateUsers={fetchUsers}
-                onUpdateArticles={fetchArticles}
+                onUpdateUsers={fetchGlobalData}
+                onUpdateArticles={fetchGlobalData}
                 onLogout={handleLogout}
               />
             )}
+
             {(currentPage === "profile" || currentPage === "settings") &&
-              profile && (
-                <ProfilePage
-                  profile={viewingProfile || profile}
-                  onLogout={handleLogout}
-                  isExternal={!!viewingProfile}
-                  initialTab={currentPage === "settings" ? "settings" : "intel"}
-                  onCloseExternal={() => {
-                    if (viewingProfile) setViewingProfile(null);
-                    handleNavigate("home");
-                  }}
-                  isLoggedIn={isLoggedIn}
-                  currentUserId={profile.id}
-                  onUpdateProfile={async (data) => {
-                    const { error } = await supabase
-                      .from("profiles")
-                      .update(data)
-                      .eq("id", profile.id);
-                    if (!error) {
-                      setProfile({ ...profile, ...data });
-                      toast.success("Synced.");
+              (isLoggedIn ? (
+                profile ? (
+                  <ProfilePage
+                    profile={viewingProfile || profile}
+                    onLogout={handleLogout}
+                    isExternal={!!viewingProfile}
+                    initialTab={
+                      currentPage === "settings" ? "settings" : "intel"
                     }
-                  }}
-                />
-              )}
+                    onCloseExternal={() => {
+                      setViewingProfile(null);
+                      handleNavigate("home");
+                    }}
+                    isLoggedIn={isLoggedIn}
+                    currentUserId={profile.id}
+                    onUpdateProfile={async (data) => {
+                      const { error } = await supabase
+                        .from("profiles")
+                        .update(data)
+                        .eq("id", profile.id);
+                      if (!error) {
+                        setProfile({ ...profile, ...data });
+                        toast.success("Identity Synced");
+                        fetchGlobalData();
+                      }
+                    }}
+                  />
+                ) : (
+                  <SetupProfilePage
+                    onComplete={async (data) => {
+                      const { error } = await supabase
+                        .from("profiles")
+                        .upsert(data);
+                      if (!error) {
+                        setProfile(data);
+                        await fetchGlobalData();
+                        toast.success("Identity Forge Complete");
+                        // Stay on profile to see the new ID card
+                      } else {
+                        console.error("Forge conflict:", error);
+                        toast.error(
+                          "Identity Forge Rejected: Check constraints."
+                        );
+                      }
+                    }}
+                  />
+                )
+              ) : (
+                <div className="flex flex-col items-center justify-center py-40 space-y-6">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                    Authentication Required
+                  </p>
+                  <button
+                    onClick={() => setShowAuth("login")}
+                    className="px-12 py-4 bg-slate-950 dark:bg-white text-white dark:text-slate-950 rounded-xl font-bold uppercase tracking-widest text-[10px]"
+                  >
+                    Sign In
+                  </button>
+                </div>
+              ))}
+
             {currentPage === "network" && (
               <NetworkPage
                 onBack={() => handleNavigate("home")}
@@ -400,6 +378,7 @@ const App: React.FC = () => {
                 }}
               />
             )}
+
             {currentPage === "support" && (
               <SupportPage onBack={() => handleNavigate("home")} />
             )}
