@@ -16,12 +16,14 @@ import SetupProfilePage from "./app/setup-profile/page";
 import { Profile, Article, ChatRequest, LiveMessage } from "./types";
 import { Toaster, toast } from "react-hot-toast";
 import { supabase } from "./lib/supabase";
+import { Loader2 } from "lucide-react";
 
 const App: React.FC = () => {
   const [currentPage, setCurrentPage] = useState("home");
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [showAuth, setShowAuth] = useState<"login" | "register" | null>(null);
   const [isSettingUp, setIsSettingUp] = useState(false);
+  const [isInitializing, setIsInitializing] = useState(true);
   const [viewingProfile, setViewingProfile] = useState<Profile | null>(null);
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [activeArticle, setActiveArticle] = useState<Article | null>(null);
@@ -63,8 +65,7 @@ const App: React.FC = () => {
     }
   }, []);
 
-  const handleAdminSync = useCallback(async (user: any) => {
-    // Silently create/verify admin profile record
+  const syncAdminProfile = useCallback(async (user: any) => {
     const adminProfile: Profile = {
       id: user.id,
       username: "root_" + user.id.substring(0, 5),
@@ -78,67 +79,71 @@ const App: React.FC = () => {
       email: user.email,
       is_online: true,
     };
-    const { error } = await supabase
-      .from("profiles")
-      .upsert(adminProfile, { onConflict: "id" });
-    if (!error) {
-      setProfile(adminProfile);
-    }
+    const { error } = await supabase.from("profiles").upsert(adminProfile);
+    if (!error) setProfile(adminProfile);
+    return adminProfile;
   }, []);
 
+  const checkUserStatus = useCallback(
+    async (user: any) => {
+      if (!user) {
+        setIsLoggedIn(false);
+        setProfile(null);
+        setIsSettingUp(false);
+        return;
+      }
+
+      setIsLoggedIn(true);
+      const isAdmin =
+        user.user_metadata?.role === "admin" || user.email?.includes("admin");
+
+      if (isAdmin) {
+        // ADMIN BYPASS: Instantly prevent setup screen
+        setIsSettingUp(false);
+        const { data: prof } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("id", user.id)
+          .maybeSingle();
+        if (prof) {
+          setProfile(prof);
+        } else {
+          await syncAdminProfile(user);
+        }
+      } else {
+        // REGULAR USER LOGIC
+        const { data: prof } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("id", user.id)
+          .maybeSingle();
+        if (prof) {
+          setProfile(prof);
+          setIsSettingUp(false);
+        } else {
+          // If they are logged in but have NO profile, they MUST set it up
+          setIsSettingUp(true);
+        }
+      }
+    },
+    [syncAdminProfile]
+  );
+
   const initApp = useCallback(async () => {
+    setIsInitializing(true);
     try {
       const {
         data: { session },
       } = await supabase.auth.getSession();
-      if (session?.user) {
-        setIsLoggedIn(true);
-
-        // Robust Admin Check: Check metadata first, then email
-        const isAdminInMetadata = session.user.user_metadata?.role === "admin";
-        const isAdminByEmail = session.user.email?.includes("admin");
-        const isAdmin = isAdminInMetadata || isAdminByEmail;
-
-        if (isAdmin) {
-          // ADMIN BYPASS: Immediately kill any setup state
-          setIsSettingUp(false);
-          const { data: prof } = await supabase
-            .from("profiles")
-            .select("*")
-            .eq("id", session.user.id)
-            .maybeSingle();
-          if (prof) {
-            setProfile(prof);
-          } else {
-            await handleAdminSync(session.user);
-          }
-          toast.success("Terminal Access Authorized.");
-        } else {
-          // Regular user logic
-          const { data: prof } = await supabase
-            .from("profiles")
-            .select("*")
-            .eq("id", session.user.id)
-            .maybeSingle();
-          if (prof) {
-            setProfile(prof);
-            setIsSettingUp(false);
-          } else {
-            setIsSettingUp(true);
-          }
-        }
-      } else {
-        setIsLoggedIn(false);
-        setProfile(null);
-        setIsSettingUp(false);
-      }
+      await checkUserStatus(session?.user);
     } catch (e) {
-      console.error("Auth initialization failure.");
-      setIsSettingUp(false);
+      console.error("Auth init failure.");
+    } finally {
+      setIsInitializing(false);
     }
     await fetchArticles();
     await fetchUsers();
-  }, [fetchArticles, fetchUsers, handleAdminSync]);
+  }, [fetchArticles, fetchUsers, checkUserStatus]);
 
   useEffect(() => {
     if (initializationInProgress.current) return;
@@ -148,36 +153,9 @@ const App: React.FC = () => {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if ((event === "SIGNED_IN" || event === "USER_UPDATED") && session) {
-        setIsLoggedIn(true);
-        const isAdmin =
-          session.user.user_metadata?.role === "admin" ||
-          session.user.email?.includes("admin");
-
-        if (isAdmin) {
-          setIsSettingUp(false); // FORCED BYPASS
-          const { data: prof } = await supabase
-            .from("profiles")
-            .select("*")
-            .eq("id", session.user.id)
-            .maybeSingle();
-          if (prof) {
-            setProfile(prof);
-          } else {
-            await handleAdminSync(session.user);
-          }
-        } else {
-          const { data: prof } = await supabase
-            .from("profiles")
-            .select("*")
-            .eq("id", session.user.id)
-            .maybeSingle();
-          if (prof) {
-            setProfile(prof);
-            setIsSettingUp(false);
-          } else {
-            setIsSettingUp(true);
-          }
+      if (event === "SIGNED_IN" || event === "USER_UPDATED") {
+        if (session?.user) {
+          await checkUserStatus(session.user);
         }
       } else if (event === "SIGNED_OUT") {
         setIsLoggedIn(false);
@@ -191,7 +169,7 @@ const App: React.FC = () => {
     else document.documentElement.classList.remove("dark");
 
     return () => subscription.unsubscribe();
-  }, [initApp, isDarkMode, handleAdminSync]);
+  }, [initApp, isDarkMode, checkUserStatus]);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -229,23 +207,12 @@ const App: React.FC = () => {
       } = await supabase.auth.getSession();
       if (!session?.user) throw new Error("No session");
 
-      const safeData = {
-        id: session.user.id,
-        username: profileData.username,
-        full_name: profileData.full_name,
-        bio: profileData.bio,
-        gender: profileData.gender,
-        serial_id: profileData.serial_id,
-        budget: profileData.budget,
-        role: profileData.role || "user",
-        is_private: profileData.is_private || false,
-        email: session.user.email,
-      };
-
-      const { error } = await supabase
-        .from("profiles")
-        .upsert(safeData, { onConflict: "id" });
+      const { error } = await supabase.from("profiles").upsert(profileData);
       if (error) throw error;
+
+      await supabase.auth.updateUser({
+        data: { setup_complete: true },
+      });
 
       setProfile(profileData);
       setIsSettingUp(false);
@@ -257,11 +224,21 @@ const App: React.FC = () => {
     }
   };
 
-  // FINAL RENDER SAFETY: Admin never sees setup page
-  // We double check against profile role OR local session markers
-  const shouldShowSetup = isSettingUp && profile?.role !== "admin";
+  const handleLoginSuccess = async (user: any) => {
+    setShowAuth(null); // Close the login overlay immediately
+    await checkUserStatus(user); // Re-run status check to decide setup vs home
+  };
 
-  if (shouldShowSetup) {
+  if (isInitializing) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-white dark:bg-slate-950">
+        <Loader2 className="text-blue-600 animate-spin" size={40} />
+      </div>
+    );
+  }
+
+  // Setup page ONLY shows if user is logged in, needs setup, and is NOT admin
+  if (isSettingUp && isLoggedIn && profile?.role !== "admin" && !showAuth) {
     return (
       <div
         className={`min-h-screen ${
@@ -284,20 +261,14 @@ const App: React.FC = () => {
       {showAuth === "login" && (
         <LoginPage
           onBack={() => setShowAuth(null)}
-          onSuccess={() => {
-            setShowAuth(null);
-            initApp();
-          }}
+          onSuccess={handleLoginSuccess}
           onGoToRegister={() => setShowAuth("register")}
         />
       )}
       {showAuth === "register" && (
         <RegisterPage
           onBack={() => setShowAuth(null)}
-          onSuccess={() => {
-            setShowAuth(null);
-            initApp();
-          }}
+          onSuccess={handleLoginSuccess}
           onGoToLogin={() => setShowAuth("login")}
         />
       )}
