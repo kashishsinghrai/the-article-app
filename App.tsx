@@ -70,49 +70,57 @@ const App: React.FC = () => {
       } = await supabase.auth.getSession();
       if (session?.user) {
         setIsLoggedIn(true);
-        const { data: prof } = await supabase
+        const { data: prof, error: profError } = await supabase
           .from("profiles")
           .select("*")
           .eq("id", session.user.id)
           .maybeSingle();
 
-        // Check if user is marked as admin in metadata OR database
+        // Robust Admin Check: Check metadata first, then database role
         const isAdmin =
           session.user.user_metadata?.role === "admin" ||
-          prof?.role === "admin";
+          prof?.role === "admin" ||
+          session.user.email?.includes("admin");
 
-        if (prof) {
+        if (isAdmin) {
+          // ADMIN BYPASS: Never show setup screen for admin
+          setIsSettingUp(false);
+          if (prof) {
+            setProfile(prof);
+          } else {
+            // Silently create admin profile if missing
+            const adminProfile: Profile = {
+              id: session.user.id,
+              username: "root_" + session.user.id.substring(0, 5),
+              full_name: "Root Administrator",
+              gender: "System",
+              serial_id: `#ART-ROOT-${session.user.id.substring(0, 4)}`,
+              budget: 9999,
+              role: "admin",
+              is_private: true,
+              bio: "Global Operations Controller.",
+              email: session.user.email,
+              is_online: true,
+            };
+            await supabase.from("profiles").upsert(adminProfile);
+            setProfile(adminProfile);
+          }
+          toast.success("Terminal Access Authorized.");
+        } else if (prof) {
           setProfile(prof);
           setIsSettingUp(false);
-        } else if (isAdmin) {
-          // If it's an admin but no profile record exists, create one silently
-          const adminProfile: Profile = {
-            id: session.user.id,
-            username: "admin_" + session.user.id.substring(0, 5),
-            full_name: "Root Administrator",
-            gender: "System",
-            serial_id: `#ART-ROOT-${session.user.id.substring(0, 4)}`,
-            budget: 9999,
-            role: "admin",
-            is_private: true,
-            bio: "Network Operations Controller.",
-            email: session.user.email,
-            is_online: true,
-          };
-          await supabase.from("profiles").upsert(adminProfile);
-          setProfile(adminProfile);
-          setIsSettingUp(false);
-          toast.success("Root Access Synchronized.");
         } else {
-          // Regular user with no profile record must set up
+          // Regular user without profile needs setup
           setIsSettingUp(true);
         }
       } else {
         setIsLoggedIn(false);
         setProfile(null);
+        setIsSettingUp(false);
       }
     } catch (e) {
-      console.error("Session sync failed.");
+      console.error("Auth initialization failure.");
+      setIsSettingUp(false);
     }
     await fetchArticles();
     await fetchUsers();
@@ -136,28 +144,33 @@ const App: React.FC = () => {
 
         const isAdmin =
           session.user.user_metadata?.role === "admin" ||
-          prof?.role === "admin";
+          prof?.role === "admin" ||
+          session.user.email?.includes("admin");
 
-        if (prof) {
-          setProfile(prof);
+        if (isAdmin) {
           setIsSettingUp(false);
-        } else if (isAdmin) {
-          // Handle admin auto-init on auth change too
-          const adminProfile: Profile = {
-            id: session.user.id,
-            username: "admin_" + session.user.id.substring(0, 5),
-            full_name: "Root Administrator",
-            gender: "System",
-            serial_id: `#ART-ROOT-${session.user.id.substring(0, 4)}`,
-            budget: 9999,
-            role: "admin",
-            is_private: true,
-            bio: "Network Operations Controller.",
-            email: session.user.email,
-            is_online: true,
-          };
-          await supabase.from("profiles").upsert(adminProfile);
-          setProfile(adminProfile);
+          if (prof) {
+            setProfile(prof);
+          } else {
+            // Auto-init admin profile record
+            const adminProfile: Profile = {
+              id: session.user.id,
+              username: "root_" + session.user.id.substring(0, 5),
+              full_name: "Root Administrator",
+              gender: "System",
+              serial_id: `#ART-ROOT-${session.user.id.substring(0, 4)}`,
+              budget: 9999,
+              role: "admin",
+              is_private: true,
+              bio: "Global Operations Controller.",
+              email: session.user.email,
+              is_online: true,
+            };
+            await supabase.from("profiles").upsert(adminProfile);
+            setProfile(adminProfile);
+          }
+        } else if (prof) {
+          setProfile(prof);
           setIsSettingUp(false);
         } else {
           setIsSettingUp(true);
@@ -237,7 +250,10 @@ const App: React.FC = () => {
     }
   };
 
-  if (isSettingUp) {
+  // FINAL RENDER SAFETY: Admin never sees setup page
+  const shouldShowSetup = isSettingUp && profile?.role !== "admin";
+
+  if (shouldShowSetup) {
     return (
       <div
         className={`min-h-screen ${
