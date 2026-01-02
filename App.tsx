@@ -176,11 +176,10 @@ const App: React.FC = () => {
   const handleFollow = async (targetId: string) => {
     if (!profile) return toast.error("Sign in to link identities.");
 
-    // Explicitly handle undefined/null states for strict TS compliance
     const currentFollowing: string[] = profile.following || [];
     const isFollowing = currentFollowing.includes(targetId);
 
-    // Create new following list with explicit typing
+    // Explicitly typed as string array to prevent TS18048
     const newFollowing: string[] = isFollowing
       ? currentFollowing.filter((id) => id !== targetId)
       : [...currentFollowing, targetId];
@@ -199,9 +198,10 @@ const App: React.FC = () => {
     // 2. Update TARGET's followers count
     const targetUser = users.find((u) => u.id === targetId);
     if (targetUser) {
+      const currentFollowers = targetUser.followers_count || 0;
       const newFollowersCount = isFollowing
-        ? Math.max(0, (targetUser.followers_count || 1) - 1)
-        : (targetUser.followers_count || 0) + 1;
+        ? Math.max(0, currentFollowers - 1)
+        : currentFollowers + 1;
       await supabase
         .from("profiles")
         .update({ followers_count: newFollowersCount })
