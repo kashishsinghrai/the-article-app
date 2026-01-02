@@ -91,7 +91,7 @@ const App: React.FC = () => {
           setProfile(prof);
           setIsSettingUp(false);
         } else {
-          // Check if session just created, give time or force setup
+          // Explicitly set setup mode if no profile found for auth user
           setIsSettingUp(true);
         }
       } else {
@@ -113,9 +113,8 @@ const App: React.FC = () => {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === "SIGNED_IN" && session) {
+      if ((event === "SIGNED_IN" || event === "USER_UPDATED") && session) {
         setIsLoggedIn(true);
-        // Direct profile check on login
         const { data: prof } = await supabase
           .from("profiles")
           .select("*")
@@ -219,7 +218,7 @@ const App: React.FC = () => {
     setProfile(null);
     setCurrentPage("home");
     setIsSettingUp(false);
-    toast.success("Identity disconnected.");
+    toast.success("Operational disconnect.");
   };
 
   const handleNavigate = (page: string) => {
@@ -234,7 +233,7 @@ const App: React.FC = () => {
         data: { session },
       } = await supabase.auth.getSession();
       if (!session?.user) {
-        toast.error("Auth expired. Please login again.");
+        toast.error("Session protocol error. Please re-login.");
         return;
       }
 
@@ -248,10 +247,10 @@ const App: React.FC = () => {
       setProfile(finalProfile);
       setIsSettingUp(false);
       handleNavigate("home");
-      toast.success("Identity Forge Complete. Node Active.");
+      toast.success("Operational Node Activated.");
       fetchUsers();
     } catch (err: any) {
-      toast.error("Registry sync failed: " + err.message);
+      toast.error("Registry sync failed: " + (err.message || "Unknown error"));
     }
   };
 
