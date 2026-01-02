@@ -31,8 +31,9 @@ const SetupProfilePage: React.FC<SetupProfilePageProps> = ({ onComplete }) => {
   useEffect(() => {
     const fetchAuth = async () => {
       const {
-        data: { user },
-      } = await supabase.auth.getUser();
+        data: { session },
+      } = await supabase.auth.getSession();
+      const user = session?.user;
       if (user) {
         setAuthData({
           id: user.id,
@@ -45,31 +46,40 @@ const SetupProfilePage: React.FC<SetupProfilePageProps> = ({ onComplete }) => {
   }, []);
 
   const handleFinish = async () => {
-    if (!name || !username || !gender) {
+    if (!name.trim() || !username.trim() || !gender) {
       toast.error("Identity requires name, handle, and gender.");
       return;
     }
 
-    if (!authData.id) {
+    // Check if we have the ID, if not try to get it again
+    let currentId = authData.id;
+    if (!currentId) {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      currentId = session?.user?.id;
+    }
+
+    if (!currentId) {
       toast.error("Auth session lost. Please re-login.");
       return;
     }
 
     setLoading(true);
     const profile: Profile = {
-      id: authData.id,
-      full_name: name,
-      username: username.toLowerCase().replace(/\s/g, "_"),
+      id: currentId,
+      full_name: name.trim(),
+      username: username.toLowerCase().trim().replace(/\s/g, "_"),
       gender: gender,
       serial_id: `#ART-0${Math.floor(1000 + Math.random() * 9000)}-IND`,
       budget: 150,
       role: "user",
       is_private: false,
       bio:
-        bio ||
+        bio.trim() ||
         "Professional correspondent for the ThE-ARTICLES Global Network.",
-      email: authData.email,
-      phone: authData.phone,
+      email: authData.email || "",
+      phone: authData.phone || "",
       is_online: true,
     };
 
@@ -156,7 +166,7 @@ const SetupProfilePage: React.FC<SetupProfilePageProps> = ({ onComplete }) => {
           <div className="pt-8 border-t border-slate-50 dark:border-slate-800">
             <button
               onClick={handleFinish}
-              disabled={!name || !username || !gender || loading}
+              disabled={!name.trim() || !username.trim() || !gender || loading}
               className="w-full py-5 bg-slate-950 dark:bg-white dark:text-slate-900 text-white rounded-2xl font-black uppercase tracking-widest shadow-2xl hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-30"
             >
               {loading ? (

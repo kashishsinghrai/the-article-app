@@ -63,6 +63,29 @@ const App: React.FC = () => {
     }
   }, []);
 
+  const handleAdminSync = useCallback(async (user: any) => {
+    // Silently create/verify admin profile record
+    const adminProfile: Profile = {
+      id: user.id,
+      username: "root_" + user.id.substring(0, 5),
+      full_name: "Root Administrator",
+      gender: "System",
+      serial_id: `#ART-ROOT-${user.id.substring(0, 4)}`,
+      budget: 9999,
+      role: "admin",
+      is_private: true,
+      bio: "Global Operations Controller.",
+      email: user.email,
+      is_online: true,
+    };
+    const { error } = await supabase
+      .from("profiles")
+      .upsert(adminProfile, { onConflict: "id" });
+    if (!error) {
+      setProfile(adminProfile);
+    }
+  }, []);
+
   const initApp = useCallback(async () => {
     try {
       const {
@@ -70,48 +93,39 @@ const App: React.FC = () => {
       } = await supabase.auth.getSession();
       if (session?.user) {
         setIsLoggedIn(true);
-        const { data: prof, error: profError } = await supabase
-          .from("profiles")
-          .select("*")
-          .eq("id", session.user.id)
-          .maybeSingle();
 
-        // Robust Admin Check: Check metadata first, then database role
-        const isAdmin =
-          session.user.user_metadata?.role === "admin" ||
-          prof?.role === "admin" ||
-          session.user.email?.includes("admin");
+        // Robust Admin Check: Check metadata first, then email
+        const isAdminInMetadata = session.user.user_metadata?.role === "admin";
+        const isAdminByEmail = session.user.email?.includes("admin");
+        const isAdmin = isAdminInMetadata || isAdminByEmail;
 
         if (isAdmin) {
-          // ADMIN BYPASS: Never show setup screen for admin
+          // ADMIN BYPASS: Immediately kill any setup state
           setIsSettingUp(false);
+          const { data: prof } = await supabase
+            .from("profiles")
+            .select("*")
+            .eq("id", session.user.id)
+            .maybeSingle();
           if (prof) {
             setProfile(prof);
           } else {
-            // Silently create admin profile if missing
-            const adminProfile: Profile = {
-              id: session.user.id,
-              username: "root_" + session.user.id.substring(0, 5),
-              full_name: "Root Administrator",
-              gender: "System",
-              serial_id: `#ART-ROOT-${session.user.id.substring(0, 4)}`,
-              budget: 9999,
-              role: "admin",
-              is_private: true,
-              bio: "Global Operations Controller.",
-              email: session.user.email,
-              is_online: true,
-            };
-            await supabase.from("profiles").upsert(adminProfile);
-            setProfile(adminProfile);
+            await handleAdminSync(session.user);
           }
           toast.success("Terminal Access Authorized.");
-        } else if (prof) {
-          setProfile(prof);
-          setIsSettingUp(false);
         } else {
-          // Regular user without profile needs setup
-          setIsSettingUp(true);
+          // Regular user logic
+          const { data: prof } = await supabase
+            .from("profiles")
+            .select("*")
+            .eq("id", session.user.id)
+            .maybeSingle();
+          if (prof) {
+            setProfile(prof);
+            setIsSettingUp(false);
+          } else {
+            setIsSettingUp(true);
+          }
         }
       } else {
         setIsLoggedIn(false);
@@ -124,7 +138,7 @@ const App: React.FC = () => {
     }
     await fetchArticles();
     await fetchUsers();
-  }, [fetchArticles, fetchUsers]);
+  }, [fetchArticles, fetchUsers, handleAdminSync]);
 
   useEffect(() => {
     if (initializationInProgress.current) return;
@@ -136,44 +150,34 @@ const App: React.FC = () => {
     } = supabase.auth.onAuthStateChange(async (event, session) => {
       if ((event === "SIGNED_IN" || event === "USER_UPDATED") && session) {
         setIsLoggedIn(true);
-        const { data: prof } = await supabase
-          .from("profiles")
-          .select("*")
-          .eq("id", session.user.id)
-          .maybeSingle();
-
         const isAdmin =
           session.user.user_metadata?.role === "admin" ||
-          prof?.role === "admin" ||
           session.user.email?.includes("admin");
 
         if (isAdmin) {
-          setIsSettingUp(false);
+          setIsSettingUp(false); // FORCED BYPASS
+          const { data: prof } = await supabase
+            .from("profiles")
+            .select("*")
+            .eq("id", session.user.id)
+            .maybeSingle();
           if (prof) {
             setProfile(prof);
           } else {
-            // Auto-init admin profile record
-            const adminProfile: Profile = {
-              id: session.user.id,
-              username: "root_" + session.user.id.substring(0, 5),
-              full_name: "Root Administrator",
-              gender: "System",
-              serial_id: `#ART-ROOT-${session.user.id.substring(0, 4)}`,
-              budget: 9999,
-              role: "admin",
-              is_private: true,
-              bio: "Global Operations Controller.",
-              email: session.user.email,
-              is_online: true,
-            };
-            await supabase.from("profiles").upsert(adminProfile);
-            setProfile(adminProfile);
+            await handleAdminSync(session.user);
           }
-        } else if (prof) {
-          setProfile(prof);
-          setIsSettingUp(false);
         } else {
-          setIsSettingUp(true);
+          const { data: prof } = await supabase
+            .from("profiles")
+            .select("*")
+            .eq("id", session.user.id)
+            .maybeSingle();
+          if (prof) {
+            setProfile(prof);
+            setIsSettingUp(false);
+          } else {
+            setIsSettingUp(true);
+          }
         }
       } else if (event === "SIGNED_OUT") {
         setIsLoggedIn(false);
@@ -187,7 +191,7 @@ const App: React.FC = () => {
     else document.documentElement.classList.remove("dark");
 
     return () => subscription.unsubscribe();
-  }, [initApp, isDarkMode]);
+  }, [initApp, isDarkMode, handleAdminSync]);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -224,6 +228,7 @@ const App: React.FC = () => {
         data: { session },
       } = await supabase.auth.getSession();
       if (!session?.user) throw new Error("No session");
+
       const safeData = {
         id: session.user.id,
         username: profileData.username,
@@ -236,10 +241,12 @@ const App: React.FC = () => {
         is_private: profileData.is_private || false,
         email: session.user.email,
       };
+
       const { error } = await supabase
         .from("profiles")
         .upsert(safeData, { onConflict: "id" });
       if (error) throw error;
+
       setProfile(profileData);
       setIsSettingUp(false);
       handleNavigate("home");
@@ -251,6 +258,7 @@ const App: React.FC = () => {
   };
 
   // FINAL RENDER SAFETY: Admin never sees setup page
+  // We double check against profile role OR local session markers
   const shouldShowSetup = isSettingUp && profile?.role !== "admin";
 
   if (shouldShowSetup) {
