@@ -7,7 +7,6 @@ export interface UserSettings {
   data_sharing: boolean;
   ai_briefings: boolean;
   secure_mode: boolean;
-  // Hardware/System Permissions
   camera_access: boolean;
   mic_access: boolean;
   location_access: boolean;
@@ -37,32 +36,25 @@ export interface Profile {
   avatar_url?: string;
   email?: string;
   phone?: string;
-  following?: string[]; // Array of IDs
-  followers_count?: number;
-  following_count?: number;
   is_online?: boolean; 
   last_seen?: string;
   settings?: UserSettings; 
 }
 
-// Combine snake_case for DB and camelCase for UI compatibility
 export interface ChatRequest {
   id: string;
   from_id: string;
   to_id: string;
-  from_name?: string; 
   status: 'pending' | 'accepted' | 'rejected';
-  timestamp: number; // For UI sorting
-  created_at: string; // For DB consistency
+  created_at: string;
+  from_name?: string; // Virtual field for UI
 }
 
 export interface LiveMessage {
   id: string;
   sender_id: string;
-  sender_name?: string; 
-  recipient_id?: string;
+  recipient_id: string;
   text: string;
-  timestamp: number;
   created_at: string;
 }
 

@@ -88,6 +88,7 @@ const SetupProfilePage: React.FC<SetupProfilePageProps> = ({ onComplete }) => {
         return;
       }
 
+      // Fix: Removed 'following', 'followers_count', and 'following_count' as they are not defined in the Profile type
       const profile: Profile = {
         id: currentId,
         full_name: name.trim(),
@@ -104,9 +105,6 @@ const SetupProfilePage: React.FC<SetupProfilePageProps> = ({ onComplete }) => {
         email: authData.email || "",
         phone: authData.phone || "",
         is_online: true,
-        following: [],
-        followers_count: 0,
-        following_count: 0,
         settings: {
           notifications_enabled: true,
           presence_visible: true,
