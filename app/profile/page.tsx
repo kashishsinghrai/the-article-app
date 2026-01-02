@@ -8,6 +8,8 @@ import {
   Mail,
   Smartphone,
   MessageSquare,
+  LogOut,
+  ShieldAlert,
 } from "lucide-react";
 import IDCard from "../../components/IDCard";
 import SettingsTerminal from "../../components/SettingsTerminal";
@@ -29,6 +31,7 @@ interface ProfilePageProps {
 
 const ProfilePage: React.FC<ProfilePageProps> = ({
   profile,
+  onLogout,
   onUpdateProfile,
   isExternal = false,
   onCloseExternal,
@@ -82,12 +85,25 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
 
   return (
     <main className="max-w-6xl px-6 py-24 mx-auto space-y-12 duration-700 md:py-32 animate-in fade-in">
-      <button
-        onClick={onCloseExternal}
-        className="flex items-center gap-2 text-slate-400 hover:text-slate-900 dark:hover:text-white font-black uppercase text-[10px] tracking-widest transition-all"
-      >
-        <ArrowLeft size={16} /> Exit Identity
-      </button>
+      <div className="flex items-center justify-between">
+        <button
+          onClick={onCloseExternal}
+          className="flex items-center gap-2 text-slate-400 hover:text-slate-900 dark:hover:text-white font-black uppercase text-[10px] tracking-widest transition-all"
+        >
+          <ArrowLeft size={16} /> Exit Identity
+        </button>
+
+        {isOwnProfile && (
+          <button
+            onClick={() => {
+              if (confirm("Terminate current session?")) onLogout();
+            }}
+            className="flex items-center gap-2 px-6 py-2.5 bg-red-50 dark:bg-red-900/10 text-red-600 rounded-xl font-black uppercase text-[10px] tracking-widest hover:bg-red-600 hover:text-white transition-all shadow-sm border border-red-100 dark:border-red-900/30"
+          >
+            <LogOut size={14} /> Terminate Session
+          </button>
+        )}
+      </div>
 
       <div className="grid grid-cols-1 gap-12 lg:grid-cols-12 lg:gap-24">
         <div className="space-y-12 lg:col-span-5">

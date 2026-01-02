@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect } from "react";
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
 import TrendingTicker from "./components/TrendingTicker";
@@ -16,10 +16,23 @@ import SetupProfilePage from "./app/setup-profile/page";
 import { Profile, Article, ChatRequest } from "./types";
 import { Toaster, toast } from "react-hot-toast";
 import { supabase } from "./lib/supabase";
+import { useStore } from "./lib/store";
 
 const App: React.FC = () => {
+  // Selective store hooks to prevent unnecessary re-renders
+  const profile = useStore((s) => s.profile);
+  const isLoggedIn = useStore((s) => s.isLoggedIn);
+  const articles = useStore((s) => s.articles);
+  const users = useStore((s) => s.users);
+  const chatRequests = useStore((s) => s.chatRequests);
+  const isInitialized = useStore((s) => s.isInitialized);
+
+  const hydrate = useStore((s) => s.hydrate);
+  const logout = useStore((s) => s.logout);
+  const syncAll = useStore((s) => s.syncAll);
+  const setChatRequests = useStore((s) => s.setChatRequests);
+
   const [currentPage, setCurrentPage] = useState("home");
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [showAuth, setShowAuth] = useState<"login" | "register" | null>(null);
   const [viewingProfile, setViewingProfile] = useState<Profile | null>(null);
   const [isDarkMode, setIsDarkMode] = useState(false);
@@ -27,141 +40,24 @@ const App: React.FC = () => {
   const [editingArticleData, setEditingArticleData] = useState<Article | null>(
     null
   );
-
-  const [chatRequests, setChatRequests] = useState<ChatRequest[]>([]);
   const [activeChat, setActiveChat] = useState<Profile | null>(null);
 
-  const [profile, setProfile] = useState<Profile | null>(null);
-  const [articles, setArticles] = useState<Article[]>([]);
-  const [users, setUsers] = useState<Profile[]>([]);
-
-  const initializationInProgress = useRef(false);
-
-  const fetchGlobalData = useCallback(async () => {
-    try {
-      const [artRes, userRes] = await Promise.all([
-        supabase
-          .from("articles")
-          .select("*")
-          .order("created_at", { ascending: false }),
-        supabase
-          .from("profiles")
-          .select("*")
-          .order("full_name", { ascending: true }),
-      ]);
-
-      if (artRes.error) throw artRes.error;
-      if (userRes.error) throw userRes.error;
-
-      setArticles(artRes.data || []);
-      setUsers(userRes.data || []);
-
-      return { articles: artRes.data, users: userRes.data };
-    } catch (e) {
-      console.error("Fetch Error:", e);
-      toast.error("Network sync failure. Retry recommended.");
-    }
-  }, []);
-
-  const fetchMyProfile = useCallback(async (userId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", userId)
-        .maybeSingle();
-      if (error) throw error;
-      if (data) {
-        setProfile(data);
-        return data;
-      }
-    } catch (e) {
-      console.warn("Profile fetch error:", e);
-    }
-    return null;
-  }, []);
-
-  const syncIdentity = useCallback(
-    async (user: any) => {
-      if (!user) return;
-      setIsLoggedIn(true);
-      const myProf = await fetchMyProfile(user.id);
-      if (myProf) {
-        // Realtime handshake listener
-        supabase
-          .channel(`chat_notifications_${user.id}`)
-          .on(
-            "postgres_changes",
-            {
-              event: "INSERT",
-              schema: "public",
-              table: "chat_requests",
-              filter: `to_id=eq.${user.id}`,
-            },
-            (payload) => {
-              setChatRequests((prev) => [...prev, payload.new as ChatRequest]);
-              toast("Secure handshake received", { icon: "🤝" });
-            }
-          )
-          .subscribe();
-
-        const { data: reqs } = await supabase
-          .from("chat_requests")
-          .select("*")
-          .eq("to_id", user.id)
-          .eq("status", "pending");
-        if (reqs) setChatRequests(reqs);
-      }
-      await fetchGlobalData();
-    },
-    [fetchMyProfile, fetchGlobalData]
-  );
-
   useEffect(() => {
-    if (initializationInProgress.current) return;
-    initializationInProgress.current = true;
-
-    const init = async () => {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      await fetchGlobalData();
-      if (session?.user) await syncIdentity(session.user);
-    };
-    init();
+    hydrate();
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === "SIGNED_IN" && session?.user) {
-        await syncIdentity(session.user);
+    } = supabase.auth.onAuthStateChange(async (event) => {
+      if (event === "SIGNED_IN") {
+        hydrate();
       } else if (event === "SIGNED_OUT") {
-        setIsLoggedIn(false);
-        setProfile(null);
-        setArticles([]); // Clear specific cache
-        setChatRequests([]);
-        setActiveChat(null);
+        logout();
         setCurrentPage("home");
       }
     });
 
     return () => subscription.unsubscribe();
-  }, [syncIdentity, fetchGlobalData]);
-
-  const handleLogout = async () => {
-    try {
-      await supabase.auth.signOut();
-      localStorage.clear();
-      setIsLoggedIn(false);
-      setProfile(null);
-      setChatRequests([]);
-      setActiveChat(null);
-      setCurrentPage("home");
-      toast.success("Identity Terminal Disconnected.");
-    } catch (e) {
-      toast.error("Logout failure.");
-    }
-  };
+  }, [hydrate, logout]);
 
   useEffect(() => {
     if (isDarkMode) document.documentElement.classList.add("dark");
@@ -174,12 +70,32 @@ const App: React.FC = () => {
       .update({ status: "accepted" })
       .eq("id", req.id);
     if (!error) {
-      setChatRequests((prev) => prev.filter((r) => r.id !== req.id));
       const sender = users.find((u) => u.id === req.from_id);
       if (sender) setActiveChat(sender);
+      if (profile) {
+        const { data } = await supabase
+          .from("chat_requests")
+          .select("*")
+          .eq("to_id", profile.id)
+          .eq("status", "pending");
+        if (data) setChatRequests(data);
+      }
       toast.success("Identity Verified.");
     }
   };
+
+  if (!isInitialized) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-white dark:bg-slate-950">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-12 h-12 border-4 border-blue-600 rounded-full border-t-transparent animate-spin" />
+          <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">
+            Synchronizing Global Node...
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -192,20 +108,14 @@ const App: React.FC = () => {
       {showAuth === "login" && (
         <LoginPage
           onBack={() => setShowAuth(null)}
-          onSuccess={(u) => {
-            setShowAuth(null);
-            syncIdentity(u);
-          }}
+          onSuccess={() => setShowAuth(null)}
           onGoToRegister={() => setShowAuth("register")}
         />
       )}
       {showAuth === "register" && (
         <RegisterPage
           onBack={() => setShowAuth(null)}
-          onSuccess={(u) => {
-            setShowAuth(null);
-            syncIdentity(u);
-          }}
+          onSuccess={() => setShowAuth(null)}
           onGoToLogin={() => setShowAuth("login")}
         />
       )}
@@ -215,7 +125,7 @@ const App: React.FC = () => {
           <Navbar
             onNavigate={setCurrentPage}
             onLogin={() => setShowAuth("login")}
-            onLogout={handleLogout}
+            onLogout={logout}
             currentPage={currentPage}
             isLoggedIn={isLoggedIn}
             userRole={profile?.role || "user"}
@@ -233,13 +143,13 @@ const App: React.FC = () => {
                 isLoggedIn={isLoggedIn}
                 onLogin={() => setShowAuth("login")}
                 userRole={profile?.role || "user"}
-                onDelete={() => fetchGlobalData()}
+                onDelete={() => syncAll()}
                 onEdit={(a) => {
                   setEditingArticleData(a);
                   setCurrentPage("post");
                 }}
                 onReadArticle={setActiveArticle}
-                onRefresh={fetchGlobalData}
+                onRefresh={syncAll}
               />
             )}
 
@@ -247,7 +157,10 @@ const App: React.FC = () => {
               <PostPage
                 profile={profile}
                 editData={editingArticleData}
-                onBack={() => setCurrentPage("home")}
+                onBack={() => {
+                  setEditingArticleData(null);
+                  setCurrentPage("home");
+                }}
                 onPublish={async (d) => {
                   if (!profile) return;
                   const method = editingArticleData
@@ -269,7 +182,8 @@ const App: React.FC = () => {
                     toast.error("Dispatch Failed.");
                     return;
                   }
-                  await fetchGlobalData();
+                  await syncAll();
+                  setEditingArticleData(null);
                   setCurrentPage("home");
                   toast.success("Dispatch Published.");
                 }}
@@ -281,7 +195,7 @@ const App: React.FC = () => {
                 profile ? (
                   <ProfilePage
                     profile={viewingProfile || profile}
-                    onLogout={handleLogout}
+                    onLogout={logout}
                     isExternal={!!viewingProfile}
                     onCloseExternal={() => {
                       setViewingProfile(null);
@@ -298,8 +212,7 @@ const App: React.FC = () => {
                       if (error) toast.error("Identity update failure.");
                       else {
                         toast.success("Identity Updated.");
-                        fetchMyProfile(profile.id);
-                        fetchGlobalData();
+                        hydrate();
                       }
                     }}
                   />
@@ -310,15 +223,11 @@ const App: React.FC = () => {
                         .from("profiles")
                         .upsert(d);
                       if (error) {
-                        toast.error(
-                          "Database conflict: Failed to establish identity."
-                        );
+                        toast.error("Establishment failed.");
                         return;
                       }
-                      setProfile(d);
-                      setIsLoggedIn(true);
+                      hydrate();
                       toast.success("Identity Established.");
-                      await fetchGlobalData();
                       setCurrentPage("home");
                     }}
                   />
@@ -347,7 +256,7 @@ const App: React.FC = () => {
                 onChat={(u) => {
                   setActiveChat(u);
                 }}
-                onRefresh={fetchGlobalData}
+                onRefresh={syncAll}
               />
             )}
 
@@ -359,9 +268,9 @@ const App: React.FC = () => {
                 articles={articles}
                 users={users}
                 currentUserId={profile.id}
-                onUpdateArticles={fetchGlobalData}
-                onUpdateUsers={fetchGlobalData}
-                onLogout={handleLogout}
+                onUpdateArticles={syncAll}
+                onUpdateUsers={syncAll}
+                onLogout={logout}
               />
             )}
           </div>
@@ -373,7 +282,7 @@ const App: React.FC = () => {
               isLoggedIn={isLoggedIn}
               currentUserId={profile?.id}
               currentUserProfile={profile}
-              onUpdateArticles={fetchGlobalData}
+              onUpdateArticles={syncAll}
             />
           )}
           {activeChat && (

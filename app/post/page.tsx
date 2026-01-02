@@ -16,7 +16,6 @@ import {
 import { toast } from "react-hot-toast";
 import { Article, Category, Profile } from "../../types";
 import NetworkMonitor from "../../components/NetworkMonitor";
-import { supabase } from "../../lib/supabase";
 
 interface PostPageProps {
   onPublish: (data: Partial<Article>) => Promise<void>;
@@ -39,21 +38,9 @@ const PostPage: React.FC<PostPageProps> = ({
   const [isSyncing, setIsSyncing] = useState(false);
   const [isEncoding, setIsEncoding] = useState(false);
   const [imageUrl, setImageUrl] = useState("");
-  const [personalArticles, setPersonalArticles] = useState<Article[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    const fetchPersonalStats = async () => {
-      if (!profile) return;
-      const { data: a } = await supabase
-        .from("articles")
-        .select("*")
-        .eq("author_id", profile.id)
-        .order("created_at", { ascending: false });
-      if (a) setPersonalArticles(a);
-    };
-    fetchPersonalStats();
-
     if (editData) {
       setTitle(editData.title);
       setContent(editData.content);
@@ -62,7 +49,7 @@ const PostPage: React.FC<PostPageProps> = ({
       setHashtags(editData.hashtags?.join(", ") || "");
       setIsPublic(editData.is_private === false);
     }
-  }, [editData, profile]);
+  }, [editData]);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -277,7 +264,7 @@ const PostPage: React.FC<PostPageProps> = ({
       </div>
 
       <div className="flex-shrink-0 w-full lg:w-80">
-        <NetworkMonitor profile={profile} personalArticles={personalArticles} />
+        <NetworkMonitor />
       </div>
     </main>
   );
