@@ -1,33 +1,18 @@
 import React, { useState, useEffect, useRef } from "react";
 import {
-  Settings,
-  LogOut,
-  TrendingUp,
-  Download,
-  X,
-  MessageSquare,
-  Loader2,
-  ShieldCheck,
-  UserCheck,
-  User,
-  Fingerprint,
-  Info,
-  Edit3,
-  Save,
-  Sliders,
+  Camera,
   ArrowLeft,
+  Lock,
+  User,
+  Info,
   Mail,
   Smartphone,
-  Camera,
-  Lock,
-  UserPlus,
-  UserMinus,
+  MessageSquare,
 } from "lucide-react";
 import IDCard from "../../components/IDCard";
 import SettingsTerminal from "../../components/SettingsTerminal";
 import { Profile } from "../../types";
 import { toast } from "react-hot-toast";
-import { supabase } from "../../lib/supabase";
 
 interface ProfilePageProps {
   profile: Profile;
@@ -44,13 +29,10 @@ interface ProfilePageProps {
 
 const ProfilePage: React.FC<ProfilePageProps> = ({
   profile,
-  onLogout,
   onUpdateProfile,
   isExternal = false,
   onCloseExternal,
-  isLoggedIn = false,
   currentUserId,
-  currentUserProfile,
   onChat,
   initialTab = "intel",
 }) => {

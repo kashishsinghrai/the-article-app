@@ -1,21 +1,12 @@
 import React, { useState, useMemo } from "react";
 import {
-  Globe,
-  Users,
-  Zap,
   Search,
   MessageSquare,
-  ShieldCheck,
   Fingerprint,
-  Network as NetworkIcon,
   ArrowLeft,
   RefreshCcw,
-  UserPlus,
-  UserMinus,
 } from "lucide-react";
 import { Profile } from "../../types";
-import { supabase } from "../../lib/supabase";
-import { toast } from "react-hot-toast";
 
 interface NetworkPageProps {
   users: Profile[];
@@ -33,7 +24,6 @@ const NetworkPage: React.FC<NetworkPageProps> = ({
   onViewProfile,
   onChat,
   onBack,
-  currentUserProfile,
   onRefresh,
 }) => {
   const [searchTerm, setSearchTerm] = useState("");

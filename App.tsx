@@ -13,7 +13,7 @@ import NetworkPage from "./app/network/page";
 import LoginPage from "./app/auth/login";
 import RegisterPage from "./app/auth/register";
 import SetupProfilePage from "./app/setup-profile/page";
-import { Profile, Article, ChatRequest, LiveMessage } from "./types";
+import { Profile, Article, ChatRequest } from "./types";
 import { Toaster, toast } from "react-hot-toast";
 import { supabase } from "./lib/supabase";
 import { Loader2 } from "lucide-react";
@@ -176,7 +176,6 @@ const App: React.FC = () => {
   const handleChatInitiate = async (target: Profile) => {
     if (!profile) return toast.error("Auth required.");
 
-    // Check if channel is already open
     const { data: existing } = await supabase
       .from("chat_requests")
       .select("*")
