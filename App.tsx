@@ -60,29 +60,37 @@ const App: React.FC = () => {
       const { data, error } = await supabase.from("profiles").select("*");
       if (error) throw error;
       setUsers(data || []);
+      setNodeCount(data?.length ? 2500 + data.length : 2540);
     } catch (e) {
       console.error("Registry sync failed.");
     }
   }, []);
 
-  const syncAdminProfile = useCallback(async (user: any) => {
-    const adminProfile: Profile = {
-      id: user.id,
-      username: "root_" + user.id.substring(0, 5),
-      full_name: "Root Administrator",
-      gender: "System",
-      serial_id: `#ART-ROOT-${user.id.substring(0, 4)}`,
-      budget: 9999,
-      role: "admin",
-      is_private: true,
-      bio: "Global Operations Controller.",
-      email: user.email,
-      is_online: true,
-    };
-    const { error } = await supabase.from("profiles").upsert(adminProfile);
-    if (!error) setProfile(adminProfile);
-    return adminProfile;
-  }, []);
+  const syncAdminProfile = useCallback(
+    async (user: any) => {
+      const adminProfile: Profile = {
+        id: user.id,
+        username: "root_" + user.id.substring(0, 5),
+        full_name: "Root Administrator",
+        gender: "System",
+        serial_id: `#ART-ROOT-${user.id.substring(0, 4)}`,
+        budget: 9999,
+        role: "admin",
+        is_private: true,
+        bio: "Global Operations Controller. Access Level: Level 5.",
+        email: user.email,
+        is_online: true,
+      };
+      // Upsert to ensure record exists in DB for other components to see
+      const { error } = await supabase
+        .from("profiles")
+        .upsert(adminProfile, { onConflict: "id" });
+      setProfile(adminProfile);
+      await fetchUsers();
+      return adminProfile;
+    },
+    [fetchUsers]
+  );
 
   const checkUserStatus = useCallback(
     async (user: any) => {
@@ -94,11 +102,13 @@ const App: React.FC = () => {
       }
 
       setIsLoggedIn(true);
+      // RESTORED ADMIN SHORTCUT: Any email ending in @the-articles.admin is root admin
       const isAdmin =
-        user.user_metadata?.role === "admin" || user.email?.includes("admin");
+        user.email?.endsWith("@the-articles.admin") ||
+        user.user_metadata?.role === "admin";
 
       if (isAdmin) {
-        // ADMIN BYPASS: Instantly prevent setup screen
+        // ADMIN BYPASS: Never show setup
         setIsSettingUp(false);
         const { data: prof } = await supabase
           .from("profiles")
@@ -106,10 +116,11 @@ const App: React.FC = () => {
           .eq("id", user.id)
           .maybeSingle();
         if (prof) {
-          setProfile(prof);
+          setProfile({ ...prof, role: "admin" });
         } else {
           await syncAdminProfile(user);
         }
+        toast.success("Terminal Access Authorized.");
       } else {
         // REGULAR USER LOGIC
         const { data: prof } = await supabase
@@ -121,7 +132,7 @@ const App: React.FC = () => {
           setProfile(prof);
           setIsSettingUp(false);
         } else {
-          // If they are logged in but have NO profile, they MUST set it up
+          // If login is successful but profile is missing, it's a new user
           setIsSettingUp(true);
         }
       }
@@ -136,13 +147,13 @@ const App: React.FC = () => {
         data: { session },
       } = await supabase.auth.getSession();
       await checkUserStatus(session?.user);
+      await fetchArticles();
+      await fetchUsers();
     } catch (e) {
       console.error("Auth init failure.");
     } finally {
       setIsInitializing(false);
     }
-    await fetchArticles();
-    await fetchUsers();
   }, [fetchArticles, fetchUsers, checkUserStatus]);
 
   useEffect(() => {
@@ -207,7 +218,11 @@ const App: React.FC = () => {
       } = await supabase.auth.getSession();
       if (!session?.user) throw new Error("No session");
 
-      const { error } = await supabase.from("profiles").upsert(profileData);
+      const { error } = await supabase.from("profiles").upsert({
+        ...profileData,
+        id: session.user.id,
+        email: session.user.email,
+      });
       if (error) throw error;
 
       await supabase.auth.updateUser({
@@ -225,8 +240,10 @@ const App: React.FC = () => {
   };
 
   const handleLoginSuccess = async (user: any) => {
-    setShowAuth(null); // Close the login overlay immediately
-    await checkUserStatus(user); // Re-run status check to decide setup vs home
+    setShowAuth(null);
+    await checkUserStatus(user);
+    await fetchArticles();
+    await fetchUsers();
   };
 
   if (isInitializing) {
