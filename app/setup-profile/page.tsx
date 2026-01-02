@@ -71,18 +71,6 @@ const SetupProfilePage: React.FC<SetupProfilePageProps> = ({ onComplete }) => {
       email: authData.email,
       phone: authData.phone,
       is_online: true,
-      settings: {
-        notifications_enabled: true,
-        presence_visible: true,
-        data_sharing: false,
-        ai_briefings: true,
-        secure_mode: true,
-        camera_access: false,
-        mic_access: false,
-        location_access: false,
-        storage_access: false,
-        contacts_sync: false,
-      },
     };
 
     onComplete(profile);

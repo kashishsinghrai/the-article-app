@@ -13,13 +13,7 @@ import NetworkPage from "./app/network/page";
 import LoginPage from "./app/auth/login";
 import RegisterPage from "./app/auth/register";
 import SetupProfilePage from "./app/setup-profile/page";
-import {
-  Profile,
-  Article,
-  ChatRequest,
-  LiveMessage,
-  UserSettings,
-} from "./types";
+import { Profile, Article, ChatRequest, LiveMessage } from "./types";
 import { Toaster, toast } from "react-hot-toast";
 import { supabase } from "./lib/supabase";
 
@@ -36,7 +30,6 @@ const App: React.FC = () => {
   const [chatRequests, setChatRequests] = useState<ChatRequest[]>([]);
   const [activeChat, setActiveChat] = useState<Profile | null>(null);
   const [chatMessages, setChatMessages] = useState<LiveMessage[]>([]);
-  const [adminIntercepts, setAdminIntercepts] = useState<any[]>([]);
 
   const [profile, setProfile] = useState<Profile | null>(null);
   const [articles, setArticles] = useState<Article[]>([]);
@@ -46,33 +39,34 @@ const App: React.FC = () => {
 
   const fetchArticles = useCallback(async () => {
     try {
-      const { data: arts, error } = await supabase
+      const { data, error } = await supabase
         .from("articles")
         .select("*")
         .order("created_at", { ascending: false });
       if (error) throw error;
-      if (arts) {
-        setArticles([...arts]);
-      }
-    } catch (e: any) {
-      console.error("Article fetch failed");
+      setArticles(data || []);
+    } catch (e) {
+      console.error("Articles fetch failed");
     }
   }, []);
 
   const fetchUsers = useCallback(async () => {
     try {
       const { data, error } = await supabase.from("profiles").select("*");
-      if (error) throw error;
-      if (data) setUsers(data);
+      if (error) {
+        // If error is 500, it's a database policy issue
+        if (error.code === "PGRST301" || error.status === 500) {
+          console.error(
+            "Database Policy Error (500). Please check RLS policies."
+          );
+        }
+        throw error;
+      }
+      setUsers(data || []);
     } catch (e) {
-      console.error("Registry sync failed.");
+      console.error("Registry sync failed. Check database logs.");
     }
   }, []);
-
-  useEffect(() => {
-    if (isDarkMode) document.documentElement.classList.add("dark");
-    else document.documentElement.classList.remove("dark");
-  }, [isDarkMode]);
 
   const initApp = useCallback(async () => {
     try {
@@ -87,17 +81,22 @@ const App: React.FC = () => {
           .eq("id", session.user.id)
           .maybeSingle();
 
+        if (error && error.status !== 406) {
+          console.error("Profile Fetch Error:", error);
+        }
+
         if (prof) {
           setProfile(prof);
           setIsSettingUp(false);
         } else {
+          // No profile found, user must go through setup
           setIsSettingUp(true);
         }
       } else {
         setIsLoggedIn(false);
         setProfile(null);
       }
-    } catch (e: any) {
+    } catch (e) {
       console.error("Session sync failed.");
     }
     await fetchArticles();
@@ -133,90 +132,14 @@ const App: React.FC = () => {
       }
     });
 
+    if (isDarkMode) document.documentElement.classList.add("dark");
+    else document.documentElement.classList.remove("dark");
+
     return () => subscription.unsubscribe();
-  }, [initApp]);
-
-  useEffect(() => {
-    if (!profile?.id) return;
-
-    const inboxChannel = supabase.channel(`inbox_${profile.id}`);
-    inboxChannel
-      .on("broadcast", { event: "handshake" }, (p) => {
-        const req = p.payload as ChatRequest;
-        setChatRequests((prev) =>
-          prev.some((r) => r.fromId === req.fromId) ? prev : [...prev, req]
-        );
-        toast(`Signal Detected: ${req.fromName}`, { icon: "🤝" });
-      })
-      .on("broadcast", { event: "handshake_accepted" }, async (p) => {
-        const { acceptorId, acceptorName } = p.payload;
-        const acceptorProfile = users.find((u) => u.id === acceptorId);
-        if (acceptorProfile) {
-          setActiveChat(acceptorProfile);
-          setChatMessages([]);
-          toast.success(`Secure link with ${acceptorName}`, { icon: "⚡" });
-        }
-      })
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(inboxChannel);
-    };
-  }, [profile?.id, users]);
-
-  const handleAcceptRequest = useCallback(
-    async (req: ChatRequest) => {
-      if (!profile) return;
-      const senderProfile = users.find((u) => u.id === req.fromId);
-      if (senderProfile) {
-        setActiveChat(senderProfile);
-        setChatMessages([]);
-        const confirmChannel = supabase.channel(`inbox_${req.fromId}`);
-        confirmChannel.subscribe((status) => {
-          if (status === "SUBSCRIBED") {
-            confirmChannel.send({
-              type: "broadcast",
-              event: "handshake_accepted",
-              payload: {
-                acceptorId: profile.id,
-                acceptorName: profile.full_name,
-              },
-            });
-            setTimeout(() => supabase.removeChannel(confirmChannel), 2000);
-          }
-        });
-        setChatRequests((prev) => prev.filter((r) => r.id !== req.id));
-      }
-    },
-    [profile, users]
-  );
-
-  const handleSendMessage = useCallback(
-    (text: string) => {
-      if (!profile || !activeChat) return;
-      const message: LiveMessage = {
-        id: Math.random().toString(36).substr(2, 9),
-        senderId: profile.id,
-        senderName: profile.full_name,
-        text: text,
-        timestamp: Date.now(),
-      };
-      setChatMessages((prev) => [...prev, message]);
-      const ids = [profile.id, activeChat.id].sort();
-      const roomName = `room_${ids[0]}_${ids[1]}`;
-      supabase
-        .channel(roomName)
-        .send({ type: "broadcast", event: "message", payload: message });
-    },
-    [profile, activeChat]
-  );
+  }, [initApp, isDarkMode]);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
-    setIsLoggedIn(false);
-    setProfile(null);
-    setCurrentPage("home");
-    setIsSettingUp(false);
     toast.success("Identity disconnected.");
   };
 
@@ -231,12 +154,8 @@ const App: React.FC = () => {
       const {
         data: { session },
       } = await supabase.auth.getSession();
-      if (!session?.user) {
-        toast.error("Protocol Error: Re-authentication required.");
-        return;
-      }
+      if (!session?.user) throw new Error("No active session");
 
-      // Defensively only send columns usually present in profiles table to avoid Error 400
       const safeData = {
         id: session.user.id,
         username: profileData.username,
@@ -245,32 +164,26 @@ const App: React.FC = () => {
         gender: profileData.gender,
         serial_id: profileData.serial_id,
         budget: profileData.budget,
-        role: profileData.role,
-        is_private: profileData.is_private,
-        email: profileData.email,
-        phone: profileData.phone,
-        is_online: profileData.is_online,
-        settings: profileData.settings,
+        role: profileData.role || "user",
+        is_private: profileData.is_private || false,
+        email: session.user.email,
       };
 
       const { error } = await supabase
         .from("profiles")
         .upsert(safeData, { onConflict: "id" });
 
-      if (error) {
-        console.error("Profile sync error:", error);
-        throw error;
-      }
+      if (error) throw error;
 
       setProfile(profileData);
       setIsSettingUp(false);
       handleNavigate("home");
-      toast.success("Identity Synchronized.");
+      toast.success("Identity Forge Complete.");
       fetchUsers();
     } catch (err: any) {
+      console.error("Setup Error:", err);
       toast.error(
-        "SYNC FAILED: Run the SQL Fix provided in the prompt instructions. " +
-          (err.message || "Unknown error")
+        "Profile sync failed: " + (err.message || "Database Error 500")
       );
     }
   };
@@ -328,7 +241,14 @@ const App: React.FC = () => {
             isDarkMode={isDarkMode}
             onToggleDarkMode={() => setIsDarkMode(!isDarkMode)}
             chatRequests={chatRequests}
-            onAcceptRequest={handleAcceptRequest}
+            onAcceptRequest={async (req) => {
+              const sender = users.find((u) => u.id === req.fromId);
+              if (sender) {
+                setActiveChat(sender);
+                setChatMessages([]);
+                setChatRequests((prev) => prev.filter((r) => r.id !== req.id));
+              }
+            }}
           />
 
           <div className="flex-grow pt-24">
@@ -349,15 +269,14 @@ const App: React.FC = () => {
                 onBack={() => handleNavigate("home")}
                 onPublish={async (data) => {
                   if (!profile) return;
-                  const payload = {
-                    ...data,
-                    author_id: profile.id,
-                    author_name: profile.full_name,
-                    author_serial: profile.serial_id,
-                  };
                   const { error } = await supabase
                     .from("articles")
-                    .insert(payload);
+                    .insert({
+                      ...data,
+                      author_id: profile.id,
+                      author_name: profile.full_name,
+                      author_serial: profile.serial_id,
+                    });
                   if (!error) {
                     toast.success("Dispatch Published");
                     fetchArticles();
@@ -383,10 +302,8 @@ const App: React.FC = () => {
                   isExternal={!!viewingProfile}
                   initialTab={currentPage === "settings" ? "settings" : "intel"}
                   onCloseExternal={() => {
-                    if (viewingProfile) {
-                      setViewingProfile(null);
-                      setCurrentPage("network");
-                    } else handleNavigate("home");
+                    if (viewingProfile) setViewingProfile(null);
+                    handleNavigate("home");
                   }}
                   isLoggedIn={isLoggedIn}
                   currentUserId={profile.id}
@@ -437,7 +354,7 @@ const App: React.FC = () => {
               currentUserId={profile?.id || ""}
               onClose={() => setActiveChat(null)}
               messages={chatMessages}
-              onSendMessage={handleSendMessage}
+              onSendMessage={() => {}}
             />
           )}
         </div>
