@@ -46,8 +46,8 @@ const App: React.FC = () => {
         .select("*")
         .order("created_at", { ascending: false });
       const { data: userData } = await supabase.from("profiles").select("*");
-      if (artData) setArticles(artData);
-      if (userData) setUsers(userData);
+      if (artData) setArticles(artData || []);
+      if (userData) setUsers(userData || []);
     } catch (e) {
       console.error("Hydration Error");
     }
