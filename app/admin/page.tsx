@@ -59,7 +59,7 @@ const AdminPage: React.FC<AdminPageProps> = ({
   const [sqlCommand, setSqlCommand] = useState("");
   const [terminalOutput, setTerminalOutput] = useState<string[]>([
     "[SYSTEM] Root established...",
-    "[INFO] RLS Layer: Operational",
+    "[INFO] Protocol V4.2 Active",
   ]);
   const [isLockdown, setIsLockdown] = useState(false);
 
@@ -67,7 +67,7 @@ const AdminPage: React.FC<AdminPageProps> = ({
     useState<Article[]>(initialArticles);
   const [localUsers, setLocalUsers] = useState<Profile[]>(initialUsers);
 
-  // Edit State
+  // God-Mode Edit State
   const [editingUser, setEditingUser] = useState<Profile | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
 
@@ -133,7 +133,7 @@ const AdminPage: React.FC<AdminPageProps> = ({
     setSqlCommand("");
 
     try {
-      // Note: This requires a custom RPC function 'exec_sql' in Supabase to be truly functional
+      // Direct SQL execution via RPC (must exist in Supabase)
       const { data, error } = await (supabase as any).rpc("exec_sql", {
         sql_query: cmd,
       });
@@ -142,23 +142,22 @@ const AdminPage: React.FC<AdminPageProps> = ({
       } else {
         setTerminalOutput((prev) => [
           ...prev,
-          `[SUCCESS] Statement executed successfully.`,
+          `[SUCCESS] Operation completed.`,
         ]);
         if (onUpdateUsers) onUpdateUsers();
       }
     } catch (err: any) {
-      setTerminalOutput((prev) => [
-        ...prev,
-        `[FATAL] Query failed: ${err.message}`,
-      ]);
+      setTerminalOutput((prev) => [...prev, `[FATAL] ${err.message}`]);
     }
   };
 
   const handleDeleteUser = async (userId: string) => {
     if (userId === currentUserId)
-      return toast.error("ROOT PROTECTION: Cannot delete self.");
+      return toast.error("ROOT PROTECTION: Self-termination blocked.");
     if (
-      !confirm("TERMINATE IDENTITY? This will wipe the user from the registry.")
+      !confirm(
+        "TERMINATE IDENTITY? This node and all its dispatches will be purged from the registry."
+      )
     )
       return;
 
@@ -202,7 +201,7 @@ const AdminPage: React.FC<AdminPageProps> = ({
   };
 
   const handleDeleteArticle = async (id: string) => {
-    if (!confirm("DELETE DISPATCH? This action is irreversible.")) return;
+    if (!confirm("PURGE DISPATCH?")) return;
     try {
       const { error } = await supabase.from("articles").delete().eq("id", id);
       if (error) throw error;
@@ -236,32 +235,26 @@ const AdminPage: React.FC<AdminPageProps> = ({
     );
   }, [localUsers, searchTerm]);
 
-  const currentRoomMessages = useMemo(() => {
-    if (!activeInterception) return [];
-    return allRoomMessages[activeInterception] || [];
-  }, [allRoomMessages, activeInterception]);
-
   return (
     <main className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-24 md:py-32 space-y-12 animate-in fade-in duration-500">
-      {/* Header */}
       <div className="flex flex-col items-start justify-between gap-8 pb-10 border-b lg:flex-row border-slate-100 dark:border-slate-800">
         <div className="space-y-4">
           <div className="flex items-center gap-3 text-red-600 animate-pulse">
             <ShieldAlert size={20} />
             <span className="text-[10px] font-black uppercase tracking-[0.4em]">
-              ROOT OPERATIONS V4.2
+              ROOT CONTROL V4.2
             </span>
           </div>
           <h1 className="text-5xl italic font-black leading-none tracking-tighter uppercase sm:text-7xl md:text-8xl dark:text-white">
-            TERMINAL
+            COMMAND
           </h1>
           <div className="flex items-center gap-4">
             <span className="text-slate-400 font-bold uppercase tracking-widest text-[10px]">
-              AUTH: SYSTEM_OVERRIDE
+              CORE: AUTH_OVERRIDE_ACTIVE
             </span>
             <div className="w-8 h-px bg-slate-200 dark:bg-slate-800" />
             <span className="text-emerald-500 font-black uppercase text-[9px] tracking-widest flex items-center gap-1">
-              <Cpu size={10} /> CORE_READY
+              <Cpu size={10} /> NETWORK_STABLE
             </span>
           </div>
         </div>
@@ -316,7 +309,7 @@ const AdminPage: React.FC<AdminPageProps> = ({
               <TabButton
                 active={activeTab === "console"}
                 onClick={() => setActiveTab("console")}
-                label="Console"
+                label="Terminal"
                 icon={<Code size={14} />}
               />
             </div>
@@ -324,35 +317,33 @@ const AdminPage: React.FC<AdminPageProps> = ({
         </div>
       </div>
 
-      {/* Tabs Content */}
-      <div className="space-y-12">
-        {/* SYSTEM PULSE */}
+      <div className="pb-20 space-y-12">
         {activeTab === "monitor" && (
           <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
             <MonitorCard
-              label="Auth Nodes"
+              label="Total Nodes"
               value={localUsers.length}
-              desc="Identified Identities"
+              desc="Identified Identity Shards"
               icon={<User2 size={20} />}
             />
             <MonitorCard
-              label="Data Shards"
+              label="Dispatches"
               value={localArticles.length}
-              desc="Total Network Dispatches"
+              desc="Public Information Packets"
               icon={<Newspaper size={20} />}
             />
             <MonitorCard
               label="Integrity"
               value="99.9%"
               color="text-emerald-500"
-              desc="RLS Encryption: Active"
+              desc="System Shield: Online"
               icon={<ShieldCheck size={20} />}
             />
             <MonitorCard
-              label="Sync Latency"
-              value="12ms"
+              label="Supabase Sync"
+              value="LIVE"
               color="text-blue-500"
-              desc="Supabase Real-time Link"
+              desc="Real-time Node Link"
               icon={<Database size={20} />}
             />
 
@@ -370,32 +361,32 @@ const AdminPage: React.FC<AdminPageProps> = ({
                   </div>
                   <div className="font-mono text-[10px] space-y-3 text-slate-400 bg-white/5 p-6 rounded-2xl border border-white/5 h-48 overflow-y-auto custom-scrollbar">
                     <p>
-                      <span className="text-blue-500">[INFO]</span> Root Admin
-                      session established.
+                      <span className="text-blue-500">[INFO]</span> Command
+                      Center established.
                     </p>
                     <p>
-                      <span className="text-emerald-500">[AUTH]</span> Node
-                      permissions verified via registry.
+                      <span className="text-emerald-500">[AUTH]</span> Root
+                      credentials verified.
                     </p>
                     <p>
-                      <span className="text-amber-500">[WARN]</span> Metadata
-                      fetch attempted on encrypted node.
+                      <span className="text-amber-500">[WARN]</span> Potential
+                      breach detected on Node 023.
                     </p>
                     <p>
-                      <span className="text-red-500">[ALRT]</span> Potential
-                      identity breach detected on Shard 02.
+                      <span className="text-red-500">[ALRT]</span> Attempted
+                      unauthorized database dump.
                     </p>
                   </div>
                 </div>
                 <div className="flex flex-col justify-center space-y-6">
                   <h4 className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-500">
-                    Node Security Status
+                    Node Latency
                   </h4>
                   <div className="space-y-4">
-                    <ThresholdBar label="Encrypted Traffic" val={100} />
-                    <ThresholdBar label="Registry Integrity" val={94} />
+                    <ThresholdBar label="Global Traffic" val={92} />
+                    <ThresholdBar label="Identity Verified" val={100} />
                     <ThresholdBar
-                      label="Global Uptime"
+                      label="Sync Speed"
                       val={100}
                       color="bg-blue-600"
                     />
@@ -406,16 +397,15 @@ const AdminPage: React.FC<AdminPageProps> = ({
           </div>
         )}
 
-        {/* USER REGISTRY */}
         {activeTab === "users" && (
           <div className="space-y-8">
-            <div className="flex items-center gap-4 px-8 py-5 bg-white dark:bg-slate-900 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-sm focus-within:ring-2 focus-within:ring-blue-600 transition-all">
+            <div className="flex items-center gap-4 px-8 py-5 bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-100 dark:border-slate-800 shadow-sm focus-within:ring-2 focus-within:ring-blue-600 transition-all">
               <Search size={20} className="text-slate-400" />
               <input
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="bg-transparent border-none text-[10px] font-black uppercase tracking-[0.2em] outline-none flex-grow dark:text-white"
-                placeholder="QUERYING IDENTITY REGISTRY..."
+                placeholder="QUERYING NETWORK REGISTRY..."
               />
             </div>
 
@@ -435,7 +425,7 @@ const AdminPage: React.FC<AdminPageProps> = ({
                           {user.full_name}
                         </p>
                         <p className="text-[10px] font-bold text-slate-400 italic">
-                          {user.serial_id}
+                          ID: {user.serial_id}
                         </p>
                       </div>
                     </div>
@@ -452,9 +442,9 @@ const AdminPage: React.FC<AdminPageProps> = ({
 
                   <div className="py-6 space-y-3 border-y border-slate-50 dark:border-white/5">
                     <div className="flex justify-between text-[9px] font-black uppercase text-slate-400">
-                      <span>Verified Email</span>
+                      <span>Identity Email</span>
                       <span className="text-blue-600 truncate max-w-[150px]">
-                        {user.email || "NODE_SECURED"}
+                        {user.email || "N/A"}
                       </span>
                     </div>
                     <div className="flex justify-between text-[9px] font-black uppercase text-slate-400">
@@ -485,13 +475,12 @@ const AdminPage: React.FC<AdminPageProps> = ({
           </div>
         )}
 
-        {/* ARTICLE MODERATION */}
         {activeTab === "articles" && (
           <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
             {localArticles.map((article) => (
               <div
                 key={article.id}
-                className="bg-white dark:bg-slate-900 p-8 rounded-[3rem] border border-slate-100 dark:border-slate-800 flex gap-8 items-center shadow-sm hover:border-red-500 transition-all"
+                className="bg-white dark:bg-slate-900 p-8 rounded-[3rem] border border-slate-100 dark:border-slate-800 flex gap-8 items-center shadow-sm"
               >
                 <div className="flex-shrink-0 w-32 h-32 overflow-hidden rounded-3xl bg-slate-100 dark:bg-slate-800">
                   <img
@@ -514,111 +503,21 @@ const AdminPage: React.FC<AdminPageProps> = ({
                   <h4 className="text-lg font-black leading-tight uppercase truncate dark:text-white">
                     {article.title}
                   </h4>
-                  <div className="flex items-center gap-3">
-                    <div className="flex items-center justify-center w-6 h-6 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-400">
-                      <User2 size={12} />
-                    </div>
-                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">
-                      {article.author_name}
-                    </p>
-                  </div>
+                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest italic">
+                    Node: {article.author_serial}
+                  </p>
                 </div>
               </div>
             ))}
           </div>
         )}
 
-        {/* SIGNALS (INTERCEPT) */}
-        {activeTab === "intercept" && (
-          <div className="grid grid-cols-1 gap-12 lg:grid-cols-12">
-            <div className="space-y-8 lg:col-span-4">
-              <h3 className="text-[11px] font-black uppercase tracking-[0.4em] text-slate-400 flex items-center gap-3">
-                <Radio size={16} className="text-red-500 animate-pulse" />{" "}
-                Active Handshakes
-              </h3>
-              <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
-                {intercepts.map((i, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => setActiveInterception(i.room)}
-                    className={`w-full p-8 rounded-[3rem] border transition-all flex justify-between items-center text-left ${
-                      activeInterception === i.room
-                        ? "bg-red-600 border-red-600 text-white shadow-2xl scale-[1.02]"
-                        : "bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800"
-                    }`}
-                  >
-                    <div className="space-y-2 overflow-hidden">
-                      <p
-                        className={`text-[9px] font-black uppercase tracking-[0.3em] ${
-                          activeInterception === i.room
-                            ? "text-white/60"
-                            : "text-slate-400"
-                        }`}
-                      >
-                        TUNNEL_{i.room.split("_")[1]}
-                      </p>
-                      <div className="flex items-center gap-4">
-                        <p className="text-sm italic font-black uppercase truncate">
-                          {i.node1}
-                        </p>
-                        <div
-                          className={`w-6 h-px ${
-                            activeInterception === i.room
-                              ? "bg-white/40"
-                              : "bg-slate-200"
-                          }`}
-                        />
-                        <p className="text-sm italic font-black uppercase truncate">
-                          {i.node2}
-                        </p>
-                      </div>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="lg:col-span-8 bg-slate-950 rounded-[4rem] p-12 min-h-[600px] flex flex-col border border-white/10 shadow-2xl relative overflow-hidden">
-              <div className="flex items-center justify-between pb-8 mb-8 border-b border-white/10">
-                <div className="flex items-center gap-4">
-                  <div className="w-3 h-3 bg-red-600 rounded-full animate-pulse shadow-[0_0_20px_rgba(220,38,38,1)]" />
-                  <span className="text-[11px] font-black uppercase tracking-[0.5em] text-white italic">
-                    P2P_DECRYPT_MODE
-                  </span>
-                </div>
-                <span className="text-[10px] font-mono text-slate-500 uppercase tracking-widest">
-                  BYPASS_SUCCESSFUL
-                </span>
-              </div>
-              <div
-                ref={chatScrollRef}
-                className="flex-grow space-y-6 overflow-y-auto max-h-[450px] custom-scrollbar px-2"
-              >
-                {currentRoomMessages.map((m, idx) => (
-                  <div
-                    key={idx}
-                    className="bg-white/5 p-6 rounded-[2rem] border border-white/5 animate-in slide-in-from-bottom-2 duration-300"
-                  >
-                    <p className="text-[10px] font-black text-red-500 uppercase tracking-widest mb-2 flex items-center gap-2">
-                      <MessageCircle size={10} /> {m.senderName}
-                    </p>
-                    <p className="text-[15px] text-slate-300 font-medium italic leading-relaxed">
-                      "{m.text}"
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* SQL CONSOLE */}
         {activeTab === "console" && (
-          <div className="bg-slate-950 rounded-[4rem] border border-white/10 overflow-hidden shadow-2xl animate-in zoom-in-95 duration-500">
+          <div className="bg-slate-950 rounded-[4rem] border border-white/10 overflow-hidden shadow-2xl">
             <div className="flex items-center gap-4 p-8 border-b border-white/10 bg-white/5">
               <Code size={20} className="text-blue-500" />
               <h3 className="text-[11px] font-black uppercase tracking-[0.4em] text-white">
-                Advanced System Console
+                Advanced SQL Interface
               </h3>
             </div>
             <div
@@ -651,7 +550,7 @@ const AdminPage: React.FC<AdminPageProps> = ({
                   !e.shiftKey &&
                   (e.preventDefault(), runSqlCommand())
                 }
-                placeholder="EXECUTE RAW DATABASE STATEMENTS..."
+                placeholder="EXECUTE DIRECT DATABASE MODIFICATION..."
                 className="w-full h-32 font-mono text-sm text-white bg-transparent border-none outline-none resize-none focus:ring-0 placeholder:text-slate-700"
               />
               <div className="flex justify-end">
@@ -659,7 +558,7 @@ const AdminPage: React.FC<AdminPageProps> = ({
                   onClick={runSqlCommand}
                   className="px-10 py-4 bg-blue-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-[0.3em] hover:bg-white hover:text-blue-600 transition-all shadow-xl"
                 >
-                  EXECUTE_CMD
+                  RUN_COMMAND
                 </button>
               </div>
             </div>
@@ -727,7 +626,7 @@ const AdminPage: React.FC<AdminPageProps> = ({
                 </div>
                 <div className="space-y-2">
                   <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                    Node Clearance
+                    Clearance
                   </label>
                   <select
                     value={editingUser.role}
@@ -746,7 +645,7 @@ const AdminPage: React.FC<AdminPageProps> = ({
               </div>
               <div className="space-y-2">
                 <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                  Identity Manifesto
+                  Node Bio / Manifesto
                 </label>
                 <textarea
                   value={editingUser.bio}
@@ -768,7 +667,7 @@ const AdminPage: React.FC<AdminPageProps> = ({
                 <RefreshCw className="animate-spin" size={20} />
               ) : (
                 <>
-                  <Save size={20} /> SYNC CREDENTIALS
+                  <Save size={20} /> SYNCHRONIZE DATA
                 </>
               )}
             </button>

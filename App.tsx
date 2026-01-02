@@ -91,7 +91,6 @@ const App: React.FC = () => {
           setProfile(prof);
           setIsSettingUp(false);
         } else {
-          // Explicitly set setup mode if no profile found for auth user
           setIsSettingUp(true);
         }
       } else {
@@ -218,7 +217,7 @@ const App: React.FC = () => {
     setProfile(null);
     setCurrentPage("home");
     setIsSettingUp(false);
-    toast.success("Operational disconnect.");
+    toast.success("Identity disconnected.");
   };
 
   const handleNavigate = (page: string) => {
@@ -233,24 +232,46 @@ const App: React.FC = () => {
         data: { session },
       } = await supabase.auth.getSession();
       if (!session?.user) {
-        toast.error("Session protocol error. Please re-login.");
+        toast.error("Protocol Error: Re-authentication required.");
         return;
       }
 
-      const finalProfile = { ...profileData, id: session.user.id };
+      // Defensively only send columns usually present in profiles table to avoid Error 400
+      const safeData = {
+        id: session.user.id,
+        username: profileData.username,
+        full_name: profileData.full_name,
+        bio: profileData.bio,
+        gender: profileData.gender,
+        serial_id: profileData.serial_id,
+        budget: profileData.budget,
+        role: profileData.role,
+        is_private: profileData.is_private,
+        email: profileData.email,
+        phone: profileData.phone,
+        is_online: profileData.is_online,
+        settings: profileData.settings,
+      };
+
       const { error } = await supabase
         .from("profiles")
-        .upsert(finalProfile, { onConflict: "id" });
+        .upsert(safeData, { onConflict: "id" });
 
-      if (error) throw error;
+      if (error) {
+        console.error("Profile sync error:", error);
+        throw error;
+      }
 
-      setProfile(finalProfile);
+      setProfile(profileData);
       setIsSettingUp(false);
       handleNavigate("home");
-      toast.success("Operational Node Activated.");
+      toast.success("Identity Synchronized.");
       fetchUsers();
     } catch (err: any) {
-      toast.error("Registry sync failed: " + (err.message || "Unknown error"));
+      toast.error(
+        "SYNC FAILED: Run the SQL Fix provided in the prompt instructions. " +
+          (err.message || "Unknown error")
+      );
     }
   };
 
