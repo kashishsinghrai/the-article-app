@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   Bell,
   Eye,
@@ -11,6 +11,13 @@ import {
   ToggleRight,
   Fingerprint,
   Globe,
+  Camera,
+  Mic,
+  MapPin,
+  HardDrive,
+  Users as UsersIcon,
+  ShieldAlert,
+  Zap,
 } from "lucide-react";
 import { UserSettings } from "../types";
 import { toast } from "react-hot-toast";
@@ -28,112 +35,190 @@ const SettingsTerminal: React.FC<SettingsTerminalProps> = ({
   isPrivate,
   onTogglePrivate,
 }) => {
-  const toggleSetting = (key: keyof UserSettings) => {
-    const newVal = !settings[key];
-    onUpdate({ ...settings, [key]: newVal });
+  const [activeTab, setActiveTab] = useState<
+    "privacy" | "hardware" | "network"
+  >("privacy");
 
-    if (key === "notifications_enabled" && newVal) {
-      if ("Notification" in window) {
-        Notification.requestPermission();
+  const toggleSetting = async (key: keyof UserSettings) => {
+    const newVal = !settings[key];
+
+    // Physical Permission Requests
+    if (newVal) {
+      try {
+        if (key === "camera_access")
+          await navigator.mediaDevices.getUserMedia({ video: true });
+        if (key === "mic_access")
+          await navigator.mediaDevices.getUserMedia({ audio: true });
+        if (key === "location_access")
+          await new Promise((res, rej) =>
+            navigator.geolocation.getCurrentPosition(res, rej)
+          );
+        if (key === "notifications_enabled") {
+          if ("Notification" in window) await Notification.requestPermission();
+        }
+      } catch (err) {
+        toast.error(`Permission denied by system.`);
+        return;
       }
     }
 
+    onUpdate({ ...settings, [key]: newVal });
     toast.success(`Protocol ${key.replace("_", " ").toUpperCase()} updated`);
   };
 
   return (
-    <div className="space-y-8 animate-in slide-in-from-right-4 duration-500">
-      <div className="bg-white dark:bg-slate-900 p-8 md:p-12 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-sm space-y-12">
-        <section className="space-y-6">
-          <div className="flex items-center gap-3 border-b border-slate-100 dark:border-white/5 pb-4">
-            <Lock size={18} className="text-blue-600" />
-            <h3 className="text-[11px] font-black uppercase tracking-[0.3em] text-slate-900 dark:text-white">
-              Privacy Protocols
-            </h3>
+    <div className="space-y-8 duration-500 animate-in slide-in-from-right-4">
+      <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden">
+        {/* Tabs */}
+        <div className="flex border-b border-slate-50 dark:border-white/5 bg-slate-50/50 dark:bg-slate-950/50">
+          <TabButton
+            active={activeTab === "privacy"}
+            onClick={() => setActiveTab("privacy")}
+            label="Privacy"
+            icon={<Lock size={12} />}
+          />
+          <TabButton
+            active={activeTab === "hardware"}
+            onClick={() => setActiveTab("hardware")}
+            label="Hardware"
+            icon={<Camera size={12} />}
+          />
+          <TabButton
+            active={activeTab === "network"}
+            onClick={() => setActiveTab("network")}
+            label="System"
+            icon={<Cpu size={12} />}
+          />
+        </div>
+
+        <div className="p-8 space-y-12 md:p-12">
+          {activeTab === "privacy" && (
+            <section className="space-y-8">
+              <div className="flex items-center gap-3 pb-4 border-b border-slate-100 dark:border-white/5">
+                <ShieldAlert size={18} className="text-blue-600" />
+                <h3 className="text-[11px] font-black uppercase tracking-[0.3em] text-slate-900 dark:text-white">
+                  Security Thresholds
+                </h3>
+              </div>
+
+              <SettingToggle
+                icon={<EyeOff size={18} />}
+                label="Stealth Mode (Private Profile)"
+                description="Disable public discovery. Only linked nodes can view your credentials."
+                active={isPrivate}
+                onClick={() => onTogglePrivate(!isPrivate)}
+              />
+
+              <SettingToggle
+                icon={<Globe size={18} />}
+                label="Real-time Presence"
+                description="Broadcast active status to the global registry."
+                active={settings.presence_visible}
+                onClick={() => toggleSetting("presence_visible")}
+              />
+            </section>
+          )}
+
+          {activeTab === "hardware" && (
+            <section className="space-y-8 duration-300 animate-in fade-in">
+              <div className="flex items-center gap-3 pb-4 border-b border-slate-100 dark:border-white/5">
+                {/* Fixed missing Zap icon import from lucide-react */}
+                <Zap size={18} className="text-blue-600" />
+                <h3 className="text-[11px] font-black uppercase tracking-[0.3em] text-slate-900 dark:text-white">
+                  Hardware Authorization
+                </h3>
+              </div>
+
+              <SettingToggle
+                icon={<Camera size={18} />}
+                label="Camera Control"
+                description="Enable for live visual reporting and press ID verification."
+                active={settings.camera_access}
+                onClick={() => toggleSetting("camera_access")}
+              />
+
+              <SettingToggle
+                icon={<Mic size={18} />}
+                label="Microphone Interface"
+                description="Required for secure voice memos and field audio capture."
+                active={settings.mic_access}
+                onClick={() => toggleSetting("mic_access")}
+              />
+
+              <SettingToggle
+                icon={<MapPin size={18} />}
+                label="Geolocation Beacon"
+                description="Tag your reports with precise regional metadata."
+                active={settings.location_access}
+                onClick={() => toggleSetting("location_access")}
+              />
+            </section>
+          )}
+
+          {activeTab === "network" && (
+            <section className="space-y-8 duration-300 animate-in fade-in">
+              <div className="flex items-center gap-3 pb-4 border-b border-slate-100 dark:border-white/5">
+                <Database size={18} className="text-blue-600" />
+                <h3 className="text-[11px] font-black uppercase tracking-[0.3em] text-slate-900 dark:text-white">
+                  Data Sovereignty
+                </h3>
+              </div>
+
+              <SettingToggle
+                icon={<HardDrive size={18} />}
+                label="Local Storage Cache"
+                description="Enable high-speed caching of network assets for offline reporting."
+                active={settings.storage_access}
+                onClick={() => toggleSetting("storage_access")}
+              />
+
+              <SettingToggle
+                icon={<UsersIcon size={18} />}
+                label="Contact Pulse Sync"
+                description="Discover known colleagues on the network via secure contact hashing."
+                active={settings.contacts_sync}
+                onClick={() => toggleSetting("contacts_sync")}
+              />
+
+              <SettingToggle
+                icon={<Cpu size={18} />}
+                label="AI Analysis Engine"
+                description="Allow Gemini Pro to pre-process incoming intelligence for your briefing."
+                active={settings.ai_briefings}
+                onClick={() => toggleSetting("ai_briefings")}
+              />
+            </section>
+          )}
+
+          <div className="flex items-center justify-between pt-6 border-t border-slate-50 dark:border-white/5">
+            <div className="flex items-center gap-3">
+              <Shield size={16} className="text-emerald-500" />
+              <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">
+                Node Compliance: Active
+              </span>
+            </div>
+            <p className="text-[9px] font-mono text-slate-500">
+              REV: 1.2.5-STABLE
+            </p>
           </div>
-
-          <SettingToggle
-            icon={<EyeOff size={18} />}
-            label="Stealth Mode (Private Profile)"
-            description="Hide your bio and identity from users who are not linked."
-            active={isPrivate}
-            onClick={() => {
-              onTogglePrivate(!isPrivate);
-              toast.success(
-                `Profile set to ${!isPrivate ? "PRIVATE" : "PUBLIC"}`
-              );
-            }}
-          />
-
-          <SettingToggle
-            icon={<Globe size={18} />}
-            label="Real-time Presence"
-            description="Allow other correspondents to see when you are active on the terminal."
-            active={settings.presence_visible}
-            onClick={() => toggleSetting("presence_visible")}
-          />
-        </section>
-
-        <section className="space-y-6">
-          <div className="flex items-center gap-3 border-b border-slate-100 dark:border-white/5 pb-4">
-            <Bell size={18} className="text-blue-600" />
-            <h3 className="text-[11px] font-black uppercase tracking-[0.3em] text-slate-900 dark:text-white">
-              Network Communication
-            </h3>
-          </div>
-
-          <SettingToggle
-            icon={<Fingerprint size={18} />}
-            label="Signal Notifications"
-            description="Receive browser notifications for new messages and connection signals."
-            active={settings.notifications_enabled}
-            onClick={() => toggleSetting("notifications_enabled")}
-          />
-
-          <SettingToggle
-            icon={<Cpu size={18} />}
-            label="AI Intelligence Briefings"
-            description="Automated AI reports on trending global news cycles delivered to your terminal."
-            active={settings.ai_briefings}
-            onClick={() => toggleSetting("ai_briefings")}
-          />
-        </section>
-
-        <section className="space-y-6">
-          <div className="flex items-center gap-3 border-b border-slate-100 dark:border-white/5 pb-4">
-            <Database size={18} className="text-blue-600" />
-            <h3 className="text-[11px] font-black uppercase tracking-[0.3em] text-slate-900 dark:text-white">
-              Data Management
-            </h3>
-          </div>
-
-          <SettingToggle
-            icon={<Shield size={18} />}
-            label="Secure Session Mode"
-            description="Enhanced encryption for all outgoing transmissions and handshakes."
-            active={settings.secure_mode}
-            onClick={() => toggleSetting("secure_mode")}
-          />
-
-          <SettingToggle
-            icon={<Database size={18} />}
-            label="Operational Data Sharing"
-            description="Share anonymous usage patterns to improve global network stability."
-            active={settings.data_sharing}
-            onClick={() => toggleSetting("data_sharing")}
-          />
-        </section>
-
-        <div className="pt-6 border-t border-slate-50 dark:border-white/5 flex items-center gap-4 text-slate-400">
-          <Shield size={16} className="text-emerald-500" />
-          <span className="text-[9px] font-black uppercase tracking-widest">
-            Protocol Version: 1.1.0-STABLE
-          </span>
         </div>
       </div>
     </div>
   );
 };
+
+const TabButton = ({ active, onClick, label, icon }: any) => (
+  <button
+    onClick={onClick}
+    className={`flex-1 flex items-center justify-center gap-2 py-4 text-[9px] font-black uppercase tracking-widest transition-all ${
+      active
+        ? "bg-white dark:bg-slate-900 text-blue-600 border-b-2 border-blue-600"
+        : "text-slate-400 hover:text-slate-600 dark:hover:text-white"
+    }`}
+  >
+    {icon} {label}
+  </button>
+);
 
 const SettingToggle = ({ icon, label, description, active, onClick }: any) => (
   <div className="flex items-start justify-between gap-6 group">
@@ -141,7 +226,7 @@ const SettingToggle = ({ icon, label, description, active, onClick }: any) => (
       <div
         className={`p-3 rounded-2xl transition-all ${
           active
-            ? "bg-blue-600 text-white"
+            ? "bg-blue-600 text-white shadow-lg"
             : "bg-slate-50 dark:bg-slate-800 text-slate-400"
         }`}
       >

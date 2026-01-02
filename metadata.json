@@ -1,7 +1,10 @@
+
 {
   "name": "ThE-ARTICLES | Decentralized Global Press Network",
   "description": "High-end citizen journalism platform with reputation rewards and digital press credentials.",
   "requestFramePermissions": [
-    "camera"
+    "camera",
+    "microphone",
+    "geolocation"
   ]
 }

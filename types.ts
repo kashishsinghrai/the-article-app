@@ -8,6 +8,12 @@ export interface UserSettings {
   data_sharing: boolean;
   ai_briefings: boolean;
   secure_mode: boolean;
+  // Hardware Permissions
+  camera_access: boolean;
+  mic_access: boolean;
+  location_access: boolean;
+  storage_access: boolean;
+  contacts_sync: boolean;
 }
 
 export interface Profile {
@@ -20,8 +26,8 @@ export interface Profile {
   role: Role;
   is_private: boolean;
   bio: string;
-  email?: string;      // Added for administrative tracking
-  phone?: string;      // Added for administrative tracking
+  email?: string;
+  phone?: string;
   following?: string[];
   is_online?: boolean; 
   last_seen?: string;

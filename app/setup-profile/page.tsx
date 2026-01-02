@@ -41,7 +41,7 @@ const SetupProfilePage: React.FC<SetupProfilePageProps> = ({ onComplete }) => {
   const handleFinish = () => {
     if (!name || !username || !gender) return;
     const profile: Profile = {
-      id: "", // Set by App.tsx
+      id: "",
       full_name: name,
       username: username.toLowerCase().replace(/\s/g, "_"),
       gender: gender,
@@ -61,6 +61,11 @@ const SetupProfilePage: React.FC<SetupProfilePageProps> = ({ onComplete }) => {
         data_sharing: false,
         ai_briefings: true,
         secure_mode: true,
+        camera_access: false,
+        mic_access: false,
+        location_access: false,
+        storage_access: false,
+        contacts_sync: false,
       },
     };
     onComplete(profile);
