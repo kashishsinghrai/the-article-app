@@ -32,10 +32,10 @@ const NetworkPage: React.FC<NetworkPageProps> = ({
   const [searchTerm, setSearchTerm] = useState("");
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // Auto-sync on mount to ensure we have the latest registry from the global store
+  // Auto-sync on mount only ONCE to prevent loops
   useEffect(() => {
     if (onRefresh) onRefresh();
-  }, [onRefresh]);
+  }, []); // Empty dependency array is critical here to prevent infinite freezing
 
   const filteredUsers = useMemo(() => {
     return users.filter((u) => {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
 import TrendingTicker from "./components/TrendingTicker";
@@ -17,20 +17,22 @@ import { Profile, Article, ChatRequest } from "./types";
 import { Toaster, toast } from "react-hot-toast";
 import { supabase } from "./lib/supabase";
 import { useStore } from "./lib/store";
+import { Lock, RefreshCw, Power } from "lucide-react";
 
 const App: React.FC = () => {
-  // Selective store hooks to prevent unnecessary re-renders
   const profile = useStore((s) => s.profile);
   const isLoggedIn = useStore((s) => s.isLoggedIn);
   const articles = useStore((s) => s.articles);
   const users = useStore((s) => s.users);
   const chatRequests = useStore((s) => s.chatRequests);
   const isInitialized = useStore((s) => s.isInitialized);
+  const error = useStore((s) => s.error);
 
   const hydrate = useStore((s) => s.hydrate);
   const logout = useStore((s) => s.logout);
   const syncAll = useStore((s) => s.syncAll);
   const setChatRequests = useStore((s) => s.setChatRequests);
+  const initAuthListener = useStore((s) => s.initAuthListener);
 
   const [currentPage, setCurrentPage] = useState("home");
   const [showAuth, setShowAuth] = useState<"login" | "register" | null>(null);
@@ -42,34 +44,39 @@ const App: React.FC = () => {
   );
   const [activeChat, setActiveChat] = useState<Profile | null>(null);
 
+  // System Boot Sequence
   useEffect(() => {
+    // Attempt standard hydration
     hydrate();
+    const unsub = initAuthListener();
 
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event) => {
-      if (event === "SIGNED_IN") {
-        hydrate();
-      } else if (event === "SIGNED_OUT") {
-        logout();
-        setCurrentPage("home");
+    // FAIL-SAFE: Automatic bypass after 3.5 seconds
+    const bypassTimer = setTimeout(() => {
+      const state = useStore.getState();
+      if (!state.isInitialized) {
+        useStore.setState({ isInitialized: true });
+        console.warn("Boot: Auto-bypass triggered due to sync latency.");
       }
-    });
+    }, 3500);
 
-    return () => subscription.unsubscribe();
-  }, [hydrate, logout]);
+    return () => {
+      if (typeof unsub === "function") unsub();
+      clearTimeout(bypassTimer);
+    };
+  }, []); // Run ONLY once on mount
 
+  // Dark Mode Persistence
   useEffect(() => {
     if (isDarkMode) document.documentElement.classList.add("dark");
     else document.documentElement.classList.remove("dark");
   }, [isDarkMode]);
 
   const handleAcceptRequest = async (req: ChatRequest) => {
-    const { error } = await supabase
+    const { error: reqError } = await supabase
       .from("chat_requests")
       .update({ status: "accepted" })
       .eq("id", req.id);
-    if (!error) {
+    if (!reqError) {
       const sender = users.find((u) => u.id === req.from_id);
       if (sender) setActiveChat(sender);
       if (profile) {
@@ -84,7 +91,7 @@ const App: React.FC = () => {
     }
   };
 
-  const handleLogoutProtocol = async () => {
+  const handleLogoutProtocol = useCallback(async () => {
     try {
       await logout();
       setCurrentPage("home");
@@ -92,19 +99,37 @@ const App: React.FC = () => {
     } catch (e) {
       toast.error("Protocol Breach during disconnection.");
     }
+  }, [logout]);
+
+  const handleForceBoot = () => {
+    useStore.setState({ isInitialized: true });
+    toast.success("Forced Node Bootstrap.");
   };
 
   if (!isInitialized) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-white dark:bg-slate-950">
-        <div className="flex flex-col items-center gap-6">
-          <div className="relative">
-            <div className="absolute inset-0 w-16 h-16 border-2 rounded-full border-slate-100 dark:border-slate-800 animate-ping" />
-            <div className="relative z-10 w-16 h-16 border-t-4 border-blue-600 rounded-full animate-spin" />
+      <div className="flex items-center justify-center min-h-screen p-6 bg-white dark:bg-slate-950">
+        <div className="flex flex-col items-center max-w-sm gap-10 text-center">
+          <div className="relative w-24 h-24">
+            <div className="absolute inset-0 border-4 rounded-full border-slate-100 dark:border-slate-800" />
+            <div className="absolute inset-0 border-t-4 border-blue-600 rounded-full animate-spin" />
           </div>
-          <p className="text-[11px] font-black uppercase tracking-[0.4em] text-slate-400 italic">
-            Synchronizing Global Node Registry...
-          </p>
+          <div className="space-y-3">
+            <p className="text-[11px] font-black uppercase tracking-[0.5em] text-slate-400 animate-pulse">
+              Syncing Global Core...
+            </p>
+            {error && (
+              <p className="text-[9px] font-bold text-red-500 uppercase tracking-widest">
+                {error}
+              </p>
+            )}
+          </div>
+          <button
+            onClick={handleForceBoot}
+            className="flex items-center justify-center gap-3 px-8 py-4 bg-slate-950 dark:bg-white rounded-2xl text-[10px] font-black uppercase tracking-widest text-white dark:text-slate-950 shadow-xl opacity-0 animate-in fade-in duration-700 delay-1000 fill-mode-forwards"
+          >
+            <Power size={14} /> Skip Sync
+          </button>
         </div>
       </div>
     );
@@ -112,11 +137,24 @@ const App: React.FC = () => {
 
   return (
     <div
-      className={`min-h-screen ${
+      className={`min-h-screen selection:bg-blue-600 selection:text-white ${
         isDarkMode ? "dark bg-slate-950" : "bg-white"
       }`}
     >
-      <Toaster position="bottom-center" />
+      <Toaster
+        position="bottom-center"
+        toastOptions={{
+          style: {
+            borderRadius: "1.5rem",
+            background: "#0f172a",
+            color: "#fff",
+            fontSize: "11px",
+            fontWeight: "900",
+            textTransform: "uppercase",
+            letterSpacing: "0.1em",
+          },
+        }}
+      />
 
       {showAuth === "login" && (
         <LoginPage
@@ -190,8 +228,8 @@ const App: React.FC = () => {
                           author_serial: profile.serial_id,
                         });
 
-                  const { error } = await method;
-                  if (error) {
+                  const { error: pubError } = await method;
+                  if (pubError) {
                     toast.error("Dispatch Failed.");
                     return;
                   }
@@ -218,11 +256,11 @@ const App: React.FC = () => {
                     currentUserId={profile.id}
                     currentUserProfile={profile}
                     onUpdateProfile={async (d) => {
-                      const { error } = await supabase
+                      const { error: updError } = await supabase
                         .from("profiles")
                         .update(d)
                         .eq("id", profile.id);
-                      if (error) toast.error("Identity update failure.");
+                      if (updError) toast.error("Identity update failure.");
                       else {
                         toast.success("Identity Updated.");
                         hydrate();
@@ -232,10 +270,10 @@ const App: React.FC = () => {
                 ) : (
                   <SetupProfilePage
                     onComplete={async (d) => {
-                      const { error } = await supabase
+                      const { error: setpError } = await supabase
                         .from("profiles")
                         .upsert(d);
-                      if (error) {
+                      if (setpError) {
                         toast.error("Establishment failed.");
                         return;
                       }
@@ -246,12 +284,15 @@ const App: React.FC = () => {
                   />
                 )
               ) : (
-                <div className="py-40 text-center">
+                <div className="flex flex-col items-center justify-center gap-8 py-60">
+                  <div className="p-8 rounded-full bg-slate-50 dark:bg-slate-900 text-slate-300">
+                    <Lock size={48} />
+                  </div>
                   <button
                     onClick={() => setShowAuth("login")}
-                    className="px-10 py-4 bg-slate-950 dark:bg-white text-white dark:text-slate-950 rounded-2xl font-black uppercase text-[11px] tracking-[0.3em] shadow-xl"
+                    className="px-12 py-5 bg-slate-950 dark:bg-white text-white dark:text-slate-950 rounded-[2rem] font-black uppercase text-[12px] tracking-[0.4em] shadow-2xl hover:scale-105 transition-all"
                   >
-                    IDENTITY REQUIRED
+                    Identity Required
                   </button>
                 </div>
               ))}
