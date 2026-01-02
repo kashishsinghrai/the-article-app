@@ -123,7 +123,6 @@ const App: React.FC = () => {
 
   const initApp = useCallback(async () => {
     try {
-      // Run auth and data check in parallel
       const [
         {
           data: { session },
@@ -138,11 +137,26 @@ const App: React.FC = () => {
     }
   }, [fetchGlobalData, checkUserStatus]);
 
+  const handleLogout = async () => {
+    try {
+      await supabase.auth.signOut();
+      // Force immediate UI update
+      setIsLoggedIn(false);
+      setProfile(null);
+      setChatRequests([]);
+      setActiveChat(null);
+      setCurrentPage("home");
+      toast.success("Disconnected from Network");
+    } catch (e) {
+      console.error("Logout error", e);
+      toast.error("Logout failed.");
+    }
+  };
+
   useEffect(() => {
     if (initializationInProgress.current) return;
     initializationInProgress.current = true;
 
-    // Silent Initialization
     initApp();
 
     const {
@@ -235,7 +249,7 @@ const App: React.FC = () => {
           <Navbar
             onNavigate={setCurrentPage}
             onLogin={() => setShowAuth("login")}
-            onLogout={() => supabase.auth.signOut()}
+            onLogout={handleLogout}
             currentPage={currentPage}
             isLoggedIn={isLoggedIn}
             userRole={profile?.role || "user"}
@@ -306,7 +320,7 @@ const App: React.FC = () => {
                 profile ? (
                   <ProfilePage
                     profile={viewingProfile || profile}
-                    onLogout={() => supabase.auth.signOut()}
+                    onLogout={handleLogout}
                     isExternal={!!viewingProfile}
                     onCloseExternal={() => {
                       setViewingProfile(null);
@@ -368,6 +382,7 @@ const App: React.FC = () => {
                 currentUserId={profile.id}
                 onUpdateArticles={fetchGlobalData}
                 onUpdateUsers={fetchGlobalData}
+                onLogout={handleLogout}
               />
             )}
           </div>
