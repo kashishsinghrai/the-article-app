@@ -21,6 +21,7 @@ import {
   MessageSquare,
   Power,
   Newspaper,
+  Star,
 } from "lucide-react";
 import { Article, Profile } from "../../types";
 import { supabase } from "../../lib/supabase";
@@ -43,14 +44,15 @@ const AdminPage: React.FC<AdminPageProps> = ({
   onUpdateArticles,
   onLogout,
 }) => {
+  // Matches your requested tab order: System, Signals, Articles, Registry
   const [activeTab, setActiveTab] = useState<
-    "articles" | "users" | "monitor" | "console"
+    "monitor" | "console" | "articles" | "users"
   >("users");
   const [searchTerm, setSearchTerm] = useState("");
   const [sqlCommand, setSqlCommand] = useState("");
   const [terminalOutput, setTerminalOutput] = useState<string[]>([
     "[SYSTEM] Root level established...",
-    "[INFO] Admin Override Active",
+    "[INFO] Protocol V6.1 Online",
   ]);
 
   const [localArticles, setLocalArticles] =
@@ -58,7 +60,6 @@ const AdminPage: React.FC<AdminPageProps> = ({
   const [localUsers, setLocalUsers] = useState<Profile[]>(initialUsers);
   const [isSyncing, setIsSyncing] = useState(false);
 
-  // Sync state with incoming props
   useEffect(() => {
     setLocalArticles(initialArticles);
     setLocalUsers(initialUsers);
@@ -70,7 +71,7 @@ const AdminPage: React.FC<AdminPageProps> = ({
     try {
       if (onUpdateArticles) await onUpdateArticles();
       if (onUpdateUsers) await onUpdateUsers();
-      toast.success("Registry Synced Successfully", { id });
+      toast.success("Network Re-synchronized", { id });
     } catch (e) {
       toast.error("Sync Failed", { id });
     } finally {
@@ -81,7 +82,7 @@ const AdminPage: React.FC<AdminPageProps> = ({
   const handleDeleteArticle = async (articleId: string) => {
     if (
       !confirm(
-        "⚠️ WARNING: PURGE DISPATCH? This will delete this article for all users globally."
+        "🚨 PURGE DISPATCH? This will remove this post from the global feed forever."
       )
     )
       return;
@@ -94,27 +95,28 @@ const AdminPage: React.FC<AdminPageProps> = ({
       toast.success("Dispatch Erased");
       if (onUpdateArticles) onUpdateArticles();
     } catch (err: any) {
-      toast.error("Moderation Error: " + err.message);
+      toast.error("Purge Failed: " + err.message);
     }
   };
 
   const handleDeleteUser = async (userId: string) => {
     if (userId === currentUserId)
-      return toast.error("ACCESS DENIED: You cannot purge the root admin.");
+      return toast.error(
+        "ROOT PROTECTION: You cannot delete your own admin account."
+      );
     if (
       !confirm(
-        "🚨 FATAL ACTION: PURGE NODE? This will delete this user identity and all their data."
+        "🧨 PURGE IDENTITY? This user and all their articles will be erased permanently."
       )
     )
       return;
-
     try {
       const { error } = await supabase
         .from("profiles")
         .delete()
         .eq("id", userId);
       if (error) throw error;
-      toast.success("Identity Purged from Registry");
+      toast.success("Identity Purged");
       if (onUpdateUsers) onUpdateUsers();
     } catch (err: any) {
       toast.error("Purge Failed: " + err.message);
@@ -133,7 +135,7 @@ const AdminPage: React.FC<AdminPageProps> = ({
       else {
         setTerminalOutput((prev) => [
           ...prev,
-          `[SUCCESS] SQL executed. Refreshing registry...`,
+          `[SUCCESS] Remote SQL executed.`,
         ]);
         forceResync();
       }
@@ -155,42 +157,42 @@ const AdminPage: React.FC<AdminPageProps> = ({
     return localUsers.filter(
       (u) =>
         u.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        u.serial_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        u.username.toLowerCase().includes(searchTerm.toLowerCase())
+        u.serial_id.toLowerCase().includes(searchTerm.toLowerCase())
     );
   }, [localUsers, searchTerm]);
 
   return (
     <main className="max-w-[1600px] mx-auto px-6 py-24 md:py-32 space-y-12">
-      {/* Admin Header (Matches your image layout) */}
+      {/* Header with requested style */}
       <div className="flex flex-col items-start justify-between gap-8 pb-10 border-b lg:flex-row border-slate-100 dark:border-slate-800">
         <div className="space-y-4">
           <div className="flex items-center gap-3 text-red-600 animate-pulse">
             <ShieldAlert size={20} />
             <span className="text-[10px] font-black uppercase tracking-[0.4em]">
-              ROOT OPERATIONS TERMINAL
+              ADMIN COMMAND TERMINAL
             </span>
           </div>
           <h1 className="text-6xl italic font-black leading-none tracking-tighter uppercase sm:text-8xl md:text-9xl dark:text-white">
-            COMMAND
+            ROOT
           </h1>
           <div className="flex items-center gap-6">
             <div className="flex items-center gap-2">
               <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
               <span className="text-[9px] font-black uppercase text-slate-400">
-                Access Verified: Root Level
+                Status: Master Overdrive
               </span>
             </div>
             <div className="flex items-center gap-2 text-blue-600">
-              <Zap size={10} />
-              <span className="text-[9px] font-black uppercase text-blue-600">
-                Active Sync
+              <Star size={10} fill="currentColor" />
+              <span className="text-[9px] font-black uppercase">
+                Verified Access
               </span>
             </div>
           </div>
         </div>
 
-        <div className="flex flex-wrap gap-2 p-2 bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-[2rem] shadow-sm">
+        {/* Tab Selection matching your image */}
+        <div className="flex flex-wrap items-center gap-2 p-1.5 bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-[2rem] shadow-sm">
           <TabButton
             active={activeTab === "monitor"}
             onClick={() => setActiveTab("monitor")}
@@ -216,40 +218,45 @@ const AdminPage: React.FC<AdminPageProps> = ({
             icon={<Users size={14} />}
           />
 
-          <div className="self-center w-px h-8 mx-1 bg-slate-200 dark:bg-slate-800" />
+          <div className="w-px h-6 mx-2 bg-slate-200 dark:bg-slate-800" />
 
           <button
             onClick={forceResync}
             disabled={isSyncing}
-            className="p-3 text-blue-600 transition-all hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-2xl"
-            title="Sync Registry"
+            className="p-3 text-red-600 transition-all hover:bg-red-50 dark:hover:bg-red-950/20 rounded-2xl"
           >
             <RefreshCw size={18} className={isSyncing ? "animate-spin" : ""} />
           </button>
         </div>
       </div>
 
-      {/* Modern Filter Bar */}
-      <div className="flex items-center gap-4 px-8 py-5 bg-white dark:bg-slate-900 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-sm focus-within:ring-2 focus-within:ring-blue-600 transition-all">
+      {/* Modern Filter */}
+      <div className="flex items-center gap-4 px-8 py-5 bg-white dark:bg-slate-900 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-sm focus-within:ring-2 focus-within:ring-red-600 transition-all">
         <Search size={20} className="text-slate-300" />
         <input
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           className="bg-transparent border-none text-[11px] font-black uppercase tracking-[0.3em] outline-none flex-grow dark:text-white placeholder:text-slate-300"
-          placeholder={`FILTERING ${activeTab.toUpperCase()} BY HASH OR SERIAL...`}
+          placeholder={`QUERING THE ${activeTab.toUpperCase()} DATABASE...`}
         />
       </div>
 
-      {/* Dynamic Main Panel */}
-      <div className="min-h-[600px]">
+      {/* Main Content Area */}
+      <div className="min-h-[500px]">
         {activeTab === "articles" && (
           <div className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-3">
             {filteredArticles.length === 0 ? (
-              <div className="py-40 space-y-4 text-center col-span-full opacity-30">
-                <Newspaper size={48} className="mx-auto" />
-                <p className="text-[10px] font-black uppercase tracking-widest">
-                  Database Empty: No Dispatches Found
+              <div className="flex flex-col items-center gap-4 py-32 text-center col-span-full">
+                <Newspaper size={48} className="opacity-10" />
+                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                  Archive Empty
                 </p>
+                <button
+                  onClick={forceResync}
+                  className="text-blue-600 text-[10px] font-black uppercase underline"
+                >
+                  Force Sync
+                </button>
               </div>
             ) : (
               filteredArticles.map((article) => (
@@ -257,36 +264,26 @@ const AdminPage: React.FC<AdminPageProps> = ({
                   key={article.id}
                   className="bg-white dark:bg-slate-950 p-8 rounded-[3rem] border border-slate-100 dark:border-slate-800 space-y-6 group hover:border-red-600 transition-all"
                 >
-                  <div className="aspect-video rounded-[2rem] overflow-hidden bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 relative">
+                  <div className="aspect-video rounded-[2.5rem] overflow-hidden bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800">
                     <img
                       src={article.image_url}
-                      className="object-cover w-full h-full transition-transform duration-700 group-hover:scale-110"
+                      className="object-cover w-full h-full transition-transform duration-700 group-hover:scale-105"
                     />
-                    <div className="absolute px-3 py-1 border rounded-lg top-4 left-4 bg-white/90 dark:bg-slate-950/90 backdrop-blur-md border-white/20">
-                      <span className="text-[8px] font-black text-blue-600 uppercase tracking-widest">
-                        {article.category}
-                      </span>
-                    </div>
                   </div>
-                  <div className="space-y-3">
-                    <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest italic">
-                      {article.author_name} // {article.author_serial}
-                    </p>
-                    <h4 className="text-xl italic font-black leading-tight uppercase truncate dark:text-white">
+                  <div className="space-y-2">
+                    <h4 className="text-xl italic font-black leading-tight uppercase dark:text-white">
                       {article.title}
                     </h4>
-                    <p className="text-[10px] text-slate-500 line-clamp-2 leading-relaxed italic">
-                      "{article.content}"
+                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest italic">
+                      {article.author_name} // {article.author_serial}
                     </p>
                   </div>
-                  <div className="flex gap-2 pt-2">
-                    <button
-                      onClick={() => handleDeleteArticle(article.id)}
-                      className="w-full py-4 bg-red-50 dark:bg-red-950/20 text-red-600 rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-red-600 hover:text-white transition-all flex items-center justify-center gap-2 border border-red-100 dark:border-red-900/20"
-                    >
-                      <Trash2 size={14} /> PURGE DISPATCH
-                    </button>
-                  </div>
+                  <button
+                    onClick={() => handleDeleteArticle(article.id)}
+                    className="w-full py-4 bg-red-50 dark:bg-red-950/20 text-red-600 rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-red-600 hover:text-white transition-all border border-red-100 dark:border-red-900/30 flex items-center justify-center gap-2"
+                  >
+                    <Trash2 size={14} /> PURGE DISPATCH
+                  </button>
                 </div>
               ))
             )}
@@ -298,12 +295,12 @@ const AdminPage: React.FC<AdminPageProps> = ({
             {filteredUsers.map((user) => (
               <div
                 key={user.id}
-                className="bg-white dark:bg-slate-950 p-8 rounded-[3rem] border border-slate-100 dark:border-slate-800 space-y-8 flex flex-col justify-between hover:border-red-600/30 transition-all"
+                className="bg-white dark:bg-slate-950 p-8 rounded-[3rem] border border-slate-100 dark:border-slate-800 space-y-8 flex flex-col justify-between hover:border-red-600 transition-all"
               >
                 <div className="space-y-6">
                   <div className="flex items-start justify-between">
                     <div className="flex items-center gap-4">
-                      <div className="flex items-center justify-center w-12 h-12 border rounded-2xl bg-slate-50 dark:bg-slate-900 text-slate-300 border-slate-100 dark:border-slate-800">
+                      <div className="flex items-center justify-center w-12 h-12 border rounded-2xl bg-slate-50 dark:bg-slate-900 text-slate-400 border-slate-100 dark:border-slate-800">
                         <Fingerprint size={24} />
                       </div>
                       <div>
@@ -328,36 +325,21 @@ const AdminPage: React.FC<AdminPageProps> = ({
 
                   <div className="p-4 border bg-slate-50/50 dark:bg-slate-900/50 rounded-2xl border-slate-100 dark:border-slate-800">
                     <p className="text-[8px] font-black uppercase tracking-widest text-slate-400 mb-2">
-                      Live Hardware Permissions
+                      Registry Details
                     </p>
-                    <div className="flex gap-2">
-                      <PermissionIcon
-                        active={user.settings?.camera_access}
-                        label="CAM"
-                      />
-                      <PermissionIcon
-                        active={user.settings?.mic_access}
-                        label="MIC"
-                      />
-                      <PermissionIcon
-                        active={user.settings?.location_access}
-                        label="GEO"
-                      />
-                      <PermissionIcon
-                        active={user.settings?.storage_access}
-                        label="FS"
-                      />
-                    </div>
+                    <p className="text-[10px] text-slate-500 font-bold uppercase">
+                      {user.serial_id}
+                    </p>
                   </div>
                 </div>
 
-                <div className="flex flex-col gap-2">
+                <div className="flex flex-col gap-2 pt-4">
                   <button className="w-full py-4 bg-slate-50 dark:bg-slate-900 rounded-xl text-[9px] font-black uppercase tracking-widest text-blue-600 hover:bg-blue-600 hover:text-white transition-all flex items-center justify-center gap-2">
-                    <ShieldCheck size={14} /> TOGGLE CLEARANCE
+                    <ShieldCheck size={14} /> MODERATE CLEARANCE
                   </button>
                   <button
                     onClick={() => handleDeleteUser(user.id)}
-                    className="w-full py-4 bg-red-50 dark:bg-red-950/20 text-red-600 rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-red-600 hover:text-white transition-all border border-red-100 dark:border-red-900/30"
+                    className="w-full py-4 bg-red-50 dark:bg-red-950/20 text-red-600 rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-red-600 hover:text-white transition-all border border-red-100 dark:border-red-900/30 flex items-center justify-center gap-2"
                   >
                     <Trash2 size={14} /> PURGE IDENTITY
                   </button>
@@ -373,13 +355,13 @@ const AdminPage: React.FC<AdminPageProps> = ({
               <div className="flex items-center gap-4">
                 <Code size={20} className="text-red-500" />
                 <h3 className="text-[11px] font-black uppercase tracking-[0.4em] text-white">
-                  Root Direct SQL Access
+                  Root System Terminal
                 </h3>
               </div>
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                 <span className="text-[8px] font-black text-slate-500 uppercase">
-                  Remote Execution Enabled
+                  Remote Ops Active
                 </span>
               </div>
             </div>
@@ -404,11 +386,11 @@ const AdminPage: React.FC<AdminPageProps> = ({
                 value={sqlCommand}
                 onChange={(e) => setSqlCommand(e.target.value)}
                 className="flex-grow h-16 font-mono text-sm text-white bg-transparent border-none outline-none resize-none focus:ring-0"
-                placeholder="EXECUTE RAW SQL..."
+                placeholder="EXECUTE RAW SQL OVERRIDE..."
               />
               <button
                 onClick={runSqlCommand}
-                className="px-10 py-4 bg-red-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] shadow-xl hover:scale-105 active:scale-95 transition-all"
+                className="px-10 py-4 bg-red-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] shadow-xl hover:scale-105 transition-all"
               >
                 RUN QUERY
               </button>
@@ -425,24 +407,12 @@ const TabButton = ({ active, onClick, label, icon }: any) => (
     onClick={onClick}
     className={`px-8 py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-3 ${
       active
-        ? "bg-white dark:bg-slate-800 text-blue-600 shadow-xl border border-slate-100 dark:border-slate-700"
+        ? "bg-white dark:bg-slate-800 text-red-600 shadow-xl border border-slate-100 dark:border-slate-700"
         : "text-slate-400 hover:text-slate-600"
     }`}
   >
     {icon} {label}
   </button>
-);
-
-const PermissionIcon = ({ active, label }: any) => (
-  <div
-    className={`px-3 py-1.5 rounded-lg border text-[8px] font-black uppercase tracking-widest ${
-      active
-        ? "bg-emerald-50 text-emerald-600 border-emerald-100"
-        : "bg-slate-50 text-slate-200 border-slate-100 dark:bg-slate-950 dark:border-slate-800"
-    }`}
-  >
-    {label}
-  </div>
 );
 
 export default AdminPage;
