@@ -11,31 +11,24 @@ import {
   Trash2,
   ShieldCheck,
   User2,
-  ExternalLink,
   RefreshCw,
   LogOut,
   Shield,
-  Globe,
-  Lock,
   Terminal as TerminalIcon,
-  Mail,
-  Smartphone,
-  Key,
   Camera,
   Mic,
   MapPin,
   CheckCircle2,
-  Server,
   Database,
-  Activity as ActivityIcon,
   Newspaper,
-  AlertTriangle,
   Code,
   Cpu,
   Power,
   MessageCircle,
   Fingerprint,
   Edit,
+  X,
+  Save,
 } from "lucide-react";
 import { Article, Profile, LiveMessage } from "../../types";
 import { supabase } from "../../lib/supabase";
@@ -69,15 +62,18 @@ const AdminPage: React.FC<AdminPageProps> = ({
   >({});
   const [sqlCommand, setSqlCommand] = useState("");
   const [terminalOutput, setTerminalOutput] = useState<string[]>([
-    "[SYSTEM] Ready for command input...",
-    "[INFO] RLS Layer: Active",
+    "[SYSTEM] Core operational...",
+    "[INFO] RLS Layer: Verified",
   ]);
   const [isLockdown, setIsLockdown] = useState(false);
 
   const [localArticles, setLocalArticles] =
     useState<Article[]>(initialArticles);
   const [localUsers, setLocalUsers] = useState<Profile[]>(initialUsers);
+
+  // Edit State
   const [editingUser, setEditingUser] = useState<Profile | null>(null);
+  const [isUpdating, setIsUpdating] = useState(false);
 
   const chatScrollRef = useRef<HTMLDivElement>(null);
   const terminalScrollRef = useRef<HTMLDivElement>(null);
@@ -146,13 +142,8 @@ const AdminPage: React.FC<AdminPageProps> = ({
       });
       if (error) {
         setTerminalOutput((prev) => [...prev, `[ERROR] ${error.message}`]);
-      } else if (data?.status === "error") {
-        setTerminalOutput((prev) => [...prev, `[DB_ERROR] ${data.message}`]);
       } else {
-        setTerminalOutput((prev) => [
-          ...prev,
-          `[SUCCESS] Query executed successfully.`,
-        ]);
+        setTerminalOutput((prev) => [...prev, `[SUCCESS] Query executed.`]);
         if (onUpdateUsers) onUpdateUsers();
       }
     } catch (err: any) {
@@ -162,10 +153,10 @@ const AdminPage: React.FC<AdminPageProps> = ({
 
   const handleDeleteUser = async (userId: string) => {
     if (userId === currentUserId)
-      return toast.error("ROOT NODE CANNOT BE SELF-DESTRUCTED.");
+      return toast.error("ROOT NODE PROTECTION: Cannot delete self.");
     if (
       !confirm(
-        "CRITICAL: Terminate this identity and all associated data permanently?"
+        "TERMINATE IDENTITY? This will wipe all associated node data forever."
       )
     )
       return;
@@ -175,24 +166,47 @@ const AdminPage: React.FC<AdminPageProps> = ({
         target_user_id: userId,
       });
       if (error) throw error;
-      toast.success("IDENTITY TERMINATED.");
+      toast.success("IDENTITY TERMINATED");
       if (onUpdateUsers) onUpdateUsers();
     } catch (err: any) {
-      toast.error("PROTOCOL FAILURE: Termination Interrupted.");
+      toast.error("TERMINATION FAILED: " + err.message);
     }
   };
 
-  const handleUpdateUserRole = async (userId: string, newRole: string) => {
+  const handleUpdateUser = async () => {
+    if (!editingUser) return;
+    setIsUpdating(true);
     try {
       const { error } = await supabase
         .from("profiles")
-        .update({ role: newRole })
-        .eq("id", userId);
+        .update({
+          full_name: editingUser.full_name,
+          bio: editingUser.bio,
+          budget: editingUser.budget,
+          role: editingUser.role,
+        })
+        .eq("id", editingUser.id);
+
       if (error) throw error;
-      toast.success(`CLEARANCE UPDATED TO ${newRole.toUpperCase()}`);
+      toast.success("NODE SYNCHRONIZED");
+      setEditingUser(null);
       if (onUpdateUsers) onUpdateUsers();
     } catch (err: any) {
-      toast.error("SYNC FAILED.");
+      toast.error("SYNC FAILED: " + err.message);
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const handleDeleteArticle = async (id: string) => {
+    if (!confirm("DELETE DISPATCH? Action cannot be undone.")) return;
+    try {
+      const { error } = await supabase.from("articles").delete().eq("id", id);
+      if (error) throw error;
+      toast.success("DISPATCH REMOVED");
+      setLocalArticles((prev) => prev.filter((a) => a.id !== id));
+    } catch (err: any) {
+      toast.error("MODERATION FAILED");
     }
   };
 
@@ -226,12 +240,13 @@ const AdminPage: React.FC<AdminPageProps> = ({
 
   return (
     <main className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-24 md:py-32 space-y-8 md:space-y-12 animate-in fade-in duration-500">
+      {/* Command Header */}
       <div className="flex flex-col items-start justify-between gap-8 pb-10 border-b lg:flex-row border-slate-100 dark:border-slate-800">
         <div className="space-y-4">
           <div className="flex items-center gap-3 text-red-600 animate-pulse">
             <ShieldAlert size={20} />
             <span className="text-[10px] font-black uppercase tracking-[0.4em]">
-              ROOT OPERATIONS V3
+              ROOT OPERATIONS V4
             </span>
           </div>
           <h1 className="text-5xl italic font-black leading-none tracking-tighter uppercase sm:text-7xl md:text-8xl dark:text-white">
@@ -284,6 +299,12 @@ const AdminPage: React.FC<AdminPageProps> = ({
                 icon={<Users size={14} />}
               />
               <TabButton
+                active={activeTab === "articles"}
+                onClick={() => setActiveTab("articles")}
+                label="Moderation"
+                icon={<FileText size={14} />}
+              />
+              <TabButton
                 active={activeTab === "intercept"}
                 onClick={() => setActiveTab("intercept")}
                 label="Signals"
@@ -300,7 +321,9 @@ const AdminPage: React.FC<AdminPageProps> = ({
         </div>
       </div>
 
+      {/* Tab Content */}
       <div className="space-y-12">
+        {/* SYSTEM PULSE */}
         {activeTab === "monitor" && (
           <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
             <MonitorCard
@@ -361,21 +384,18 @@ const AdminPage: React.FC<AdminPageProps> = ({
                     </p>
                   </div>
                 </div>
-
-                <div className="space-y-8">
+                <div className="flex flex-col justify-center">
+                  <h4 className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-500 mb-6">
+                    Security Thresholds
+                  </h4>
                   <div className="space-y-4">
-                    <h4 className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-500">
-                      Security Thresholds
-                    </h4>
-                    <div className="space-y-4">
-                      <ThresholdBar label="Encrypted Traffic" val={85} />
-                      <ThresholdBar label="Node Reputation" val={92} />
-                      <ThresholdBar
-                        label="API Throughput"
-                        val={44}
-                        color="bg-blue-600"
-                      />
-                    </div>
+                    <ThresholdBar label="Encryption" val={98} />
+                    <ThresholdBar label="Reputation Integrity" val={92} />
+                    <ThresholdBar
+                      label="Uptime"
+                      val={100}
+                      color="bg-blue-600"
+                    />
                   </div>
                 </div>
               </div>
@@ -383,6 +403,7 @@ const AdminPage: React.FC<AdminPageProps> = ({
           </div>
         )}
 
+        {/* USER REGISTRY */}
         {activeTab === "users" && (
           <div className="space-y-8">
             <div className="flex items-center gap-4 px-8 py-5 bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-100 dark:border-slate-800 shadow-sm focus-within:ring-2 focus-within:ring-blue-600 transition-all">
@@ -430,38 +451,25 @@ const AdminPage: React.FC<AdminPageProps> = ({
 
                   <div className="py-6 space-y-3 border-y border-slate-50 dark:border-white/5">
                     <div className="flex justify-between text-[9px] font-black uppercase text-slate-400">
-                      <span>Verified Channels</span>
-                      <span className="text-blue-600">
+                      <span>Verified Email</span>
+                      <span className="text-blue-600 truncate max-w-[150px]">
                         {user.email || "N/A"}
                       </span>
                     </div>
                     <div className="flex justify-between text-[9px] font-black uppercase text-slate-400">
                       <span>Reputation Budget</span>
-                      <span className="text-emerald-500">
-                        {user.budget} Credits
+                      <span className="font-bold text-emerald-500">
+                        {user.budget} CREDITS
                       </span>
                     </div>
                   </div>
 
                   <div className="flex gap-2">
                     <button
-                      onClick={() =>
-                        handleUpdateUserRole(
-                          user.id,
-                          user.role === "admin" ? "user" : "admin"
-                        )
-                      }
+                      onClick={() => setEditingUser(user)}
                       className="flex-1 py-4 bg-slate-50 dark:bg-slate-800 rounded-2xl text-[9px] font-black uppercase tracking-widest hover:bg-blue-600 hover:text-white transition-all flex items-center justify-center gap-2"
                     >
-                      <Shield
-                        size={14}
-                        className={
-                          user.role === "admin"
-                            ? "text-red-500"
-                            : "text-blue-500"
-                        }
-                      />
-                      Clearance
+                      <Edit size={14} /> Edit Node
                     </button>
                     <button
                       onClick={() => handleDeleteUser(user.id)}
@@ -476,6 +484,47 @@ const AdminPage: React.FC<AdminPageProps> = ({
           </div>
         )}
 
+        {/* ARTICLE MODERATION */}
+        {activeTab === "articles" && (
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+              {localArticles.map((article) => (
+                <div
+                  key={article.id}
+                  className="bg-white dark:bg-slate-900 p-6 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 flex gap-6 items-center shadow-sm"
+                >
+                  <div className="flex-shrink-0 w-24 h-24 overflow-hidden rounded-2xl bg-slate-100 dark:bg-slate-800">
+                    <img
+                      src={article.image_url}
+                      className="object-cover w-full h-full"
+                    />
+                  </div>
+                  <div className="flex-grow space-y-2 overflow-hidden">
+                    <div className="flex items-start justify-between">
+                      <p className="text-[10px] font-black uppercase text-blue-600 tracking-widest">
+                        {article.category}
+                      </p>
+                      <button
+                        onClick={() => handleDeleteArticle(article.id)}
+                        className="p-1 text-red-500 transition-all hover:text-red-700"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                    <h4 className="text-sm font-black uppercase truncate dark:text-white">
+                      {article.title}
+                    </h4>
+                    <p className="text-[9px] font-bold text-slate-400 italic">
+                      By: {article.author_name} ({article.author_serial})
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* SIGNALS */}
         {activeTab === "intercept" && (
           <div className="grid grid-cols-1 gap-12 pb-20 lg:grid-cols-12">
             <div className="space-y-8 lg:col-span-4">
@@ -484,13 +533,9 @@ const AdminPage: React.FC<AdminPageProps> = ({
                   <Radio size={16} className="text-red-500 animate-pulse" />{" "}
                   Signal Shards
                 </h3>
-                <span className="text-[9px] font-black text-white bg-red-600 px-3 py-1 rounded-full uppercase tracking-widest">
-                  {intercepts.length} Captured
-                </span>
               </div>
               <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
                 {intercepts.map((i, idx) => (
-                  /* Fix: Replaced undefined 'joinIntercept' with 'setActiveInterception' */
                   <button
                     key={idx}
                     onClick={() => setActiveInterception(i.room)}
@@ -526,7 +571,6 @@ const AdminPage: React.FC<AdminPageProps> = ({
                         </p>
                       </div>
                     </div>
-                    <ChevronRight size={18} />
                   </button>
                 ))}
               </div>
@@ -566,6 +610,7 @@ const AdminPage: React.FC<AdminPageProps> = ({
           </div>
         )}
 
+        {/* SQL CONSOLE */}
         {activeTab === "console" && (
           <div className="bg-slate-950 rounded-[3rem] border border-white/10 overflow-hidden shadow-2xl animate-in zoom-in-95 duration-500">
             <div className="flex items-center justify-between p-8 border-b border-white/10 bg-white/5">
@@ -626,6 +671,107 @@ const AdminPage: React.FC<AdminPageProps> = ({
           </div>
         )}
       </div>
+
+      {/* EDIT MODAL */}
+      {editingUser && (
+        <div className="fixed inset-0 z-[500] flex items-center justify-center p-6 animate-in fade-in duration-300">
+          <div
+            className="absolute inset-0 bg-black/60 backdrop-blur-md"
+            onClick={() => setEditingUser(null)}
+          />
+          <div className="relative w-full max-w-xl bg-white dark:bg-slate-900 rounded-[3rem] p-10 border border-slate-100 dark:border-slate-800 shadow-2xl space-y-8">
+            <div className="flex items-center justify-between">
+              <h3 className="text-2xl italic font-black tracking-tighter uppercase dark:text-white">
+                Adjust Node: {editingUser.serial_id}
+              </h3>
+              <button onClick={() => setEditingUser(null)}>
+                <X size={24} className="text-slate-400" />
+              </button>
+            </div>
+
+            <div className="space-y-6">
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase text-slate-400">
+                  Node Holder Name
+                </label>
+                <input
+                  value={editingUser.full_name}
+                  onChange={(e) =>
+                    setEditingUser({
+                      ...editingUser,
+                      full_name: e.target.value,
+                    })
+                  }
+                  className="w-full p-4 text-sm font-bold border-none outline-none bg-slate-50 dark:bg-slate-950 rounded-xl dark:text-white"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase text-slate-400">
+                    Clearance Level
+                  </label>
+                  <select
+                    value={editingUser.role}
+                    onChange={(e) =>
+                      setEditingUser({
+                        ...editingUser,
+                        role: e.target.value as any,
+                      })
+                    }
+                    className="w-full p-4 text-sm font-bold border-none outline-none appearance-none bg-slate-50 dark:bg-slate-950 rounded-xl dark:text-white"
+                  >
+                    <option value="user">User Node</option>
+                    <option value="admin">Root Admin</option>
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase text-slate-400">
+                    Reputation Budget
+                  </label>
+                  <input
+                    type="number"
+                    value={editingUser.budget}
+                    onChange={(e) =>
+                      setEditingUser({
+                        ...editingUser,
+                        budget: parseInt(e.target.value),
+                      })
+                    }
+                    className="w-full p-4 text-sm font-bold border-none outline-none bg-slate-50 dark:bg-slate-950 rounded-xl dark:text-white"
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase text-slate-400">
+                  Node Bio / Manifesto
+                </label>
+                <textarea
+                  value={editingUser.bio}
+                  onChange={(e) =>
+                    setEditingUser({ ...editingUser, bio: e.target.value })
+                  }
+                  rows={3}
+                  className="w-full p-4 text-sm font-medium border-none outline-none bg-slate-50 dark:bg-slate-950 rounded-xl dark:text-white"
+                />
+              </div>
+            </div>
+
+            <button
+              onClick={handleUpdateUser}
+              disabled={isUpdating}
+              className="w-full py-5 bg-blue-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-950 transition-all flex items-center justify-center gap-3"
+            >
+              {isUpdating ? (
+                <RefreshCw className="animate-spin" size={16} />
+              ) : (
+                <>
+                  <Save size={16} /> Synchronize Node Data
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      )}
     </main>
   );
 };
@@ -657,7 +803,7 @@ const ThresholdBar = ({ label, val, color }: any) => (
       <span>{label}</span>
       <span>{val}%</span>
     </div>
-    <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
+    <div className="h-1.5 bg-slate-100 dark:bg-white/5 rounded-full overflow-hidden">
       <div
         className={`h-full ${
           color || "bg-emerald-500"
