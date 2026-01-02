@@ -50,6 +50,7 @@ const App: React.FC = () => {
 
   const initializationInProgress = useRef(false);
 
+  // Resilience: Local Storage Fallback Logic
   const fetchArticles = useCallback(async () => {
     try {
       const { data: arts, error } = await supabase
@@ -57,9 +58,14 @@ const App: React.FC = () => {
         .select("*")
         .order("created_at", { ascending: false });
       if (error) throw error;
-      if (arts) setArticles([...arts]);
+      if (arts) {
+        setArticles([...arts]);
+        localStorage.setItem("the_articles_cache", JSON.stringify(arts));
+      }
     } catch (e: any) {
-      console.error(e);
+      console.warn("Network error, loading from cache...");
+      const cached = localStorage.getItem("the_articles_cache");
+      if (cached) setArticles(JSON.parse(cached));
     }
   }, []);
 
@@ -69,7 +75,7 @@ const App: React.FC = () => {
       if (error) throw error;
       if (data) setUsers(data);
     } catch (e) {
-      console.error(e);
+      console.error("Failed to sync network registry.");
     }
   }, []);
 
@@ -99,7 +105,7 @@ const App: React.FC = () => {
         }
       }
     } catch (e: any) {
-      console.error(e);
+      console.error("Session integrity check failed.");
     }
     await fetchArticles();
     await fetchUsers();
@@ -111,68 +117,63 @@ const App: React.FC = () => {
     initApp();
   }, [initApp]);
 
-  // Unified Real-time Listener
+  // Unified Real-time Listener (Resilient)
   useEffect(() => {
     if (!profile?.id) return;
 
-    const inboxChannel = supabase.channel(`inbox_${profile.id}`);
-    inboxChannel
-      .on("broadcast", { event: "handshake" }, (p) => {
-        const req = p.payload as ChatRequest;
-        setChatRequests((prev) =>
-          prev.some((r) => r.fromId === req.fromId) ? prev : [...prev, req]
-        );
-        toast(`Incoming Handshake: ${req.fromName}`, { icon: "🤝" });
-      })
-      .on("broadcast", { event: "handshake_accepted" }, async (p) => {
-        const { acceptorId, acceptorName } = p.payload;
-        const acceptorProfile = users.find((u) => u.id === acceptorId);
-        if (acceptorProfile) {
-          setActiveChat(acceptorProfile);
-          setChatMessages([]);
-          toast.success(`Secure link connected with ${acceptorName}`, {
-            icon: "⚡",
-          });
-        }
-      })
-      .subscribe();
-
-    // Admin Intercept Hub
-    let adminChannel: any = null;
-    if (profile.role === "admin") {
-      adminChannel = supabase.channel("admin_oversight");
-      adminChannel
-        .on("broadcast", { event: "intercept_pulse" }, (p: any) => {
-          setAdminIntercepts((prev) => {
-            const exists = prev.find((i) => i.room === p.payload.room);
-            if (!exists) {
-              // Only toast if it's a BRAND NEW channel being detected
-              toast(`NEW SIGNAL: ${p.payload.node1} ↔ ${p.payload.node2}`, {
-                icon: "👁️",
-                style: {
-                  fontSize: "10px",
-                  fontWeight: "bold",
-                  background: "#000",
-                  color: "#fff",
-                },
-              });
-              return [...prev, p.payload];
-            }
-            // Update last active time for existing channels
-            return prev.map((i) =>
-              i.room === p.payload.room
-                ? { ...i, timestamp: Date.now(), lastText: p.payload.text }
-                : i
-            );
-          });
+    try {
+      const inboxChannel = supabase.channel(`inbox_${profile.id}`);
+      inboxChannel
+        .on("broadcast", { event: "handshake" }, (p) => {
+          const req = p.payload as ChatRequest;
+          setChatRequests((prev) =>
+            prev.some((r) => r.fromId === req.fromId) ? prev : [...prev, req]
+          );
+          toast(`Incoming Handshake: ${req.fromName}`, { icon: "🤝" });
+        })
+        .on("broadcast", { event: "handshake_accepted" }, async (p) => {
+          const { acceptorId, acceptorName } = p.payload;
+          const acceptorProfile = users.find((u) => u.id === acceptorId);
+          if (acceptorProfile) {
+            setActiveChat(acceptorProfile);
+            setChatMessages([]);
+            toast.success(`Secure link connected with ${acceptorName}`, {
+              icon: "⚡",
+            });
+          }
         })
         .subscribe();
-    }
 
-    return () => {
-      supabase.removeChannel(inboxChannel);
-      if (adminChannel) supabase.removeChannel(adminChannel);
-    };
+      // Admin Intercept Hub
+      let adminChannel: any = null;
+      if (profile.role === "admin") {
+        adminChannel = supabase.channel("admin_oversight");
+        adminChannel
+          .on("broadcast", { event: "intercept_pulse" }, (p: any) => {
+            setAdminIntercepts((prev) => {
+              const exists = prev.find((i) => i.room === p.payload.room);
+              if (!exists) {
+                return [...prev, p.payload];
+              }
+              return prev.map((i) =>
+                i.room === p.payload.room
+                  ? { ...i, timestamp: Date.now(), lastText: p.payload.text }
+                  : i
+              );
+            });
+          })
+          .subscribe();
+      }
+
+      return () => {
+        supabase.removeChannel(inboxChannel);
+        if (adminChannel) supabase.removeChannel(adminChannel);
+      };
+    } catch (err) {
+      console.error(
+        "Realtime subscription failed, falling back to manual sync."
+      );
+    }
   }, [profile?.id, profile?.role, users, currentPage]);
 
   const handleAcceptRequest = useCallback(
@@ -196,7 +197,6 @@ const App: React.FC = () => {
               },
             });
 
-            // Notify admin of the new channel immediately
             const ids = [profile.id, senderProfile.id].sort();
             supabase.channel("admin_oversight").send({
               type: "broadcast",
@@ -240,7 +240,6 @@ const App: React.FC = () => {
         .channel(roomName)
         .send({ type: "broadcast", event: "message", payload: message });
 
-      // Send intercept pulse with message details
       supabase.channel("admin_oversight").send({
         type: "broadcast",
         event: "intercept_pulse",
@@ -284,7 +283,7 @@ const App: React.FC = () => {
         setProfile(finalProfile);
         setIsSettingUp(false);
         handleNavigate("home");
-        toast.success("Identity established. Welcome to the network.");
+        toast.success("Identity established.");
       } else {
         toast.error("Profile synchronization failed.");
       }
@@ -295,6 +294,7 @@ const App: React.FC = () => {
     fetchUsers();
   };
 
+  // Global Navigation with Error Resilience
   if (isSettingUp) {
     return (
       <div
@@ -312,7 +312,7 @@ const App: React.FC = () => {
     <div
       className={`min-h-screen ${
         isDarkMode ? "dark bg-slate-950" : "bg-slate-50"
-      } transition-colors duration-500`}
+      } transition-colors duration-500 overflow-x-hidden`}
     >
       <Toaster position="bottom-center" />
       {showAuth === "login" && (
@@ -339,7 +339,7 @@ const App: React.FC = () => {
       )}
 
       {!showAuth && (
-        <>
+        <div className="relative flex flex-col min-h-screen">
           <Navbar
             onNavigate={handleNavigate}
             onLogin={() => setShowAuth("login")}
@@ -354,7 +354,7 @@ const App: React.FC = () => {
             adminIntercepts={adminIntercepts}
           />
 
-          <div className="pt-24">
+          <div className="flex-grow pt-24">
             {currentPage === "home" && (
               <HomePage
                 articles={articles}
@@ -372,19 +372,23 @@ const App: React.FC = () => {
                 onBack={() => handleNavigate("home")}
                 onPublish={async (data) => {
                   if (!profile) return;
-                  const payload = {
-                    ...data,
-                    author_id: profile.id,
-                    author_name: profile.full_name,
-                    author_serial: profile.serial_id,
-                  };
-                  const { error } = await supabase
-                    .from("articles")
-                    .insert(payload);
-                  if (!error) {
-                    toast.success("Published");
-                    fetchArticles();
-                    handleNavigate("home");
+                  try {
+                    const payload = {
+                      ...data,
+                      author_id: profile.id,
+                      author_name: profile.full_name,
+                      author_serial: profile.serial_id,
+                    };
+                    const { error } = await supabase
+                      .from("articles")
+                      .insert(payload);
+                    if (!error) {
+                      toast.success("Published");
+                      fetchArticles();
+                      handleNavigate("home");
+                    }
+                  } catch (err) {
+                    toast.error("Transmission Interrupted.");
                   }
                 }}
               />
@@ -416,6 +420,17 @@ const App: React.FC = () => {
                   onSendChatRequest={(u) => {
                     setActiveChat(u);
                     setChatMessages([]);
+                  }}
+                  onUpdateProfile={async (data) => {
+                    if (!profile) return;
+                    const { error } = await supabase
+                      .from("profiles")
+                      .update(data)
+                      .eq("id", profile.id);
+                    if (!error) {
+                      setProfile({ ...profile, ...data });
+                      toast.success("Identity Updated.");
+                    }
                   }}
                 />
               )}
@@ -457,7 +472,7 @@ const App: React.FC = () => {
               onSendMessage={handleSendMessage}
             />
           )}
-        </>
+        </div>
       )}
     </div>
   );

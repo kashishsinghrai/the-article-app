@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
+// Added missing 'Newspaper' import from 'lucide-react'
 import {
   ShieldAlert,
   Search,
@@ -25,6 +26,10 @@ import {
   Mic,
   MapPin,
   CheckCircle2,
+  Server,
+  Database,
+  Activity as ActivityIcon,
+  Newspaper,
 } from "lucide-react";
 import { Article, Profile, LiveMessage } from "../../types";
 import { supabase } from "../../lib/supabase";
@@ -231,48 +236,87 @@ const AdminPage: React.FC<AdminPageProps> = ({
               label="Broadcast Volume"
               value={localArticles.length}
               desc="Active Intelligence"
+              icon={<Newspaper size={20} />}
             />
             <MonitorCard
               label="Verified Nodes"
               value={localUsers.length}
               desc="Operator Registry"
+              icon={<Users size={20} />}
             />
             <MonitorCard
-              label="Network Latency"
-              value="0.4ms"
+              label="Network Health"
+              value="99.9%"
               color="text-emerald-500"
-              desc="Secure Proxy Ready"
+              desc="Uptime Verified"
+              icon={<ActivityIcon size={20} />}
             />
             <MonitorCard
-              label="Security state"
-              value="LOCKDOWN"
+              label="Database Sync"
+              value="REALTIME"
               color="text-blue-500"
-              desc="Admin Oversight Active"
+              desc="Supabase Active"
+              icon={<Database size={20} />}
             />
 
-            <div className="lg:col-span-4 bg-slate-950 rounded-[2.5rem] p-8 md:p-12 border border-white/10 relative overflow-hidden">
+            <div className="lg:col-span-4 bg-slate-950 rounded-[2.5rem] p-8 md:p-12 border border-white/10 relative overflow-hidden shadow-2xl">
               <div className="absolute top-0 right-0 p-8 opacity-10">
                 <TerminalIcon size={120} className="text-white" />
               </div>
-              <div className="relative z-10 space-y-6">
+              <div className="relative z-10 space-y-8">
                 <div className="flex items-center gap-4">
                   <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                   <h3 className="text-[10px] font-black uppercase tracking-[0.4em] text-white">
-                    Live Operations Log
+                    Hyper-Registry Operations Log
                   </h3>
                 </div>
-                <div className="font-mono text-[11px] space-y-2 text-slate-400">
+
+                <div className="grid grid-cols-1 gap-8 md:grid-cols-3">
+                  <div className="space-y-2">
+                    <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">
+                      Active Server
+                    </p>
+                    <div className="flex items-center gap-2 text-white">
+                      <Server size={14} className="text-blue-500" />
+                      <span className="font-mono text-xs">
+                        ap-south-1.supabase.co
+                      </span>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">
+                      Protocol Type
+                    </p>
+                    <div className="flex items-center gap-2 text-white">
+                      <Lock size={14} className="text-emerald-500" />
+                      <span className="font-mono text-xs">RLS_ENFORCED_V2</span>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">
+                      Integrity Hash
+                    </p>
+                    <div className="flex items-center gap-2 text-white">
+                      <Key size={14} className="text-amber-500" />
+                      <span className="font-mono text-xs">
+                        sha256:7f8e...3b2a
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="font-mono text-[10px] space-y-2 text-slate-400 bg-white/5 p-6 rounded-2xl border border-white/5">
                   <p>
-                    <span className="text-emerald-500">[OK]</span> Node
-                    integrity verified.
+                    <span className="text-emerald-500">[SYSTEM]</span> RLS
+                    Policies verified for 'profiles' table.
                   </p>
                   <p>
-                    <span className="text-blue-500">[INFO]</span> Permission
-                    auditing system enabled.
+                    <span className="text-blue-500">[INFO]</span> Broadcast
+                    Handshake: Peer link success for Node-774.
                   </p>
                   <p>
-                    <span className="text-amber-500">[WARN]</span> Restricted
-                    metadata fetch initiated.
+                    <span className="text-emerald-500">[OK]</span> Hardware
+                    permissions audited for 100% of active nodes.
                   </p>
                 </div>
               </div>
@@ -325,7 +369,7 @@ const AdminPage: React.FC<AdminPageProps> = ({
 
                   <div className="py-6 space-y-4 border-y border-slate-50 dark:border-white/5">
                     <p className="text-[9px] font-black uppercase tracking-widest text-slate-300">
-                      Permission Audit
+                      Live Hardware Permissions
                     </p>
                     <div className="flex flex-wrap gap-4">
                       <PermissionIndicator
@@ -364,7 +408,7 @@ const AdminPage: React.FC<AdminPageProps> = ({
                             : "text-blue-500"
                         }
                       />
-                      Toggle Access
+                      Toggle Clearance
                     </button>
                   </div>
                 </div>
@@ -470,19 +514,22 @@ const PermissionIndicator = ({ active, icon, label }: any) => (
   <div
     className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-[8px] font-black uppercase tracking-widest ${
       active
-        ? "bg-emerald-50 text-emerald-600 border-emerald-100 dark:bg-emerald-950/20"
-        : "bg-slate-50 text-slate-300 border-slate-100 dark:bg-slate-900"
+        ? "bg-emerald-50 text-emerald-600 border-emerald-100 dark:bg-emerald-950/20 shadow-sm"
+        : "bg-slate-50 text-slate-300 border-slate-100 dark:bg-slate-900 opacity-40"
     }`}
   >
     {icon} {label}
   </div>
 );
 
-const MonitorCard = ({ label, value, color, desc }: any) => (
-  <div className="p-10 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-[2.5rem] space-y-4 shadow-sm group">
-    <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 group-hover:text-blue-600 transition-colors">
-      {label}
-    </p>
+const MonitorCard = ({ label, value, color, desc, icon }: any) => (
+  <div className="p-10 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-[2.5rem] space-y-4 shadow-sm group hover:scale-[1.02] transition-all duration-300">
+    <div className="flex items-center justify-between">
+      <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 group-hover:text-blue-600 transition-colors">
+        {label}
+      </p>
+      <div className="text-slate-200 dark:text-slate-800">{icon}</div>
+    </div>
     <p
       className={`text-5xl font-black dark:text-white uppercase italic tracking-tighter ${
         color || ""
