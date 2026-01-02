@@ -2,311 +2,164 @@ import React, { useState, useEffect, useRef } from "react";
 import {
   X,
   Send,
-  Zap,
   Lock,
-  MoreVertical,
-  Phone,
-  Video,
-  Info,
-  ChevronLeft,
-  User2,
   ShieldAlert,
+  ChevronLeft,
+  Fingerprint,
 } from "lucide-react";
 import { LiveMessage, Profile } from "../types";
 import { supabase } from "../lib/supabase";
+import { toast } from "react-hot-toast";
 
 interface ChatOverlayProps {
   recipient: Profile;
   currentUserId: string;
   onClose: () => void;
-  messages: LiveMessage[];
-  onSendMessage: (text: string) => void;
 }
 
 const ChatOverlay: React.FC<ChatOverlayProps> = ({
   recipient,
   currentUserId,
   onClose,
-  messages,
-  onSendMessage,
 }) => {
   const [input, setInput] = useState("");
   const [localMessages, setLocalMessages] = useState<LiveMessage[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const isAdmin = recipient.role === "admin";
+  const fetchMessages = async () => {
+    const { data } = await supabase
+      .from("chat_messages")
+      .select("*")
+      .or(
+        `and(sender_id.eq.${currentUserId},recipient_id.eq.${recipient.id}),and(sender_id.eq.${recipient.id},recipient_id.eq.${currentUserId})`
+      )
+      .order("created_at", { ascending: true });
+    if (data) setLocalMessages(data);
+  };
 
   useEffect(() => {
-    setLocalMessages(messages);
-  }, [messages]);
-
-  useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
-  }, [localMessages]);
-
-  useEffect(() => {
-    if (!currentUserId || !recipient.id) return;
-
-    const ids = [currentUserId, recipient.id].sort();
-    const roomName = `room_${ids[0]}_${ids[1]}`;
-    const channel = supabase.channel(roomName);
-
-    channel
-      .on("broadcast", { event: "message" }, (p) => {
-        const msg = p.payload as LiveMessage;
-        setLocalMessages((prev) =>
-          prev.some((m) => m.id === msg.id) ? prev : [...prev, msg]
-        );
-      })
+    fetchMessages();
+    const channel = supabase
+      .channel(`chat_${recipient.id}`)
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "chat_messages" },
+        (payload) => {
+          const newMsg = payload.new as LiveMessage;
+          if (
+            (newMsg.sender_id === currentUserId &&
+              newMsg.recipient_id === recipient.id) ||
+            (newMsg.sender_id === recipient.id &&
+              newMsg.recipient_id === currentUserId)
+          ) {
+            setLocalMessages((prev) => [...prev, newMsg]);
+          }
+        }
+      )
       .subscribe();
-
     return () => {
       channel.unsubscribe();
     };
-  }, [currentUserId, recipient.id]);
+  }, [recipient.id, currentUserId]);
 
-  const handleSend = (e: React.FormEvent) => {
+  useEffect(() => {
+    if (scrollRef.current)
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+  }, [localMessages]);
+
+  const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.trim()) return;
-    onSendMessage(input);
-    setInput("");
-  };
-
-  const formatTime = (ts: number) => {
-    return new Date(ts).toLocaleTimeString([], {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+    const { error } = await supabase
+      .from("chat_messages")
+      .insert({
+        sender_id: currentUserId,
+        recipient_id: recipient.id,
+        text: input.trim(),
+      });
+    if (!error) setInput("");
+    else toast.error("Bypass failed. Message dropped.");
   };
 
   return (
-    <div className="fixed inset-0 md:inset-auto md:bottom-8 md:right-8 z-[200] flex flex-col md:w-96 md:h-[600px] animate-in slide-in-from-bottom-10 md:slide-in-from-right-10 duration-500">
-      {/* Container - Full screen on mobile, floating box on desktop */}
-      <div className="flex-grow flex flex-col bg-white dark:bg-slate-950 md:rounded-[2.5rem] shadow-2xl border-none md:border md:border-white/20 dark:md:border-slate-800 overflow-hidden h-full">
-        {/* Modern Header */}
-        <div
-          className={`px-4 py-3 md:px-6 md:py-4 ${
-            isAdmin ? "bg-red-700" : "bg-[#075e54]"
-          } dark:bg-slate-900 text-white flex justify-between items-center shadow-lg relative z-10 transition-colors duration-500`}
-        >
-          <div className="flex items-center gap-2 md:gap-3">
-            {/* Mobile Back Button */}
-            <button
-              onClick={onClose}
-              className="p-2 -ml-2 transition-colors rounded-full hover:bg-white/10"
-            >
+    <div className="fixed inset-0 md:inset-auto md:bottom-8 md:right-8 z-[200] flex flex-col md:w-96 md:h-[600px] animate-in slide-in-from-bottom-10">
+      <div className="flex-grow flex flex-col bg-white dark:bg-slate-950 md:rounded-[2.5rem] shadow-2xl border border-slate-100 dark:border-slate-800 overflow-hidden">
+        <div className="flex items-center justify-between px-6 py-4 text-white bg-slate-900">
+          <div className="flex items-center gap-3">
+            <button onClick={onClose} className="md:hidden">
               <ChevronLeft size={24} />
             </button>
-
-            <div className="relative">
-              <div className="overflow-hidden border rounded-full w-9 h-9 md:w-11 md:h-11 bg-white/10 border-white/20">
+            <div className="w-10 h-10 overflow-hidden border rounded-full bg-slate-800 border-white/10">
+              {recipient.avatar_url ? (
                 <img
-                  src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${recipient.username}`}
+                  src={recipient.avatar_url}
                   className="object-cover w-full h-full"
-                  alt={recipient.username}
                 />
-              </div>
-              <div
-                className={`absolute bottom-0 right-0 w-2.5 h-2.5 ${
-                  isAdmin ? "bg-red-400" : "bg-emerald-400"
-                } rounded-full border-2 border-current shadow-sm`}
-              />
+              ) : (
+                <Fingerprint className="m-2 text-slate-500" />
+              )}
             </div>
-
-            <div className="cursor-pointer max-w-[120px] xs:max-w-none">
-              <h4 className="text-[14px] md:text-sm font-bold truncate flex items-center gap-2 uppercase tracking-tighter">
+            <div>
+              <h4 className="text-sm font-bold uppercase truncate">
                 {recipient.full_name}
               </h4>
-              <div className="flex items-center gap-2">
-                <p
-                  className={`text-[10px] ${
-                    isAdmin ? "text-red-200" : "text-emerald-300"
-                  } font-black uppercase tracking-widest`}
-                >
-                  {isAdmin ? "Root Clearance" : "Verified Online"}
-                </p>
-                <span className="w-1 h-1 rounded-full bg-white/30" />
-
-                {isAdmin ? (
-                  <div className="flex items-center gap-1 bg-white text-red-700 px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-widest animate-pulse">
-                    <ShieldAlert size={8} />
-                    ROOT ADMIN
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-1 bg-white/10 px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-widest text-white/90">
-                    <User2 size={8} />
-                    {recipient.gender || "Node"}
-                  </div>
-                )}
-              </div>
+              <p className="text-[8px] font-black uppercase text-emerald-400">
+                Encrypted Line
+              </p>
             </div>
           </div>
-
-          <div className="flex items-center gap-2 md:gap-4 opacity-80">
-            <span
-              title="Encrypted Voice"
-              className="hidden cursor-not-allowed xs:block text-white/30"
-            >
-              <Video size={18} />
-            </span>
-            <span
-              title="Secure Line"
-              className="hidden cursor-not-allowed xs:block text-white/30"
-            >
-              <Phone size={16} />
-            </span>
-            <button
-              onClick={onClose}
-              className="hidden p-1 transition-colors rounded-full md:block hover:bg-white/10"
-            >
-              <X size={20} />
-            </button>
-            <MoreVertical size={18} className="cursor-pointer" />
-          </div>
+          <button onClick={onClose} className="hidden md:block">
+            <X size={20} />
+          </button>
         </div>
 
-        {/* Encrypted Notice Banner */}
-        <div
-          className={`${
-            isAdmin
-              ? "bg-red-50 dark:bg-red-950/20 border-red-100 dark:border-red-900/30"
-              : "bg-slate-100/50 dark:bg-slate-900/50 border-slate-100 dark:border-white/5"
-          } px-4 py-2 flex items-center justify-center gap-2 border-b relative z-10`}
-        >
-          {isAdmin ? (
-            <ShieldAlert size={10} className="text-red-500" />
-          ) : (
-            <Lock size={10} className="text-slate-400" />
-          )}
-          <span
-            className={`text-[8px] font-black uppercase tracking-[0.2em] ${
-              isAdmin ? "text-red-600" : "text-slate-400"
-            }`}
-          >
-            {isAdmin
-              ? "System Oversight Channel Established"
-              : "P2P encrypted channel active"}
-          </span>
-        </div>
-
-        {/* Dynamic Chat Surface */}
         <div
           ref={scrollRef}
-          className="flex-grow overflow-y-auto p-4 md:p-6 space-y-4 bg-[#e5ddd5] dark:bg-slate-950/50 custom-scrollbar pattern-whatsapp relative"
+          className="flex-grow p-6 space-y-4 overflow-y-auto bg-slate-50 dark:bg-slate-950/50"
         >
-          {localMessages.length === 0 && (
-            <div className="flex flex-col items-center justify-center py-10 space-y-4 text-center opacity-40">
+          {localMessages.map((msg) => (
+            <div
+              key={msg.id}
+              className={`flex ${
+                msg.sender_id === currentUserId
+                  ? "justify-end"
+                  : "justify-start"
+              }`}
+            >
               <div
-                className={`p-4 ${
-                  isAdmin
-                    ? "bg-red-100 border-red-200"
-                    : "bg-amber-100 border-amber-200"
-                } rounded-2xl border shadow-sm`}
+                className={`max-w-[80%] px-4 py-2 rounded-2xl text-sm font-medium ${
+                  msg.sender_id === currentUserId
+                    ? "bg-blue-600 text-white rounded-tr-none"
+                    : "bg-white dark:bg-slate-800 dark:text-white rounded-tl-none shadow-sm"
+                }`}
               >
-                <p
-                  className={`text-[10px] font-black uppercase tracking-widest ${
-                    isAdmin ? "text-red-700" : "text-amber-700"
-                  } max-w-[200px]`}
-                >
-                  {isAdmin
-                    ? "Direct root session initiated. Authorized personnel only."
-                    : "Secure Handshake Established. Begin exchange."}
-                </p>
-              </div>
-            </div>
-          )}
-          {localMessages.map((msg) => {
-            const isMe = msg.senderId === currentUserId;
-            // Note: In a real P2P chat, we might want to check the sender's role from a user list
-            // For now, we assume if isMe is false and recipient is admin, the sender is admin
-            const isSenderAdmin = !isMe && isAdmin;
-
-            return (
-              <div
-                key={msg.id}
-                className={`flex ${
-                  isMe ? "justify-end" : "justify-start"
-                } animate-in fade-in slide-in-from-bottom-1 duration-300`}
-              >
-                <div
-                  className={`relative max-w-[85%] px-3 py-1.5 md:px-4 md:py-2 shadow-sm ${
-                    isMe
-                      ? "whatsapp-bubble-out"
-                      : isSenderAdmin
-                      ? "bg-red-600 text-white rounded-2xl rounded-tl-none border-none"
-                      : "whatsapp-bubble-in"
-                  }`}
-                >
-                  {isSenderAdmin && (
-                    <div className="flex items-center gap-1 mb-1">
-                      <ShieldAlert size={10} className="text-red-100" />
-                      <span className="text-[8px] font-black uppercase tracking-widest text-red-100">
-                        Official Admin
-                      </span>
-                    </div>
-                  )}
-                  <p className="text-[14px] md:text-[15px] leading-relaxed break-words">
-                    {msg.text}
-                  </p>
-                  <div
-                    className={`flex items-center justify-end gap-1 mt-1 ${
-                      isMe
-                        ? "text-white/60"
-                        : isSenderAdmin
-                        ? "text-white/50"
-                        : "text-slate-400"
-                    }`}
-                  >
-                    <span className="text-[9px] font-bold uppercase tracking-tighter">
-                      {formatTime(msg.timestamp)}
-                    </span>
-                    {isMe && <Zap size={8} fill="currentColor" />}
-                  </div>
+                {msg.text}
+                <div className="text-[8px] mt-1 opacity-50 uppercase font-black">
+                  {new Date(msg.created_at).toLocaleTimeString([], {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
                 </div>
               </div>
-            );
-          })}
+            </div>
+          ))}
         </div>
 
-        {/* Footer / Input Area */}
         <form
           onSubmit={handleSend}
-          className="p-3 md:p-4 bg-[#f0f2f5] dark:bg-slate-900 flex items-center gap-2 md:gap-3 relative z-10 pb-[env(safe-area-inset-bottom)] md:pb-4"
+          className="flex gap-2 p-4 bg-white dark:bg-slate-900"
         >
-          <button
-            type="button"
-            className="hidden p-2 transition-colors text-slate-500 hover:text-blue-600 xs:block"
-          >
-            <Info size={20} />
-          </button>
           <input
-            type="text"
-            autoFocus
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder={
-              isAdmin ? "Type your inquiry for admin..." : "Type a message..."
-            }
-            className="flex-grow bg-white dark:bg-slate-800 border-none rounded-2xl px-4 py-3 md:py-2 text-[15px] md:text-[14px] focus:ring-2 focus:ring-blue-600 transition-all dark:text-white shadow-sm"
+            placeholder="Secure message..."
+            className="flex-grow px-4 py-2 text-sm font-bold outline-none bg-slate-50 dark:bg-slate-800 rounded-xl dark:text-white"
           />
           <button
             type="submit"
-            disabled={!input.trim()}
-            className={`w-12 h-12 md:w-11 md:h-11 rounded-full flex items-center justify-center transition-all shadow-lg active:scale-90 flex-shrink-0 ${
-              input.trim()
-                ? isAdmin
-                  ? "bg-red-600"
-                  : "bg-[#00a884]"
-                : "bg-slate-300 dark:bg-slate-700 text-slate-400"
-            } text-white`}
+            className="flex items-center justify-center w-10 h-10 text-white bg-blue-600 rounded-xl"
           >
-            <Send
-              size={20}
-              className="ml-1"
-              fill={input.trim() ? "white" : "transparent"}
-            />
+            <Send size={18} />
           </button>
         </form>
       </div>

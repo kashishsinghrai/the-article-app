@@ -13,7 +13,7 @@ import NetworkPage from "./app/network/page";
 import LoginPage from "./app/auth/login";
 import RegisterPage from "./app/auth/register";
 import SetupProfilePage from "./app/setup-profile/page";
-import { Profile, Article, ChatRequest, LiveMessage, Comment } from "./types";
+import { Profile, Article, ChatRequest, LiveMessage } from "./types";
 import { Toaster, toast } from "react-hot-toast";
 import { supabase } from "./lib/supabase";
 import { Loader2 } from "lucide-react";
@@ -29,72 +29,82 @@ const App: React.FC = () => {
   const [editingArticleData, setEditingArticleData] = useState<Article | null>(
     null
   );
-  const [nodeCount, setNodeCount] = useState(2540);
 
   const [chatRequests, setChatRequests] = useState<ChatRequest[]>([]);
   const [activeChat, setActiveChat] = useState<Profile | null>(null);
-  const [chatMessages, setChatMessages] = useState<LiveMessage[]>([]);
 
   const [profile, setProfile] = useState<Profile | null>(null);
   const [articles, setArticles] = useState<Article[]>([]);
   const [users, setUsers] = useState<Profile[]>([]);
 
   const initializationInProgress = useRef(false);
-  const isFetchingProfile = useRef(false);
 
   const fetchGlobalData = useCallback(async () => {
     try {
-      const { data: artData, error: artErr } = await supabase
+      const { data: artData } = await supabase
         .from("articles")
         .select("*")
         .order("created_at", { ascending: false });
-      const { data: userData, error: userErr } = await supabase
-        .from("profiles")
-        .select("*");
-
-      if (!artErr) setArticles(artData || []);
-      if (!userErr) {
-        setUsers(userData || []);
-        setNodeCount(userData?.length ? 2500 + userData.length : 2540);
-      }
+      const { data: userData } = await supabase.from("profiles").select("*");
+      if (artData) setArticles(artData);
+      if (userData) setUsers(userData);
     } catch (e) {
-      console.error("Hydration Error:", e);
+      console.error("Hydration Error");
     }
   }, []);
 
-  const checkUserStatus = useCallback(async (user: any) => {
-    if (!user) {
-      setIsLoggedIn(false);
-      setProfile(null);
-      return;
-    }
+  const listenForChatRequests = useCallback((userId: string) => {
+    const channel = supabase
+      .channel("schema-db-changes")
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "chat_requests",
+          filter: `to_id=eq.${userId}`,
+        },
+        (payload) => {
+          const newReq = payload.new as ChatRequest;
+          setChatRequests((prev) => [...prev, newReq]);
+          toast("Incoming Network Connection Request", { icon: "📡" });
+        }
+      )
+      .subscribe();
+    return () => channel.unsubscribe();
+  }, []);
 
-    setIsLoggedIn(true);
-
-    if (isFetchingProfile.current) return;
-    isFetchingProfile.current = true;
-
-    try {
-      const { data: prof, error } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", user.id)
-        .maybeSingle();
-
-      if (prof) {
-        const isAdmin =
-          user.user_metadata?.role === "admin" ||
-          user.email?.endsWith("@the-articles.admin");
-        setProfile({ ...prof, role: isAdmin ? "admin" : prof.role });
-      } else {
+  const checkUserStatus = useCallback(
+    async (user: any) => {
+      if (!user) {
+        setIsLoggedIn(false);
         setProfile(null);
+        return;
       }
-    } catch (err) {
-      console.error("Identity check failure.");
-    } finally {
-      isFetchingProfile.current = false;
-    }
-  }, []);
+      setIsLoggedIn(true);
+      try {
+        const { data: prof } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("id", user.id)
+          .maybeSingle();
+        if (prof) {
+          setProfile(prof);
+          listenForChatRequests(user.id);
+          // Fetch existing pending requests
+          const { data: reqs } = await supabase
+            .from("chat_requests")
+            .select("*")
+            .eq("to_id", user.id)
+            .eq("status", "pending");
+          if (reqs) setChatRequests(reqs);
+        }
+      } catch (err) {
+        console.error("Identity check failure.");
+      }
+    },
+    [listenForChatRequests]
+  );
 
   const initApp = useCallback(async () => {
     setIsInitializing(true);
@@ -102,12 +112,8 @@ const App: React.FC = () => {
       const {
         data: { session },
       } = await supabase.auth.getSession();
-      if (session?.user) {
-        await checkUserStatus(session.user);
-      }
+      if (session?.user) await checkUserStatus(session.user);
       await fetchGlobalData();
-    } catch (e) {
-      console.error("Boot failure");
     } finally {
       setIsInitializing(false);
     }
@@ -121,90 +127,33 @@ const App: React.FC = () => {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === "SIGNED_IN" || event === "USER_UPDATED") {
-        if (session?.user) {
-          await checkUserStatus(session.user);
-          await fetchGlobalData();
-        }
+      if (event === "SIGNED_IN") {
+        if (session?.user) await checkUserStatus(session.user);
       } else if (event === "SIGNED_OUT") {
         setIsLoggedIn(false);
         setProfile(null);
-        setViewingProfile(null);
         setCurrentPage("home");
       }
     });
 
     return () => subscription.unsubscribe();
-  }, [initApp, checkUserStatus, fetchGlobalData]);
+  }, [initApp, checkUserStatus]);
 
   useEffect(() => {
     if (isDarkMode) document.documentElement.classList.add("dark");
     else document.documentElement.classList.remove("dark");
   }, [isDarkMode]);
 
-  const handleLogout = async () => {
-    try {
-      await supabase.auth.signOut();
-      setIsLoggedIn(false);
-      setProfile(null);
-      setViewingProfile(null);
-      setActiveArticle(null);
-      setEditingArticleData(null);
-      setCurrentPage("home");
-      toast.success("Identity Disconnected.");
-      setTimeout(() => (window.location.href = "/"), 100);
-    } catch (e) {
-      window.location.reload();
-    }
-  };
-
-  const handleNavigate = (page: string) => {
-    setViewingProfile(null);
-    setEditingArticleData(null);
-    setCurrentPage(page);
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  };
-
-  const handleInteraction = async (
-    type: "like" | "dislike",
-    articleId: string
-  ) => {
-    if (!isLoggedIn) return toast.error("Sign in to engage.");
-
-    const art = articles.find((a) => a.id === articleId);
-    if (!art) return;
-
-    const column = type === "like" ? "likes_count" : "dislikes_count";
-    const newVal = (art[column] || 0) + 1;
-
-    const { error } = await supabase
-      .from("articles")
-      .update({ [column]: newVal })
-      .eq("id", articleId);
-
-    if (!error) {
-      setArticles((prev) =>
-        prev.map((a) => (a.id === articleId ? { ...a, [column]: newVal } : a))
-      );
-      if (activeArticle?.id === articleId) {
-        setActiveArticle({ ...activeArticle, [column]: newVal });
-      }
-      toast.success(
-        type === "like" ? "Dispatch Supported" : "Dispatch Contested"
-      );
-    }
-  };
-
   const handleFollow = async (targetId: string) => {
-    if (!profile) return toast.error("Identity verification required.");
+    if (!profile) return toast.error("Sign in to follow.");
     const isFollowing = profile.following?.includes(targetId);
 
-    // 1. Update Current User Following Array
-    let newFollowing = isFollowing
+    // 1. Update following list
+    const newFollowing = isFollowing
       ? profile.following?.filter((id) => id !== targetId)
       : [...(profile.following || []), targetId];
 
-    const { error: followErr } = await supabase
+    const { error: pError } = await supabase
       .from("profiles")
       .update({
         following: newFollowing,
@@ -212,14 +161,14 @@ const App: React.FC = () => {
       })
       .eq("id", profile.id);
 
-    if (followErr) return toast.error("Sync Failure: Social Graph busy.");
+    if (pError) return toast.error("Sync Error");
 
-    // 2. Atomic Increment/Decrement for Target Followers
-    const targetUser = users.find((u) => u.id === targetId);
-    if (targetUser) {
+    // 2. Update target user's followers count
+    const target = users.find((u) => u.id === targetId);
+    if (target) {
       const newFollowersCount = isFollowing
-        ? (targetUser.followers_count || 1) - 1
-        : (targetUser.followers_count || 0) + 1;
+        ? (target.followers_count || 1) - 1
+        : (target.followers_count || 0) + 1;
       await supabase
         .from("profiles")
         .update({ followers_count: Math.max(0, newFollowersCount) })
@@ -231,8 +180,45 @@ const App: React.FC = () => {
       following: newFollowing,
       following_count: newFollowing.length,
     });
-    toast.success(isFollowing ? "Link Dissolved" : "Follower Link Locked");
-    await fetchGlobalData();
+    toast.success(isFollowing ? "Disconnected" : "Handshake Verified");
+    fetchGlobalData();
+  };
+
+  const handleChatInitiate = async (target: Profile) => {
+    if (!profile) return toast.error("Login to message.");
+    // Check if request already exists
+    const { data: existing } = await supabase
+      .from("chat_requests")
+      .select("*")
+      .or(
+        `and(from_id.eq.${profile.id},to_id.eq.${target.id}),and(from_id.eq.${target.id},to_id.eq.${profile.id})`
+      )
+      .maybeSingle();
+
+    if (existing?.status === "accepted") {
+      setActiveChat(target);
+    } else if (existing?.status === "pending") {
+      // Fix: replaced non-existent toast.info with base toast function
+      toast("Connection Pending Verification.");
+    } else {
+      const { error } = await supabase
+        .from("chat_requests")
+        .insert({ from_id: profile.id, to_id: target.id });
+      if (!error) toast.success("Access Request Transmitted.");
+    }
+  };
+
+  const handleAcceptRequest = async (req: ChatRequest) => {
+    const { error } = await supabase
+      .from("chat_requests")
+      .update({ status: "accepted" })
+      .eq("id", req.id);
+    if (!error) {
+      setChatRequests((prev) => prev.filter((r) => r.id !== req.id));
+      const sender = users.find((u) => u.id === req.from_id);
+      if (sender) setActiveChat(sender);
+      toast.success("Identity Verified. Channel Open.");
+    }
   };
 
   if (isInitializing) {
@@ -247,7 +233,7 @@ const App: React.FC = () => {
     <div
       className={`min-h-screen ${
         isDarkMode ? "dark bg-slate-950" : "bg-white"
-      } transition-colors duration-500`}
+      }`}
     >
       <Toaster position="bottom-center" />
 
@@ -273,81 +259,71 @@ const App: React.FC = () => {
       )}
 
       {!showAuth && (
-        <div className="relative flex flex-col min-h-screen">
+        <>
           <Navbar
-            onNavigate={handleNavigate}
+            onNavigate={setCurrentPage}
             onLogin={() => setShowAuth("login")}
-            onLogout={handleLogout}
+            onLogout={() => supabase.auth.signOut()}
             currentPage={currentPage}
             isLoggedIn={isLoggedIn}
             userRole={profile?.role || "user"}
             isDarkMode={isDarkMode}
             onToggleDarkMode={() => setIsDarkMode(!isDarkMode)}
             chatRequests={chatRequests}
-            onAcceptRequest={async () => {}}
+            onAcceptRequest={handleAcceptRequest}
             profileAvatar={profile?.avatar_url}
           />
 
-          <div className="flex-grow pt-24">
+          <div className="pt-24">
             {currentPage === "home" && (
               <HomePage
                 articles={articles}
                 isLoggedIn={isLoggedIn}
                 onLogin={() => setShowAuth("login")}
                 userRole={profile?.role || "user"}
-                onDelete={async (id) => {
-                  const { error } = await supabase
-                    .from("articles")
-                    .delete()
-                    .eq("id", id);
-                  if (!error) {
-                    toast.success("Dispatch Purged");
-                    fetchGlobalData();
-                  }
-                }}
+                onDelete={() => fetchGlobalData()}
                 onEdit={(a) => {
                   setEditingArticleData(a);
-                  handleNavigate("post");
+                  setCurrentPage("post");
                 }}
                 onReadArticle={setActiveArticle}
                 onRefresh={fetchGlobalData}
-                onInteraction={handleInteraction}
+                onInteraction={async (type, id) => {
+                  const art = articles.find((a) => a.id === id);
+                  if (!art) return;
+                  const col =
+                    type === "like" ? "likes_count" : "dislikes_count";
+                  const newVal = (art[col] || 0) + 1;
+                  await supabase
+                    .from("articles")
+                    .update({ [col]: newVal })
+                    .eq("id", id);
+                  fetchGlobalData();
+                }}
               />
             )}
 
             {currentPage === "post" && (
               <PostPage
                 editData={editingArticleData}
-                onBack={() => handleNavigate("home")}
-                onPublish={async (data) => {
-                  if (!profile) {
-                    toast.error("Forge Identity first.");
-                    handleNavigate("profile");
-                    return;
-                  }
+                onBack={() => setCurrentPage("home")}
+                onPublish={async (d) => {
                   const method = editingArticleData
                     ? supabase
                         .from("articles")
-                        .update(data)
+                        .update(d)
                         .eq("id", editingArticleData.id)
-                    : supabase.from("articles").insert({
-                        ...data,
-                        author_id: profile.id,
-                        author_name: profile.full_name,
-                        author_serial: profile.serial_id,
-                        likes_count: 0,
-                        dislikes_count: 0,
-                        comments_count: 0,
-                      });
-
-                  const { error } = await method;
-                  if (!error) {
-                    toast.success("Transmission Successful");
-                    await fetchGlobalData();
-                    handleNavigate("home");
-                  } else {
-                    toast.error(`Broadcast failed: ${error.message}`);
-                  }
+                    : supabase
+                        .from("articles")
+                        .insert({
+                          ...d,
+                          author_id: profile?.id,
+                          author_name: profile?.full_name,
+                          author_serial: profile?.serial_id,
+                        });
+                  await method;
+                  await fetchGlobalData();
+                  setCurrentPage("home");
                 }}
               />
             )}
@@ -357,60 +333,47 @@ const App: React.FC = () => {
                 profile ? (
                   <ProfilePage
                     profile={viewingProfile || profile}
-                    onLogout={handleLogout}
+                    onLogout={() => supabase.auth.signOut()}
                     isExternal={!!viewingProfile}
-                    initialTab={
-                      currentPage === "settings" ? "settings" : "intel"
-                    }
                     onCloseExternal={() => {
                       setViewingProfile(null);
-                      handleNavigate("home");
+                      setCurrentPage("home");
                     }}
                     isLoggedIn={isLoggedIn}
                     currentUserId={profile.id}
                     currentUserProfile={profile}
-                    onUpdateProfile={async (data) => {
-                      const { error } = await supabase
-                        .from("profiles")
-                        .update(data)
-                        .eq("id", profile.id);
-                      if (!error) {
-                        setProfile({ ...profile, ...data });
-                        toast.success("Identity Synced");
-                        fetchGlobalData();
-                      }
-                    }}
                     onFollow={handleFollow}
-                    onChat={(u) => setActiveChat(u)}
+                    onChat={handleChatInitiate}
+                    onUpdateProfile={async (d) => {
+                      await supabase
+                        .from("profiles")
+                        .update(d)
+                        .eq("id", profile.id);
+                      fetchGlobalData();
+                    }}
                   />
                 ) : (
                   <SetupProfilePage
-                    onComplete={async (data) => {
-                      const { error } = await supabase
-                        .from("profiles")
-                        .upsert(data);
-                      if (!error) {
-                        setProfile(data);
-                        await fetchGlobalData();
-                        toast.success("Identity Forged");
-                      }
+                    onComplete={async (d) => {
+                      await supabase.from("profiles").upsert(d);
+                      fetchGlobalData();
                     }}
                   />
                 )
               ) : (
-                <div className="flex flex-col items-center justify-center py-40">
+                <div className="py-40 text-center">
                   <button
                     onClick={() => setShowAuth("login")}
-                    className="px-12 py-4 bg-slate-950 dark:bg-white text-white dark:text-slate-950 rounded-xl font-bold uppercase tracking-widest text-[10px]"
+                    className="px-8 py-3 text-white bg-slate-900 rounded-xl"
                   >
-                    Identify to Continue
+                    Identify First
                   </button>
                 </div>
               ))}
 
             {currentPage === "network" && (
               <NetworkPage
-                onBack={() => handleNavigate("home")}
+                onBack={() => setCurrentPage("home")}
                 users={users}
                 currentUserId={profile?.id}
                 currentUserProfile={profile}
@@ -418,35 +381,18 @@ const App: React.FC = () => {
                   setViewingProfile(u);
                   setCurrentPage("profile");
                 }}
-                onChat={(u) => setActiveChat(u)}
+                onChat={handleChatInitiate}
                 onRefresh={fetchGlobalData}
                 onFollow={handleFollow}
               />
             )}
-
-            {currentPage === "support" && (
-              <SupportPage onBack={() => handleNavigate("home")} />
-            )}
-            {currentPage === "admin" && profile?.role === "admin" && (
-              <AdminPage
-                articles={articles}
-                users={users}
-                currentUserId={profile.id}
-                onUpdateArticles={fetchGlobalData}
-                onUpdateUsers={fetchGlobalData}
-                onLogout={handleLogout}
-              />
-            )}
           </div>
 
-          <TrendingTicker />
-          <Footer nodeCount={nodeCount} onNavigate={handleNavigate} />
           {activeArticle && (
             <ArticleDetail
               article={activeArticle}
               onClose={() => setActiveArticle(null)}
               isLoggedIn={isLoggedIn}
-              onInteraction={handleInteraction}
               currentUserId={profile?.id}
               currentUserProfile={profile}
               onUpdateArticles={fetchGlobalData}
@@ -457,11 +403,11 @@ const App: React.FC = () => {
               recipient={activeChat}
               currentUserId={profile?.id || ""}
               onClose={() => setActiveChat(null)}
-              messages={chatMessages}
-              onSendMessage={() => {}}
             />
           )}
-        </div>
+          <TrendingTicker />
+          <Footer onNavigate={setCurrentPage} />
+        </>
       )}
     </div>
   );
