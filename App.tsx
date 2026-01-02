@@ -39,168 +39,134 @@ const App: React.FC = () => {
 
   const fetchGlobalData = useCallback(async () => {
     try {
-      const { data: artData } = await supabase
-        .from("articles")
-        .select("*")
-        .order("created_at", { ascending: false });
-      const { data: userData } = await supabase.from("profiles").select("*");
-      if (artData) setArticles(artData);
-      if (userData) setUsers(userData);
+      const [artRes, userRes] = await Promise.all([
+        supabase
+          .from("articles")
+          .select("*")
+          .order("created_at", { ascending: false }),
+        supabase
+          .from("profiles")
+          .select("*")
+          .order("full_name", { ascending: true }),
+      ]);
+
+      if (artRes.error) throw artRes.error;
+      if (userRes.error) throw userRes.error;
+
+      setArticles(artRes.data || []);
+      setUsers(userRes.data || []);
+
+      return { articles: artRes.data, users: userRes.data };
     } catch (e) {
-      console.warn("Background Sync: Data fetch skipped (check network/keys).");
+      console.error("Fetch Error:", e);
+      toast.error("Network sync failure. Retry recommended.");
     }
   }, []);
 
   const fetchMyProfile = useCallback(async (userId: string) => {
     try {
-      const { data: prof, error } = await supabase
+      const { data, error } = await supabase
         .from("profiles")
         .select("*")
         .eq("id", userId)
         .maybeSingle();
-      if (prof && !error) {
-        setProfile(prof);
-        return prof;
+      if (error) throw error;
+      if (data) {
+        setProfile(data);
+        return data;
       }
     } catch (e) {
-      console.warn("Profile background sync skipped.");
+      console.warn("Profile fetch error:", e);
     }
     return null;
   }, []);
 
-  const listenForChatRequests = useCallback((userId: string) => {
-    try {
-      const channel = supabase
-        .channel("chat_notifications_global")
-        .on(
-          "postgres_changes",
-          {
-            event: "INSERT",
-            schema: "public",
-            table: "chat_requests",
-            filter: `to_id=eq.${userId}`,
-          },
-          (payload) => {
-            const newReq = payload.new as ChatRequest;
-            setChatRequests((prev) =>
-              prev.find((r) => r.id === newReq.id) ? prev : [...prev, newReq]
-            );
-            toast("📡 New Secure Handshake Received");
-          }
-        )
-        .subscribe();
-      return () => {
-        supabase.removeChannel(channel);
-      };
-    } catch (e) {
-      console.error("Realtime communications disabled.");
-    }
-  }, []);
-
-  const checkUserStatus = useCallback(
+  const syncIdentity = useCallback(
     async (user: any) => {
-      if (!user) {
-        setIsLoggedIn(false);
-        setProfile(null);
-        return;
-      }
+      if (!user) return;
       setIsLoggedIn(true);
-      try {
-        await fetchMyProfile(user.id);
-        listenForChatRequests(user.id);
+      const myProf = await fetchMyProfile(user.id);
+      if (myProf) {
+        // Realtime handshake listener
+        supabase
+          .channel(`chat_notifications_${user.id}`)
+          .on(
+            "postgres_changes",
+            {
+              event: "INSERT",
+              schema: "public",
+              table: "chat_requests",
+              filter: `to_id=eq.${user.id}`,
+            },
+            (payload) => {
+              setChatRequests((prev) => [...prev, payload.new as ChatRequest]);
+              toast("Secure handshake received", { icon: "🤝" });
+            }
+          )
+          .subscribe();
+
         const { data: reqs } = await supabase
           .from("chat_requests")
           .select("*")
           .eq("to_id", user.id)
           .eq("status", "pending");
         if (reqs) setChatRequests(reqs);
-      } catch (err) {
-        console.warn("Identity context re-syncing...");
       }
+      await fetchGlobalData();
     },
-    [listenForChatRequests, fetchMyProfile]
+    [fetchMyProfile, fetchGlobalData]
   );
-
-  const initApp = useCallback(async () => {
-    try {
-      const [
-        {
-          data: { session },
-        },
-      ] = await Promise.all([supabase.auth.getSession(), fetchGlobalData()]);
-
-      if (session?.user) {
-        await checkUserStatus(session.user);
-      }
-    } catch (e) {
-      console.log("App initialized in offline/guest mode.");
-    }
-  }, [fetchGlobalData, checkUserStatus]);
-
-  const handleLogout = async () => {
-    try {
-      await supabase.auth.signOut();
-      // Force immediate UI update
-      setIsLoggedIn(false);
-      setProfile(null);
-      setChatRequests([]);
-      setActiveChat(null);
-      setCurrentPage("home");
-      toast.success("Disconnected from Network");
-    } catch (e) {
-      console.error("Logout error", e);
-      toast.error("Logout failed.");
-    }
-  };
 
   useEffect(() => {
     if (initializationInProgress.current) return;
     initializationInProgress.current = true;
 
-    initApp();
+    const init = async () => {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      await fetchGlobalData();
+      if (session?.user) await syncIdentity(session.user);
+    };
+    init();
 
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
-        if (session?.user) await checkUserStatus(session.user);
+      if (event === "SIGNED_IN" && session?.user) {
+        await syncIdentity(session.user);
       } else if (event === "SIGNED_OUT") {
         setIsLoggedIn(false);
         setProfile(null);
+        setArticles([]); // Clear specific cache
         setChatRequests([]);
+        setActiveChat(null);
         setCurrentPage("home");
       }
     });
 
     return () => subscription.unsubscribe();
-  }, [initApp, checkUserStatus]);
+  }, [syncIdentity, fetchGlobalData]);
+
+  const handleLogout = async () => {
+    try {
+      await supabase.auth.signOut();
+      localStorage.clear();
+      setIsLoggedIn(false);
+      setProfile(null);
+      setChatRequests([]);
+      setActiveChat(null);
+      setCurrentPage("home");
+      toast.success("Identity Terminal Disconnected.");
+    } catch (e) {
+      toast.error("Logout failure.");
+    }
+  };
 
   useEffect(() => {
     if (isDarkMode) document.documentElement.classList.add("dark");
     else document.documentElement.classList.remove("dark");
   }, [isDarkMode]);
-
-  const handleChatInitiate = async (target: Profile) => {
-    if (!profile) return toast.error("Identity verification required.");
-    const { data: existing } = await supabase
-      .from("chat_requests")
-      .select("*")
-      .or(
-        `and(from_id.eq.${profile.id},to_id.eq.${target.id}),and(from_id.eq.${target.id},to_id.eq.${profile.id})`
-      )
-      .maybeSingle();
-
-    if (existing?.status === "accepted") {
-      setActiveChat(target);
-    } else if (existing?.status === "pending") {
-      toast("Handshake Pending.");
-    } else {
-      const { error } = await supabase
-        .from("chat_requests")
-        .insert({ from_id: profile.id, to_id: target.id, status: "pending" });
-      if (!error) toast.success("Handshake Dispatched.");
-    }
-  };
 
   const handleAcceptRequest = async (req: ChatRequest) => {
     const { error } = await supabase
@@ -228,7 +194,7 @@ const App: React.FC = () => {
           onBack={() => setShowAuth(null)}
           onSuccess={(u) => {
             setShowAuth(null);
-            checkUserStatus(u);
+            syncIdentity(u);
           }}
           onGoToRegister={() => setShowAuth("register")}
         />
@@ -238,7 +204,7 @@ const App: React.FC = () => {
           onBack={() => setShowAuth(null)}
           onSuccess={(u) => {
             setShowAuth(null);
-            checkUserStatus(u);
+            syncIdentity(u);
           }}
           onGoToLogin={() => setShowAuth("login")}
         />
@@ -274,19 +240,6 @@ const App: React.FC = () => {
                 }}
                 onReadArticle={setActiveArticle}
                 onRefresh={fetchGlobalData}
-                onInteraction={async (type, id) => {
-                  if (!isLoggedIn) return toast.error("Verification required.");
-                  const col =
-                    type === "like" ? "likes_count" : "dislikes_count";
-                  const targetArt = articles.find((a) => a.id === id);
-                  if (targetArt) {
-                    await supabase
-                      .from("articles")
-                      .update({ [col]: ((targetArt as any)[col] || 0) + 1 })
-                      .eq("id", id);
-                    fetchGlobalData();
-                  }
-                }}
               />
             )}
 
@@ -296,6 +249,7 @@ const App: React.FC = () => {
                 editData={editingArticleData}
                 onBack={() => setCurrentPage("home")}
                 onPublish={async (d) => {
+                  if (!profile) return;
                   const method = editingArticleData
                     ? supabase
                         .from("articles")
@@ -305,13 +259,19 @@ const App: React.FC = () => {
                         .from("articles")
                         .insert({
                           ...d,
-                          author_id: profile?.id,
-                          author_name: profile?.full_name,
-                          author_serial: profile?.serial_id,
+                          author_id: profile.id,
+                          author_name: profile.full_name,
+                          author_serial: profile.serial_id,
                         });
-                  await method;
+
+                  const { error } = await method;
+                  if (error) {
+                    toast.error("Dispatch Failed.");
+                    return;
+                  }
                   await fetchGlobalData();
                   setCurrentPage("home");
+                  toast.success("Dispatch Published.");
                 }}
               />
             )}
@@ -330,20 +290,36 @@ const App: React.FC = () => {
                     isLoggedIn={isLoggedIn}
                     currentUserId={profile.id}
                     currentUserProfile={profile}
-                    onChat={handleChatInitiate}
                     onUpdateProfile={async (d) => {
-                      await supabase
+                      const { error } = await supabase
                         .from("profiles")
                         .update(d)
                         .eq("id", profile.id);
-                      fetchGlobalData();
+                      if (error) toast.error("Identity update failure.");
+                      else {
+                        toast.success("Identity Updated.");
+                        fetchMyProfile(profile.id);
+                        fetchGlobalData();
+                      }
                     }}
                   />
                 ) : (
                   <SetupProfilePage
                     onComplete={async (d) => {
-                      await supabase.from("profiles").upsert(d);
-                      fetchGlobalData();
+                      const { error } = await supabase
+                        .from("profiles")
+                        .upsert(d);
+                      if (error) {
+                        toast.error(
+                          "Database conflict: Failed to establish identity."
+                        );
+                        return;
+                      }
+                      setProfile(d);
+                      setIsLoggedIn(true);
+                      toast.success("Identity Established.");
+                      await fetchGlobalData();
+                      setCurrentPage("home");
                     }}
                   />
                 )
@@ -351,7 +327,7 @@ const App: React.FC = () => {
                 <div className="py-40 text-center">
                   <button
                     onClick={() => setShowAuth("login")}
-                    className="px-8 py-3 font-bold text-white bg-slate-900 rounded-xl"
+                    className="px-8 py-3 bg-slate-900 text-white rounded-xl font-bold uppercase text-[10px] tracking-widest"
                   >
                     IDENTITY REQUIRED
                   </button>
@@ -368,7 +344,9 @@ const App: React.FC = () => {
                   setViewingProfile(u);
                   setCurrentPage("profile");
                 }}
-                onChat={handleChatInitiate}
+                onChat={(u) => {
+                  setActiveChat(u);
+                }}
                 onRefresh={fetchGlobalData}
               />
             )}

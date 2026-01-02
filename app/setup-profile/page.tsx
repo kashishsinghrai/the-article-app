@@ -25,29 +25,7 @@ const SetupProfilePage: React.FC<SetupProfilePageProps> = ({ onComplete }) => {
   const [avatar, setAvatar] = useState("");
   const [loading, setLoading] = useState(false);
   const [isEncoding, setIsEncoding] = useState(false);
-  const [authData, setAuthData] = useState<{
-    id?: string;
-    email?: string;
-    phone?: string;
-  }>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    const fetchAuth = async () => {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      const user = session?.user;
-      if (user) {
-        setAuthData({
-          id: user.id,
-          email: user.email,
-          phone: user.user_metadata?.phone || user.phone,
-        });
-      }
-    };
-    fetchAuth();
-  }, []);
 
   const handleAvatarUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -74,22 +52,20 @@ const SetupProfilePage: React.FC<SetupProfilePageProps> = ({ onComplete }) => {
 
     setLoading(true);
     try {
-      let currentId = authData.id;
-      if (!currentId) {
-        const {
-          data: { session },
-        } = await supabase.auth.getSession();
-        currentId = session?.user?.id;
-      }
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      const currentId = session?.user?.id;
 
       if (!currentId) {
-        toast.error("Auth session expired.");
+        toast.error(
+          "Critical: Identity verification failed. Re-login required."
+        );
         setLoading(false);
         return;
       }
 
-      // Fix: Removed 'following', 'followers_count', and 'following_count' as they are not defined in the Profile type
-      const profile: Profile = {
+      const profileData: Profile = {
         id: currentId,
         full_name: name.trim(),
         username: username.toLowerCase().trim().replace(/\s/g, "_"),
@@ -100,10 +76,9 @@ const SetupProfilePage: React.FC<SetupProfilePageProps> = ({ onComplete }) => {
         role: "user",
         is_private: false,
         bio:
-          bio.trim() ||
-          "Professional correspondent for the ThE-ARTICLES Global Network.",
-        email: authData.email || "",
-        phone: authData.phone || "",
+          bio.trim() || "Verified correspondent for the ThE-ARTICLES Network.",
+        email: session?.user?.email || "",
+        phone: session?.user?.user_metadata?.phone || "",
         is_online: true,
         settings: {
           notifications_enabled: true,
@@ -119,9 +94,10 @@ const SetupProfilePage: React.FC<SetupProfilePageProps> = ({ onComplete }) => {
         },
       };
 
-      await onComplete(profile);
+      await onComplete(profileData);
     } catch (err) {
-      toast.error("Critical failure in identity forge.");
+      console.error(err);
+      toast.error("Establishment Protocol Failed.");
     } finally {
       setLoading(false);
     }
