@@ -1,0 +1,38 @@
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body { 
+    @apply bg-white text-slate-900 transition-colors duration-200 antialiased; 
+    font-family: 'Inter', sans-serif;
+    overflow-x: hidden;
+  }
+  .dark body { @apply bg-[#000000] text-slate-100; }
+  
+  .goog-te-banner-frame, .goog-te-gadget-icon, .goog-te-banner, .goog-te-spinner-pos { display: none !important; }
+  .goog-te-gadget-simple { background-color: transparent !important; border: none !important; padding: 0 !important; }
+  #google_translate_element { position: absolute; left: -9999px; top: -9999px; visibility: hidden; }
+  iframe.skiptranslate { display: none !important; }
+  body { top: 0px !important; }
+
+  .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+  .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+  .custom-scrollbar::-webkit-scrollbar-thumb { @apply bg-slate-200; border-radius: 10px; }
+  .dark .custom-scrollbar::-webkit-scrollbar-thumb { @apply bg-slate-800; }
+}
+
+@layer components {
+  .btn-minimal {
+    @apply px-5 py-2.5 rounded-lg text-[11px] font-semibold uppercase tracking-wider transition-all border;
+  }
+  .card-minimal {
+    @apply bg-white dark:bg-slate-950 border border-slate-100 dark:border-slate-800 rounded-2xl;
+  }
+}
+
+@keyframes ticker {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}

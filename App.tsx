@@ -16,13 +16,11 @@ import SetupProfilePage from "./app/setup-profile/page";
 import { Profile, Article, ChatRequest } from "./types";
 import { Toaster, toast } from "react-hot-toast";
 import { supabase } from "./lib/supabase";
-import { Loader2 } from "lucide-react";
 
 const App: React.FC = () => {
   const [currentPage, setCurrentPage] = useState("home");
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [showAuth, setShowAuth] = useState<"login" | "register" | null>(null);
-  const [isInitializing, setIsInitializing] = useState(true);
   const [viewingProfile, setViewingProfile] = useState<Profile | null>(null);
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [activeArticle, setActiveArticle] = useState<Article | null>(null);
@@ -46,67 +44,57 @@ const App: React.FC = () => {
         .select("*")
         .order("created_at", { ascending: false });
       const { data: userData } = await supabase.from("profiles").select("*");
-      if (artData) setArticles(artData || []);
-      if (userData) setUsers(userData || []);
+      if (artData) setArticles(artData);
+      if (userData) setUsers(userData);
     } catch (e) {
-      console.error("Hydration Error");
+      console.warn("Background Sync: Data fetch skipped (check network/keys).");
     }
   }, []);
 
   const fetchMyProfile = useCallback(async (userId: string) => {
-    const { data: prof, error } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("id", userId)
-      .maybeSingle();
-    if (prof && !error) {
-      setProfile(prof);
-      return prof;
+    try {
+      const { data: prof, error } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", userId)
+        .maybeSingle();
+      if (prof && !error) {
+        setProfile(prof);
+        return prof;
+      }
+    } catch (e) {
+      console.warn("Profile background sync skipped.");
     }
     return null;
   }, []);
 
   const listenForChatRequests = useCallback((userId: string) => {
-    const channel = supabase
-      .channel("chat_notifications_global")
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "chat_requests",
-          filter: `to_id=eq.${userId}`,
-        },
-        (payload) => {
-          const newReq = payload.new as ChatRequest;
-          setChatRequests((prev) => {
-            if (prev.find((r) => r.id === newReq.id)) return prev;
-            return [...prev, newReq];
-          });
-          toast("📡 New Secure Handshake Request Received");
-        }
-      )
-      .on(
-        "postgres_changes",
-        {
-          event: "UPDATE",
-          schema: "public",
-          table: "chat_requests",
-          filter: `to_id=eq.${userId}`,
-        },
-        (payload) => {
-          const updatedReq = payload.new as ChatRequest;
-          if (updatedReq.status !== "pending") {
+    try {
+      const channel = supabase
+        .channel("chat_notifications_global")
+        .on(
+          "postgres_changes",
+          {
+            event: "INSERT",
+            schema: "public",
+            table: "chat_requests",
+            filter: `to_id=eq.${userId}`,
+          },
+          (payload) => {
+            const newReq = payload.new as ChatRequest;
             setChatRequests((prev) =>
-              prev.filter((r) => r.id !== updatedReq.id)
+              prev.find((r) => r.id === newReq.id) ? prev : [...prev, newReq]
             );
+            toast("📡 New Secure Handshake Received");
           }
-        }
-      )
-      .subscribe();
-    return () => {
-      supabase.removeChannel(channel);
-    };
+        )
+        .subscribe();
+      return () => {
+        supabase.removeChannel(channel);
+      };
+    } catch (e) {
+      console.error("Realtime communications disabled.");
+    }
   }, []);
 
   const checkUserStatus = useCallback(
@@ -120,7 +108,6 @@ const App: React.FC = () => {
       try {
         await fetchMyProfile(user.id);
         listenForChatRequests(user.id);
-
         const { data: reqs } = await supabase
           .from("chat_requests")
           .select("*")
@@ -128,28 +115,34 @@ const App: React.FC = () => {
           .eq("status", "pending");
         if (reqs) setChatRequests(reqs);
       } catch (err) {
-        console.error("Identity sync failure.");
+        console.warn("Identity context re-syncing...");
       }
     },
     [listenForChatRequests, fetchMyProfile]
   );
 
   const initApp = useCallback(async () => {
-    setIsInitializing(true);
     try {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      if (session?.user) await checkUserStatus(session.user);
-      await fetchGlobalData();
-    } finally {
-      setIsInitializing(false);
+      // Run auth and data check in parallel
+      const [
+        {
+          data: { session },
+        },
+      ] = await Promise.all([supabase.auth.getSession(), fetchGlobalData()]);
+
+      if (session?.user) {
+        await checkUserStatus(session.user);
+      }
+    } catch (e) {
+      console.log("App initialized in offline/guest mode.");
     }
   }, [fetchGlobalData, checkUserStatus]);
 
   useEffect(() => {
     if (initializationInProgress.current) return;
     initializationInProgress.current = true;
+
+    // Silent Initialization
     initApp();
 
     const {
@@ -174,8 +167,7 @@ const App: React.FC = () => {
   }, [isDarkMode]);
 
   const handleChatInitiate = async (target: Profile) => {
-    if (!profile) return toast.error("Auth required.");
-
+    if (!profile) return toast.error("Identity verification required.");
     const { data: existing } = await supabase
       .from("chat_requests")
       .select("*")
@@ -187,13 +179,12 @@ const App: React.FC = () => {
     if (existing?.status === "accepted") {
       setActiveChat(target);
     } else if (existing?.status === "pending") {
-      toast("Channel Handshake Pending Verification.");
+      toast("Handshake Pending.");
     } else {
       const { error } = await supabase
         .from("chat_requests")
         .insert({ from_id: profile.id, to_id: target.id, status: "pending" });
-      if (!error) toast.success("Secure Handshake Dispatched.");
-      else toast.error("Channel Establishment Failed.");
+      if (!error) toast.success("Handshake Dispatched.");
     }
   };
 
@@ -206,17 +197,9 @@ const App: React.FC = () => {
       setChatRequests((prev) => prev.filter((r) => r.id !== req.id));
       const sender = users.find((u) => u.id === req.from_id);
       if (sender) setActiveChat(sender);
-      toast.success("Identity Verified. Comm Link: ACTIVE.");
+      toast.success("Identity Verified.");
     }
   };
-
-  if (isInitializing) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-white dark:bg-slate-950">
-        <Loader2 className="text-blue-600 animate-spin" size={32} />
-      </div>
-    );
-  }
 
   return (
     <div
@@ -278,18 +261,17 @@ const App: React.FC = () => {
                 onReadArticle={setActiveArticle}
                 onRefresh={fetchGlobalData}
                 onInteraction={async (type, id) => {
-                  if (!isLoggedIn)
-                    return toast.error("Identity verification required.");
-                  const art = articles.find((a) => a.id === id);
-                  if (!art) return;
+                  if (!isLoggedIn) return toast.error("Verification required.");
                   const col =
                     type === "like" ? "likes_count" : "dislikes_count";
-                  const newVal = (art[col] || 0) + 1;
-                  await supabase
-                    .from("articles")
-                    .update({ [col]: newVal })
-                    .eq("id", id);
-                  fetchGlobalData();
+                  const targetArt = articles.find((a) => a.id === id);
+                  if (targetArt) {
+                    await supabase
+                      .from("articles")
+                      .update({ [col]: ((targetArt as any)[col] || 0) + 1 })
+                      .eq("id", id);
+                    fetchGlobalData();
+                  }
                 }}
               />
             )}

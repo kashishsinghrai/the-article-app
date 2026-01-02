@@ -30,15 +30,19 @@ const AiAssistant: React.FC<AiAssistantProps> = ({
   const lastAnalysisTime = useRef(0);
 
   const runAnalysis = async () => {
+    const apiKey =
+      (typeof process !== "undefined" && process.env?.API_KEY) ||
+      (import.meta as any).env?.VITE_API_KEY;
+
     if (!currentHeadline.trim() || currentContent.length < 100) return;
     if (Date.now() - lastAnalysisTime.current < 30000) return;
 
     setLoading(true);
     setError(null);
     try {
-      if (!process.env.API_KEY) throw new Error("Key Missing");
+      if (!apiKey) throw new Error("Key Missing");
 
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      const ai = new GoogleGenAI({ apiKey });
       const response = await ai.models.generateContent({
         model: "gemini-3-pro-preview",
         contents: `Act as a senior editor. Analyze report:
@@ -63,11 +67,13 @@ const AiAssistant: React.FC<AiAssistantProps> = ({
         },
       });
 
-      const data = JSON.parse(response.text || "{}");
+      const text = response.text || "{}";
+      const data = JSON.parse(text);
       setAnalysis(data);
       lastAnalysisTime.current = Date.now();
     } catch (err: any) {
-      setError("Network busy. Please retry later.");
+      console.error(err);
+      setError("AI Insights temporarily unavailable.");
     } finally {
       setLoading(false);
     }
@@ -84,7 +90,7 @@ const AiAssistant: React.FC<AiAssistantProps> = ({
 
   return (
     <div className="sticky top-32 glass dark:bg-slate-900/40 rounded-[3rem] p-10 border border-blue-100 dark:border-blue-900/30 shadow-2xl space-y-10 animate-in fade-in slide-in-from-right-10 duration-700">
-      <div className="flex justify-between items-center border-b border-blue-50 dark:border-blue-900/20 pb-6">
+      <div className="flex items-center justify-between pb-6 border-b border-blue-50 dark:border-blue-900/20">
         <div className="flex items-center gap-3">
           <div
             className={`p-2 rounded-xl text-white shadow-lg ${
@@ -102,16 +108,16 @@ const AiAssistant: React.FC<AiAssistantProps> = ({
                 error ? "text-amber-500" : "text-slate-400"
               }`}
             >
-              {error ? "NETWORK BUSY" : "READY TO ANALYSE"}
+              {error ? "NETWORK BUSY" : "READY"}
             </p>
           </div>
         </div>
       </div>
 
       {error && (
-        <div className="py-8 text-center animate-in zoom-in duration-300">
+        <div className="py-8 text-center">
           <div className="bg-amber-50 dark:bg-amber-950/30 p-6 rounded-[2rem] border border-amber-100 dark:border-amber-900/40">
-            <p className="text-[10px] font-black uppercase tracking-widest text-amber-600 leading-relaxed">
+            <p className="text-[10px] font-black uppercase tracking-widest text-amber-600">
               {error}
             </p>
           </div>
@@ -119,8 +125,8 @@ const AiAssistant: React.FC<AiAssistantProps> = ({
       )}
 
       {!analysis && !loading && !error && (
-        <div className="py-20 text-center space-y-4 opacity-30">
-          <Zap size={32} className="text-slate-300 mx-auto" />
+        <div className="py-20 space-y-4 text-center opacity-30">
+          <Zap size={32} className="mx-auto text-slate-300" />
           <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">
             WAITING FOR CONTENT...
           </p>
@@ -128,25 +134,25 @@ const AiAssistant: React.FC<AiAssistantProps> = ({
       )}
 
       {analysis && !error && (
-        <div className="space-y-10 animate-in fade-in duration-500">
+        <div className="space-y-10 duration-500 animate-in fade-in">
           <div className="space-y-3">
             <label className="text-[9px] font-black uppercase tracking-widest text-blue-600">
               EDITORIAL BRIEF
             </label>
-            <p className="text-xs font-bold text-slate-600 dark:text-slate-400 leading-relaxed uppercase tracking-tight italic">
+            <p className="text-xs italic font-bold leading-relaxed tracking-tight uppercase text-slate-600 dark:text-slate-400">
               "{analysis.field_context}"
             </p>
           </div>
 
           <div className="space-y-4">
             <label className="text-[9px] font-black uppercase tracking-widest text-blue-600">
-              VERIFICATION STEPS
+              VERIFICATION
             </label>
             <ul className="space-y-3">
               {analysis.verification_tips.map((tip, i) => (
                 <li
                   key={i}
-                  className="flex gap-3 items-start bg-slate-50 dark:bg-white/5 p-4 rounded-2xl border border-slate-100 dark:border-white/5"
+                  className="flex items-start gap-3 p-4 bg-slate-50 dark:bg-white/5 rounded-2xl"
                 >
                   <ShieldCheck size={12} className="text-emerald-500 mt-0.5" />
                   <span className="text-[10px] font-bold text-slate-500 uppercase tracking-tight">
@@ -157,10 +163,10 @@ const AiAssistant: React.FC<AiAssistantProps> = ({
             </ul>
           </div>
 
-          <div className="space-y-4 pt-6 border-t border-blue-50 dark:border-blue-900/20">
-            <div className="flex justify-between items-center">
+          <div className="pt-6 space-y-4 border-t border-blue-50 dark:border-blue-900/20">
+            <div className="flex items-center justify-between">
               <label className="text-[9px] font-black uppercase tracking-widest text-slate-400">
-                SUBJECTIVITY SCORE
+                SUBJECTIVITY
               </label>
               <span
                 className={`text-[10px] font-black ${
@@ -181,7 +187,11 @@ const AiAssistant: React.FC<AiAssistantProps> = ({
         disabled={loading}
         className="w-full py-4 rounded-2xl bg-blue-50 dark:bg-blue-900/20 text-blue-600 text-[9px] font-black uppercase tracking-widest hover:bg-blue-600 hover:text-white transition-all border border-blue-100"
       >
-        {loading ? "PROCESSING..." : "REFRESH INSIGHTS"}
+        {loading ? (
+          <Loader2 className="m-auto animate-spin" size={14} />
+        ) : (
+          "REFRESH INSIGHTS"
+        )}
       </button>
     </div>
   );
