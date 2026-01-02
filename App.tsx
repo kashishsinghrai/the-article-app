@@ -84,13 +84,26 @@ const App: React.FC = () => {
     }
   };
 
+  const handleLogoutProtocol = async () => {
+    try {
+      await logout();
+      setCurrentPage("home");
+      toast.success("Identity Node Disconnected.");
+    } catch (e) {
+      toast.error("Protocol Breach during disconnection.");
+    }
+  };
+
   if (!isInitialized) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-white dark:bg-slate-950">
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-12 h-12 border-4 border-blue-600 rounded-full border-t-transparent animate-spin" />
-          <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">
-            Synchronizing Global Node...
+        <div className="flex flex-col items-center gap-6">
+          <div className="relative">
+            <div className="absolute inset-0 w-16 h-16 border-2 rounded-full border-slate-100 dark:border-slate-800 animate-ping" />
+            <div className="relative z-10 w-16 h-16 border-t-4 border-blue-600 rounded-full animate-spin" />
+          </div>
+          <p className="text-[11px] font-black uppercase tracking-[0.4em] text-slate-400 italic">
+            Synchronizing Global Node Registry...
           </p>
         </div>
       </div>
@@ -125,7 +138,7 @@ const App: React.FC = () => {
           <Navbar
             onNavigate={setCurrentPage}
             onLogin={() => setShowAuth("login")}
-            onLogout={logout}
+            onLogout={handleLogoutProtocol}
             currentPage={currentPage}
             isLoggedIn={isLoggedIn}
             userRole={profile?.role || "user"}
@@ -195,7 +208,7 @@ const App: React.FC = () => {
                 profile ? (
                   <ProfilePage
                     profile={viewingProfile || profile}
-                    onLogout={logout}
+                    onLogout={handleLogoutProtocol}
                     isExternal={!!viewingProfile}
                     onCloseExternal={() => {
                       setViewingProfile(null);
@@ -236,7 +249,7 @@ const App: React.FC = () => {
                 <div className="py-40 text-center">
                   <button
                     onClick={() => setShowAuth("login")}
-                    className="px-8 py-3 bg-slate-900 text-white rounded-xl font-bold uppercase text-[10px] tracking-widest"
+                    className="px-10 py-4 bg-slate-950 dark:bg-white text-white dark:text-slate-950 rounded-2xl font-black uppercase text-[11px] tracking-[0.3em] shadow-xl"
                   >
                     IDENTITY REQUIRED
                   </button>
@@ -270,7 +283,7 @@ const App: React.FC = () => {
                 currentUserId={profile.id}
                 onUpdateArticles={syncAll}
                 onUpdateUsers={syncAll}
-                onLogout={logout}
+                onLogout={handleLogoutProtocol}
               />
             )}
           </div>
