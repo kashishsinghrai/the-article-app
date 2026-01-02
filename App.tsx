@@ -173,50 +173,6 @@ const App: React.FC = () => {
     else document.documentElement.classList.remove("dark");
   }, [isDarkMode]);
 
-  const handleFollow = async (targetId: string) => {
-    if (!profile) return toast.error("Sign in to link identities.");
-
-    const currentFollowing: string[] = profile.following || [];
-    const isFollowing = currentFollowing.includes(targetId);
-
-    // Explicitly typed as string array to prevent TS18048
-    const newFollowing: string[] = isFollowing
-      ? currentFollowing.filter((id) => id !== targetId)
-      : [...currentFollowing, targetId];
-
-    // 1. Update MY following list
-    const { error: pError } = await supabase
-      .from("profiles")
-      .update({
-        following: newFollowing,
-        following_count: newFollowing.length,
-      })
-      .eq("id", profile.id);
-
-    if (pError) return toast.error("Social sync failed.");
-
-    // 2. Update TARGET's followers count
-    const targetUser = users.find((u) => u.id === targetId);
-    if (targetUser) {
-      const currentFollowers = targetUser.followers_count || 0;
-      const newFollowersCount = isFollowing
-        ? Math.max(0, currentFollowers - 1)
-        : currentFollowers + 1;
-      await supabase
-        .from("profiles")
-        .update({ followers_count: newFollowersCount })
-        .eq("id", targetId);
-    }
-
-    toast.success(
-      isFollowing ? "Identity Unlinked" : "Node Connection Secured"
-    );
-
-    // Forced Refetch
-    await fetchMyProfile(profile.id);
-    await fetchGlobalData();
-  };
-
   const handleChatInitiate = async (target: Profile) => {
     if (!profile) return toast.error("Auth required.");
 
@@ -378,7 +334,6 @@ const App: React.FC = () => {
                     isLoggedIn={isLoggedIn}
                     currentUserId={profile.id}
                     currentUserProfile={profile}
-                    onFollow={handleFollow}
                     onChat={handleChatInitiate}
                     onUpdateProfile={async (d) => {
                       await supabase
@@ -419,7 +374,6 @@ const App: React.FC = () => {
                 }}
                 onChat={handleChatInitiate}
                 onRefresh={fetchGlobalData}
-                onFollow={handleFollow}
               />
             )}
 

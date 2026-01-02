@@ -38,7 +38,6 @@ interface ProfilePageProps {
   isLoggedIn?: boolean;
   currentUserId?: string;
   currentUserProfile?: Profile | null;
-  onFollow?: (id: string) => void;
   onChat?: (user: Profile) => void;
   initialTab?: "intel" | "settings";
 }
@@ -52,7 +51,6 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
   isLoggedIn = false,
   currentUserId,
   currentUserProfile,
-  onFollow,
   onChat,
   initialTab = "intel",
 }) => {
@@ -71,8 +69,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
   });
 
   const isOwnProfile = !isExternal || currentUserId === profile.id;
-  const isFollowing = currentUserProfile?.following?.includes(profile.id);
-  const canSeeDetails = isOwnProfile || !profile.is_private || isFollowing;
+  const canSeeDetails = isOwnProfile || !profile.is_private;
 
   useEffect(() => {
     setActiveTab(initialTab);
@@ -127,39 +124,19 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
                   Locked Identity Node
                 </p>
                 <p className="text-[10px] font-bold text-slate-500 uppercase">
-                  Follow to verify credentials
+                  Profile is private
                 </p>
               </div>
             )}
 
             <div className="flex w-full gap-3">
               {!isOwnProfile && (
-                <>
-                  <button
-                    onClick={() => onFollow?.(profile.id)}
-                    className={`flex-1 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 shadow-xl ${
-                      isFollowing
-                        ? "bg-red-50 text-red-600"
-                        : "bg-slate-950 dark:bg-white text-white dark:text-slate-950"
-                    }`}
-                  >
-                    {isFollowing ? (
-                      <>
-                        <UserMinus size={16} /> Unfollow
-                      </>
-                    ) : (
-                      <>
-                        <UserPlus size={16} /> Follow Node
-                      </>
-                    )}
-                  </button>
-                  <button
-                    onClick={() => onChat?.(profile)}
-                    className="flex items-center justify-center w-16 text-blue-600 transition-all shadow-xl h-14 rounded-2xl bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-600 hover:text-white"
-                  >
-                    <MessageSquare size={20} />
-                  </button>
-                </>
+                <button
+                  onClick={() => onChat?.(profile)}
+                  className="flex-1 py-4 rounded-2xl bg-blue-600 text-white text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 shadow-xl hover:bg-blue-700"
+                >
+                  <MessageSquare size={16} /> Secure Handshake
+                </button>
               )}
               {isOwnProfile && isEditing && (
                 <button
@@ -180,13 +157,8 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
           </div>
 
           <div className="grid grid-cols-2 gap-4">
-            <StatCard label="Followers" value={profile.followers_count || 0} />
-            <StatCard
-              label="Following"
-              value={profile.following_count || profile.following?.length || 0}
-            />
-            <StatCard label="Status" value={profile.role.toUpperCase()} />
-            <StatCard label="Rep" value={profile.budget} />
+            <StatCard label="Role" value={profile.role.toUpperCase()} />
+            <StatCard label="Reputation" value={profile.budget} />
           </div>
         </div>
 
@@ -307,7 +279,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
                       <p className="text-xs font-black leading-loose tracking-widest uppercase">
                         Detail view restricted.
                         <br />
-                        Follow node to unlock manifesto.
+                        Identity is hidden.
                       </p>
                     </div>
                   )}

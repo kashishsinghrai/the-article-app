@@ -25,7 +25,6 @@ interface NetworkPageProps {
   onBack: () => void;
   currentUserProfile?: Profile | null;
   onRefresh?: () => void;
-  onFollow?: (id: string) => void;
 }
 
 const NetworkPage: React.FC<NetworkPageProps> = ({
@@ -36,7 +35,6 @@ const NetworkPage: React.FC<NetworkPageProps> = ({
   onBack,
   currentUserProfile,
   onRefresh,
-  onFollow,
 }) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -106,7 +104,6 @@ const NetworkPage: React.FC<NetworkPageProps> = ({
 
       <section className="grid grid-cols-1 gap-8 pb-20 sm:grid-cols-2 lg:grid-cols-3">
         {filteredUsers.map((user) => {
-          const isFollowing = currentUserProfile?.following?.includes(user.id);
           const isMe = user.id === currentUserId;
           return (
             <div
@@ -142,18 +139,18 @@ const NetworkPage: React.FC<NetworkPageProps> = ({
                 <div className="flex gap-6 py-4 border-y border-slate-50 dark:border-white/5">
                   <div className="text-center">
                     <p className="text-[8px] font-black text-slate-400 uppercase">
-                      Followers
+                      Reputation
                     </p>
                     <p className="text-sm font-black dark:text-white">
-                      {user.followers_count || 0}
+                      {user.budget || 0}
                     </p>
                   </div>
                   <div className="text-center">
                     <p className="text-[8px] font-black text-slate-400 uppercase">
-                      Following
+                      Status
                     </p>
-                    <p className="text-sm font-black dark:text-white">
-                      {user.following_count || user.following?.length || 0}
+                    <p className="text-sm italic font-black text-blue-600 uppercase">
+                      {user.role}
                     </p>
                   </div>
                 </div>
@@ -171,32 +168,12 @@ const NetworkPage: React.FC<NetworkPageProps> = ({
                   Identity
                 </button>
                 {!isMe && (
-                  <>
-                    <button
-                      onClick={() => onChat(user)}
-                      className="p-3 text-blue-600 transition-all rounded-xl bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-600 hover:text-white"
-                    >
-                      <MessageSquare size={16} />
-                    </button>
-                    <button
-                      onClick={() => onFollow?.(user.id)}
-                      className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase transition-all flex items-center justify-center gap-2 ${
-                        isFollowing
-                          ? "bg-red-50 text-red-600 border border-red-100"
-                          : "bg-slate-950 dark:bg-white text-white dark:text-slate-950"
-                      }`}
-                    >
-                      {isFollowing ? (
-                        <>
-                          <UserMinus size={14} /> Sever
-                        </>
-                      ) : (
-                        <>
-                          <UserPlus size={14} /> Follow
-                        </>
-                      )}
-                    </button>
-                  </>
+                  <button
+                    onClick={() => onChat(user)}
+                    className="flex-1 py-3 rounded-xl bg-blue-600 text-white text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-blue-700 transition-all"
+                  >
+                    <MessageSquare size={16} /> Handshake
+                  </button>
                 )}
               </div>
             </div>
