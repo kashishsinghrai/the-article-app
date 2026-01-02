@@ -1,10 +1,4 @@
-import React, {
-  useState,
-  useEffect,
-  useRef,
-  useMemo,
-  useCallback,
-} from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
 import TrendingTicker from "./components/TrendingTicker";
@@ -50,7 +44,6 @@ const App: React.FC = () => {
 
   const initializationInProgress = useRef(false);
 
-  // Resilience: Local Storage Fallback Logic
   const fetchArticles = useCallback(async () => {
     try {
       const { data: arts, error } = await supabase
@@ -63,7 +56,6 @@ const App: React.FC = () => {
         localStorage.setItem("the_articles_cache", JSON.stringify(arts));
       }
     } catch (e: any) {
-      console.warn("Network error, loading from cache...");
       const cached = localStorage.getItem("the_articles_cache");
       if (cached) setArticles(JSON.parse(cached));
     }
@@ -75,7 +67,7 @@ const App: React.FC = () => {
       if (error) throw error;
       if (data) setUsers(data);
     } catch (e) {
-      console.error("Failed to sync network registry.");
+      console.error("Registry sync failed.");
     }
   }, []);
 
@@ -88,10 +80,10 @@ const App: React.FC = () => {
     try {
       const {
         data: { session },
-      } = await (supabase.auth as any).getSession();
+      } = await supabase.auth.getSession();
       if (session?.user) {
         setIsLoggedIn(true);
-        const { data: prof } = await supabase
+        const { data: prof, error } = await supabase
           .from("profiles")
           .select("*")
           .eq("id", session.user.id)
@@ -101,11 +93,15 @@ const App: React.FC = () => {
           setProfile(prof);
           setIsSettingUp(false);
         } else {
+          // No profile found for active session user
           setIsSettingUp(true);
         }
+      } else {
+        setIsLoggedIn(false);
+        setProfile(null);
       }
     } catch (e: any) {
-      console.error("Session integrity check failed.");
+      console.error("Session sync failed.");
     }
     await fetchArticles();
     await fetchUsers();
@@ -115,76 +111,77 @@ const App: React.FC = () => {
     if (initializationInProgress.current) return;
     initializationInProgress.current = true;
     initApp();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === "SIGNED_IN") {
+        setIsLoggedIn(true);
+        initApp();
+      } else if (event === "SIGNED_OUT") {
+        setIsLoggedIn(false);
+        setProfile(null);
+        setCurrentPage("home");
+      }
+    });
+
+    return () => subscription.unsubscribe();
   }, [initApp]);
 
-  // Unified Real-time Listener (Resilient)
   useEffect(() => {
     if (!profile?.id) return;
 
-    try {
-      const inboxChannel = supabase.channel(`inbox_${profile.id}`);
-      inboxChannel
-        .on("broadcast", { event: "handshake" }, (p) => {
-          const req = p.payload as ChatRequest;
-          setChatRequests((prev) =>
-            prev.some((r) => r.fromId === req.fromId) ? prev : [...prev, req]
-          );
-          toast(`Incoming Handshake: ${req.fromName}`, { icon: "🤝" });
-        })
-        .on("broadcast", { event: "handshake_accepted" }, async (p) => {
-          const { acceptorId, acceptorName } = p.payload;
-          const acceptorProfile = users.find((u) => u.id === acceptorId);
-          if (acceptorProfile) {
-            setActiveChat(acceptorProfile);
-            setChatMessages([]);
-            toast.success(`Secure link connected with ${acceptorName}`, {
-              icon: "⚡",
-            });
-          }
+    const inboxChannel = supabase.channel(`inbox_${profile.id}`);
+    inboxChannel
+      .on("broadcast", { event: "handshake" }, (p) => {
+        const req = p.payload as ChatRequest;
+        setChatRequests((prev) =>
+          prev.some((r) => r.fromId === req.fromId) ? prev : [...prev, req]
+        );
+        toast(`Signal Detected: ${req.fromName}`, { icon: "🤝" });
+      })
+      .on("broadcast", { event: "handshake_accepted" }, async (p) => {
+        const { acceptorId, acceptorName } = p.payload;
+        const acceptorProfile = users.find((u) => u.id === acceptorId);
+        if (acceptorProfile) {
+          setActiveChat(acceptorProfile);
+          setChatMessages([]);
+          toast.success(`Secure link with ${acceptorName}`, { icon: "⚡" });
+        }
+      })
+      .subscribe();
+
+    let adminChannel: any = null;
+    if (profile.role === "admin") {
+      adminChannel = supabase.channel("admin_oversight");
+      adminChannel
+        .on("broadcast", { event: "intercept_pulse" }, (p: any) => {
+          setAdminIntercepts((prev) => {
+            const exists = prev.find((i) => i.room === p.payload.room);
+            if (!exists) return [...prev, p.payload];
+            return prev.map((i) =>
+              i.room === p.payload.room
+                ? { ...i, timestamp: Date.now(), lastText: p.payload.text }
+                : i
+            );
+          });
         })
         .subscribe();
-
-      // Admin Intercept Hub
-      let adminChannel: any = null;
-      if (profile.role === "admin") {
-        adminChannel = supabase.channel("admin_oversight");
-        adminChannel
-          .on("broadcast", { event: "intercept_pulse" }, (p: any) => {
-            setAdminIntercepts((prev) => {
-              const exists = prev.find((i) => i.room === p.payload.room);
-              if (!exists) {
-                return [...prev, p.payload];
-              }
-              return prev.map((i) =>
-                i.room === p.payload.room
-                  ? { ...i, timestamp: Date.now(), lastText: p.payload.text }
-                  : i
-              );
-            });
-          })
-          .subscribe();
-      }
-
-      return () => {
-        supabase.removeChannel(inboxChannel);
-        if (adminChannel) supabase.removeChannel(adminChannel);
-      };
-    } catch (err) {
-      console.error(
-        "Realtime subscription failed, falling back to manual sync."
-      );
     }
-  }, [profile?.id, profile?.role, users, currentPage]);
+
+    return () => {
+      supabase.removeChannel(inboxChannel);
+      if (adminChannel) supabase.removeChannel(adminChannel);
+    };
+  }, [profile?.id, profile?.role, users]);
 
   const handleAcceptRequest = useCallback(
     async (req: ChatRequest) => {
       if (!profile) return;
-
       const senderProfile = users.find((u) => u.id === req.fromId);
       if (senderProfile) {
         setActiveChat(senderProfile);
         setChatMessages([]);
-
         const confirmChannel = supabase.channel(`inbox_${req.fromId}`);
         confirmChannel.subscribe((status) => {
           if (status === "SUBSCRIBED") {
@@ -196,26 +193,10 @@ const App: React.FC = () => {
                 acceptorName: profile.full_name,
               },
             });
-
-            const ids = [profile.id, senderProfile.id].sort();
-            supabase.channel("admin_oversight").send({
-              type: "broadcast",
-              event: "intercept_pulse",
-              payload: {
-                room: `room_${ids[0]}_${ids[1]}`,
-                node1: profile.full_name,
-                node2: senderProfile.full_name,
-                text: "Channel Established",
-                timestamp: Date.now(),
-              },
-            });
-
             setTimeout(() => supabase.removeChannel(confirmChannel), 2000);
           }
         });
-
         setChatRequests((prev) => prev.filter((r) => r.id !== req.id));
-        toast.success(`Handshake complete. Secure tunnel active.`);
       }
     },
     [profile, users]
@@ -232,28 +213,11 @@ const App: React.FC = () => {
         timestamp: Date.now(),
       };
       setChatMessages((prev) => [...prev, message]);
-
       const ids = [profile.id, activeChat.id].sort();
       const roomName = `room_${ids[0]}_${ids[1]}`;
-
       supabase
         .channel(roomName)
         .send({ type: "broadcast", event: "message", payload: message });
-
-      supabase.channel("admin_oversight").send({
-        type: "broadcast",
-        event: "intercept_pulse",
-        payload: {
-          room: roomName,
-          node1: profile.full_name,
-          node2: activeChat.full_name,
-          id: message.id,
-          senderId: profile.id,
-          senderName: profile.full_name,
-          text: text,
-          timestamp: message.timestamp,
-        },
-      });
     },
     [profile, activeChat]
   );
@@ -273,28 +237,30 @@ const App: React.FC = () => {
   };
 
   const handleProfileSetupComplete = async (profileData: Profile) => {
-    const {
-      data: { session },
-    } = await (supabase.auth as any).getSession();
-    if (session?.user) {
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (!session?.user) {
+        toast.error("Session expired. Please login again.");
+        return;
+      }
+
       const finalProfile = { ...profileData, id: session.user.id };
       const { error } = await supabase.from("profiles").upsert(finalProfile);
-      if (!error) {
-        setProfile(finalProfile);
-        setIsSettingUp(false);
-        handleNavigate("home");
-        toast.success("Identity established.");
-      } else {
-        toast.error("Profile synchronization failed.");
-      }
+
+      if (error) throw error;
+
+      setProfile(finalProfile);
+      setIsSettingUp(false);
+      handleNavigate("home");
+      toast.success("Operational Node Activated.");
+      fetchUsers();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to sync profile.");
     }
   };
 
-  const handleUpdateUsers = () => {
-    fetchUsers();
-  };
-
-  // Global Navigation with Error Resilience
   if (isSettingUp) {
     return (
       <div
@@ -312,14 +278,13 @@ const App: React.FC = () => {
     <div
       className={`min-h-screen ${
         isDarkMode ? "dark bg-slate-950" : "bg-slate-50"
-      } transition-colors duration-500 overflow-x-hidden`}
+      } transition-colors duration-500`}
     >
       <Toaster position="bottom-center" />
       {showAuth === "login" && (
         <LoginPage
           onBack={() => setShowAuth(null)}
           onSuccess={() => {
-            setIsLoggedIn(true);
             setShowAuth(null);
             initApp();
           }}
@@ -330,7 +295,6 @@ const App: React.FC = () => {
         <RegisterPage
           onBack={() => setShowAuth(null)}
           onSuccess={() => {
-            setIsLoggedIn(true);
             setShowAuth(null);
             initApp();
           }}
@@ -351,7 +315,6 @@ const App: React.FC = () => {
             onToggleDarkMode={() => setIsDarkMode(!isDarkMode)}
             chatRequests={chatRequests}
             onAcceptRequest={handleAcceptRequest}
-            adminIntercepts={adminIntercepts}
           />
 
           <div className="flex-grow pt-24">
@@ -372,23 +335,19 @@ const App: React.FC = () => {
                 onBack={() => handleNavigate("home")}
                 onPublish={async (data) => {
                   if (!profile) return;
-                  try {
-                    const payload = {
-                      ...data,
-                      author_id: profile.id,
-                      author_name: profile.full_name,
-                      author_serial: profile.serial_id,
-                    };
-                    const { error } = await supabase
-                      .from("articles")
-                      .insert(payload);
-                    if (!error) {
-                      toast.success("Published");
-                      fetchArticles();
-                      handleNavigate("home");
-                    }
-                  } catch (err) {
-                    toast.error("Transmission Interrupted.");
+                  const payload = {
+                    ...data,
+                    author_id: profile.id,
+                    author_name: profile.full_name,
+                    author_serial: profile.serial_id,
+                  };
+                  const { error } = await supabase
+                    .from("articles")
+                    .insert(payload);
+                  if (!error) {
+                    toast.success("Dispatch Published");
+                    fetchArticles();
+                    handleNavigate("home");
                   }
                 }}
               />
@@ -398,14 +357,14 @@ const App: React.FC = () => {
                 articles={articles}
                 users={users}
                 currentUserId={profile.id}
-                onUpdateUsers={handleUpdateUsers}
+                onUpdateUsers={fetchUsers}
                 onLogout={handleLogout}
               />
             )}
             {(currentPage === "profile" || currentPage === "settings") &&
-              (viewingProfile || profile) && (
+              profile && (
                 <ProfilePage
-                  profile={viewingProfile || profile!}
+                  profile={viewingProfile || profile}
                   onLogout={handleLogout}
                   isExternal={!!viewingProfile}
                   initialTab={currentPage === "settings" ? "settings" : "intel"}
@@ -416,20 +375,15 @@ const App: React.FC = () => {
                     } else handleNavigate("home");
                   }}
                   isLoggedIn={isLoggedIn}
-                  currentUserId={profile?.id}
-                  onSendChatRequest={(u) => {
-                    setActiveChat(u);
-                    setChatMessages([]);
-                  }}
+                  currentUserId={profile.id}
                   onUpdateProfile={async (data) => {
-                    if (!profile) return;
                     const { error } = await supabase
                       .from("profiles")
                       .update(data)
                       .eq("id", profile.id);
                     if (!error) {
                       setProfile({ ...profile, ...data });
-                      toast.success("Identity Updated.");
+                      toast.success("Synced.");
                     }
                   }}
                 />

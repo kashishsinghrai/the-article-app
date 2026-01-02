@@ -7,7 +7,6 @@ import {
   Loader2,
   Fingerprint,
   Lock,
-  Shield,
 } from "lucide-react";
 import { supabase } from "../../lib/supabase";
 import { toast } from "react-hot-toast";
@@ -33,15 +32,15 @@ const RegisterPage: React.FC<RegisterPageProps> = ({
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !password || !phone) {
-      toast.error("All fields are required for network entry.");
+      toast.error("Network entry requires all credentials.");
       return;
     }
     if (!validateEmail(email)) {
-      toast.error("Invalid email format.");
+      toast.error("Invalid email architecture.");
       return;
     }
     if (password.length < 6) {
-      toast.error("Security risk: Password too short.");
+      toast.error("Security risk: Weak password.");
       return;
     }
 
@@ -62,10 +61,18 @@ const RegisterPage: React.FC<RegisterPageProps> = ({
 
       if (error) throw error;
 
-      toast.success("Account created. Please establish your identity.");
-      onSuccess(data.user);
+      if (data.user && !data.session) {
+        toast.success(
+          "Identity reserved. Please verify your email to activate node.",
+          { duration: 6000 }
+        );
+        onGoToLogin();
+      } else if (data.user) {
+        toast.success("Access granted. Initializing setup.");
+        onSuccess(data.user);
+      }
     } catch (err: any) {
-      toast.error(err.message || "Protocol failure: Registration interrupted.");
+      toast.error(err.message || "Registration protocol failed.");
     } finally {
       setLoading(false);
     }
@@ -93,43 +100,43 @@ const RegisterPage: React.FC<RegisterPageProps> = ({
         <div className="w-full max-w-[380px] space-y-12">
           <div className="space-y-4 text-center">
             <h1 className="text-4xl font-semibold leading-none tracking-tight text-slate-900 dark:text-white">
-              Register Node
+              Node Registration
             </h1>
             <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.3em]">
-              Phase 01: Secure Entry Credentials
+              Phase 01: Auth Shard Creation
             </p>
           </div>
 
           <form onSubmit={handleRegister} className="space-y-6">
             <div className="space-y-2">
               <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 flex items-center gap-2">
-                <Mail size={12} /> Primary Email
+                <Mail size={12} /> Email Interface
               </label>
               <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3.5 text-sm font-bold outline-none dark:text-white"
-                placeholder="name@provider.com"
+                placeholder="identity@network.org"
               />
             </div>
 
             <div className="space-y-2">
               <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 flex items-center gap-2">
-                <Smartphone size={12} /> Contact Number
+                <Smartphone size={12} /> Comms Link (Phone)
               </label>
               <input
                 type="tel"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3.5 text-sm font-bold outline-none dark:text-white"
-                placeholder="+1 234 567 890"
+                placeholder="+1 000 000 000"
               />
             </div>
 
             <div className="space-y-2">
               <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 flex items-center gap-2">
-                <Lock size={12} /> Secure Password
+                <Lock size={12} /> Security Hash (Password)
               </label>
               <input
                 type="password"
@@ -140,16 +147,16 @@ const RegisterPage: React.FC<RegisterPageProps> = ({
               />
             </div>
 
-            <div className="pt-4 space-y-4">
+            <div className="pt-4">
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full py-5 bg-slate-950 dark:bg-white text-white dark:text-slate-950 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl flex items-center justify-center gap-3 disabled:opacity-30 transition-all hover:scale-[1.01] active:scale-[0.99]"
+                className="w-full py-5 bg-slate-950 dark:bg-white text-white dark:text-slate-950 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl flex items-center justify-center gap-3 disabled:opacity-30 transition-all hover:scale-[1.01]"
               >
                 {loading ? (
                   <Loader2 className="animate-spin" size={18} />
                 ) : (
-                  "Register & Setup Identity"
+                  "Establish Auth Link"
                 )}
                 <Fingerprint size={18} />
               </button>
@@ -157,7 +164,7 @@ const RegisterPage: React.FC<RegisterPageProps> = ({
           </form>
 
           <p className="text-xs text-center text-slate-400">
-            Already registered?{" "}
+            Registered already?{" "}
             <button
               onClick={onGoToLogin}
               className="font-bold text-slate-900 dark:text-white hover:underline"

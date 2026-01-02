@@ -6,9 +6,11 @@ import {
   Fingerprint,
   Info,
   Globe,
+  Loader2,
 } from "lucide-react";
 import { Profile } from "../../types";
 import { supabase } from "../../lib/supabase";
+import { toast } from "react-hot-toast";
 
 interface SetupProfilePageProps {
   onComplete: (data: Profile) => void;
@@ -19,9 +21,12 @@ const SetupProfilePage: React.FC<SetupProfilePageProps> = ({ onComplete }) => {
   const [username, setUsername] = useState("");
   const [gender, setGender] = useState("");
   const [bio, setBio] = useState("");
-  const [authData, setAuthData] = useState<{ email?: string; phone?: string }>(
-    {}
-  );
+  const [loading, setLoading] = useState(false);
+  const [authData, setAuthData] = useState<{
+    id?: string;
+    email?: string;
+    phone?: string;
+  }>({});
 
   useEffect(() => {
     const fetchAuth = async () => {
@@ -30,6 +35,7 @@ const SetupProfilePage: React.FC<SetupProfilePageProps> = ({ onComplete }) => {
       } = await supabase.auth.getUser();
       if (user) {
         setAuthData({
+          id: user.id,
           email: user.email,
           phone: user.user_metadata?.phone || user.phone,
         });
@@ -38,10 +44,20 @@ const SetupProfilePage: React.FC<SetupProfilePageProps> = ({ onComplete }) => {
     fetchAuth();
   }, []);
 
-  const handleFinish = () => {
-    if (!name || !username || !gender) return;
+  const handleFinish = async () => {
+    if (!name || !username || !gender) {
+      toast.error("Identity requires name, handle, and gender.");
+      return;
+    }
+
+    if (!authData.id) {
+      toast.error("Auth session lost. Please re-login.");
+      return;
+    }
+
+    setLoading(true);
     const profile: Profile = {
-      id: "",
+      id: authData.id,
       full_name: name,
       username: username.toLowerCase().replace(/\s/g, "_"),
       gender: gender,
@@ -68,6 +84,7 @@ const SetupProfilePage: React.FC<SetupProfilePageProps> = ({ onComplete }) => {
         contacts_sync: false,
       },
     };
+
     onComplete(profile);
   };
 
@@ -81,10 +98,10 @@ const SetupProfilePage: React.FC<SetupProfilePageProps> = ({ onComplete }) => {
             <ShieldCheck size={32} />
           </div>
           <h1 className="text-4xl italic font-black tracking-tighter uppercase text-slate-900 dark:text-white">
-            Identify Entry
+            Identity Forge
           </h1>
           <p className="text-slate-400 font-black uppercase tracking-[0.3em] text-[10px]">
-            Step 02: Establish Network Credentials
+            Step 02: Establishing Global Credentials
           </p>
         </div>
 
@@ -92,31 +109,31 @@ const SetupProfilePage: React.FC<SetupProfilePageProps> = ({ onComplete }) => {
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
             <div className="space-y-2">
               <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 flex items-center gap-2">
-                <User size={12} /> Legal Full Name
+                <User size={12} /> Legal Identity
               </label>
               <input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="w-full bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 rounded-xl px-5 py-3.5 text-sm font-bold dark:text-white outline-none focus:ring-1 focus:ring-blue-600 transition-all"
+                className="w-full bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 rounded-xl px-5 py-3.5 text-sm font-bold dark:text-white outline-none focus:ring-1 focus:ring-blue-600"
                 placeholder="Alexander Pierce"
               />
             </div>
             <div className="space-y-2">
               <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 flex items-center gap-2">
-                <Fingerprint size={12} /> Network Handle
+                <Fingerprint size={12} /> Network Alias
               </label>
               <input
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                className="w-full bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 rounded-xl px-5 py-3.5 text-sm font-bold dark:text-white outline-none focus:ring-1 focus:ring-blue-600 transition-all"
-                placeholder="alex_reports"
+                className="w-full bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 rounded-xl px-5 py-3.5 text-sm font-bold dark:text-white outline-none focus:ring-1 focus:ring-blue-600"
+                placeholder="alex_dispatch"
               />
             </div>
           </div>
 
           <div className="space-y-4">
             <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 flex items-center gap-2">
-              <Globe size={12} /> Gender Specification
+              <Globe size={12} /> Gender Signature
             </label>
             <div className="flex flex-wrap gap-2">
               {genders.map((g) => (
@@ -137,13 +154,13 @@ const SetupProfilePage: React.FC<SetupProfilePageProps> = ({ onComplete }) => {
 
           <div className="space-y-2">
             <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 flex items-center gap-2">
-              <Info size={12} /> Professional Manifesto
+              <Info size={12} /> Personal Manifesto
             </label>
             <textarea
               value={bio}
               onChange={(e) => setBio(e.target.value)}
-              className="w-full bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 rounded-xl px-5 py-3.5 text-sm font-medium dark:text-white outline-none focus:ring-1 focus:ring-blue-600 transition-all"
-              placeholder="What is your journalistic mission?"
+              className="w-full bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 rounded-xl px-5 py-3.5 text-sm font-medium dark:text-white outline-none focus:ring-1 focus:ring-blue-600"
+              placeholder="Journalistic mission statement..."
               rows={4}
             />
           </div>
@@ -151,11 +168,15 @@ const SetupProfilePage: React.FC<SetupProfilePageProps> = ({ onComplete }) => {
           <div className="pt-8 border-t border-slate-50 dark:border-slate-800">
             <button
               onClick={handleFinish}
-              disabled={!name || !username || !gender}
+              disabled={!name || !username || !gender || loading}
               className="w-full py-5 bg-slate-950 dark:bg-white dark:text-slate-900 text-white rounded-2xl font-black uppercase tracking-widest shadow-2xl hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-30"
             >
-              Activate Operations Node
-              <Check size={20} />
+              {loading ? (
+                <Loader2 className="animate-spin" size={20} />
+              ) : (
+                "Sync with Global Network"
+              )}
+              {!loading && <Check size={20} />}
             </button>
           </div>
         </div>
