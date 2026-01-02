@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
-// Added missing 'Newspaper' import from 'lucide-react'
 import {
   ShieldAlert,
   Search,
@@ -30,6 +29,13 @@ import {
   Database,
   Activity as ActivityIcon,
   Newspaper,
+  AlertTriangle,
+  Code,
+  Cpu,
+  Power,
+  MessageCircle,
+  Fingerprint,
+  Edit,
 } from "lucide-react";
 import { Article, Profile, LiveMessage } from "../../types";
 import { supabase } from "../../lib/supabase";
@@ -51,7 +57,7 @@ const AdminPage: React.FC<AdminPageProps> = ({
   onLogout,
 }) => {
   const [activeTab, setActiveTab] = useState<
-    "monitor" | "articles" | "users" | "intercept"
+    "monitor" | "articles" | "users" | "intercept" | "console"
   >("monitor");
   const [searchTerm, setSearchTerm] = useState("");
   const [intercepts, setIntercepts] = useState<any[]>([]);
@@ -61,10 +67,20 @@ const AdminPage: React.FC<AdminPageProps> = ({
   const [allRoomMessages, setAllRoomMessages] = useState<
     Record<string, LiveMessage[]>
   >({});
+  const [sqlCommand, setSqlCommand] = useState("");
+  const [terminalOutput, setTerminalOutput] = useState<string[]>([
+    "[SYSTEM] Ready for command input...",
+    "[INFO] RLS Layer: Active",
+  ]);
+  const [isLockdown, setIsLockdown] = useState(false);
+
   const [localArticles, setLocalArticles] =
     useState<Article[]>(initialArticles);
   const [localUsers, setLocalUsers] = useState<Profile[]>(initialUsers);
+  const [editingUser, setEditingUser] = useState<Profile | null>(null);
+
   const chatScrollRef = useRef<HTMLDivElement>(null);
+  const terminalScrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setLocalArticles(initialArticles);
@@ -108,41 +124,90 @@ const AdminPage: React.FC<AdminPageProps> = ({
   }, []);
 
   useEffect(() => {
-    if (chatScrollRef.current) {
+    if (chatScrollRef.current)
       chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
-    }
   }, [allRoomMessages, activeInterception]);
 
-  const joinIntercept = (room: string) => {
-    setActiveInterception(room);
-    toast(`MONITORING: CHANNEL ${room.substring(5, 12)}`, {
-      icon: "🎧",
-      style: {
-        background: "#000",
-        border: "1px solid #1d4ed8",
-        color: "#fff",
-        fontSize: "10px",
-        textTransform: "uppercase",
-        fontWeight: "black",
-      },
-    });
+  useEffect(() => {
+    if (terminalScrollRef.current)
+      terminalScrollRef.current.scrollTop =
+        terminalScrollRef.current.scrollHeight;
+  }, [terminalOutput]);
+
+  const runSqlCommand = async () => {
+    if (!sqlCommand.trim()) return;
+    const cmd = sqlCommand.trim();
+    setTerminalOutput((prev) => [...prev, `> ${cmd}`]);
+    setSqlCommand("");
+
+    try {
+      const { data, error } = await (supabase as any).rpc("exec_sql", {
+        sql_query: cmd,
+      });
+      if (error) {
+        setTerminalOutput((prev) => [...prev, `[ERROR] ${error.message}`]);
+      } else if (data?.status === "error") {
+        setTerminalOutput((prev) => [...prev, `[DB_ERROR] ${data.message}`]);
+      } else {
+        setTerminalOutput((prev) => [
+          ...prev,
+          `[SUCCESS] Query executed successfully.`,
+        ]);
+        if (onUpdateUsers) onUpdateUsers();
+      }
+    } catch (err: any) {
+      setTerminalOutput((prev) => [...prev, `[FATAL] ${err.message}`]);
+    }
   };
 
-  const handleToggleAdmin = async (userId: string, currentRole: string) => {
+  const handleDeleteUser = async (userId: string) => {
     if (userId === currentUserId)
-      return toast.error("ROOT NODE PROTECTION ACTIVE.");
-    const newRole = currentRole === "admin" ? "user" : "admin";
+      return toast.error("ROOT NODE CANNOT BE SELF-DESTRUCTED.");
+    if (
+      !confirm(
+        "CRITICAL: Terminate this identity and all associated data permanently?"
+      )
+    )
+      return;
+
+    try {
+      const { error } = await (supabase as any).rpc("admin_delete_user", {
+        target_user_id: userId,
+      });
+      if (error) throw error;
+      toast.success("IDENTITY TERMINATED.");
+      if (onUpdateUsers) onUpdateUsers();
+    } catch (err: any) {
+      toast.error("PROTOCOL FAILURE: Termination Interrupted.");
+    }
+  };
+
+  const handleUpdateUserRole = async (userId: string, newRole: string) => {
     try {
       const { error } = await supabase
         .from("profiles")
         .update({ role: newRole })
         .eq("id", userId);
       if (error) throw error;
-      toast.success(`CLEARANCE UPDATED: ${newRole.toUpperCase()}`);
+      toast.success(`CLEARANCE UPDATED TO ${newRole.toUpperCase()}`);
       if (onUpdateUsers) onUpdateUsers();
     } catch (err: any) {
-      toast.error("SYNCHRONIZATION FAILURE");
+      toast.error("SYNC FAILED.");
     }
+  };
+
+  const toggleLockdown = () => {
+    setIsLockdown(!isLockdown);
+    toast(isLockdown ? "LOCKDOWN TERMINATED" : "GLOBAL LOCKDOWN INITIATED", {
+      icon: isLockdown ? "🔓" : "🔒",
+      style: {
+        background: isLockdown ? "#10b981" : "#ef4444",
+        color: "#fff",
+        fontWeight: "black",
+        textTransform: "uppercase",
+        fontSize: "10px",
+      },
+    });
   };
 
   const filteredUsers = useMemo(() => {
@@ -154,17 +219,10 @@ const AdminPage: React.FC<AdminPageProps> = ({
     );
   }, [localUsers, searchTerm]);
 
-  const filteredArticles = useMemo(() => {
-    return localArticles.filter(
-      (a) =>
-        a.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        a.author_name.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-  }, [localArticles, searchTerm]);
-
-  const currentRoomMessages = activeInterception
-    ? allRoomMessages[activeInterception] || []
-    : [];
+  const currentRoomMessages = useMemo(() => {
+    if (!activeInterception) return [];
+    return allRoomMessages[activeInterception] || [];
+  }, [allRoomMessages, activeInterception]);
 
   return (
     <main className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-24 md:py-32 space-y-8 md:space-y-12 animate-in fade-in duration-500">
@@ -173,38 +231,57 @@ const AdminPage: React.FC<AdminPageProps> = ({
           <div className="flex items-center gap-3 text-red-600 animate-pulse">
             <ShieldAlert size={20} />
             <span className="text-[10px] font-black uppercase tracking-[0.4em]">
-              Root Operations Terminal
+              ROOT OPERATIONS V3
             </span>
           </div>
           <h1 className="text-5xl italic font-black leading-none tracking-tighter uppercase sm:text-7xl md:text-8xl dark:text-white">
-            COMMAND
+            TERMINAL
           </h1>
           <div className="flex items-center gap-4">
             <span className="text-slate-400 font-bold uppercase tracking-widest text-[10px]">
-              Access Verified: Root Level
+              AUTH: SYSTEM_OVERRIDE
             </span>
             <div className="w-8 h-px bg-slate-200 dark:bg-slate-800" />
             <span className="text-emerald-500 font-black uppercase text-[9px] tracking-widest flex items-center gap-1">
-              <Zap size={10} fill="currentColor" /> Active Sync
+              <Cpu size={10} /> CORE_READY
             </span>
           </div>
         </div>
 
         <div className="flex flex-col items-end w-full gap-4 sm:flex-row lg:flex-col lg:w-auto">
-          <button
-            onClick={onLogout}
-            className="w-full sm:w-auto flex items-center justify-center gap-3 px-8 py-4 bg-red-600/10 text-red-600 border border-red-600/20 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-red-600 hover:text-white transition-all shadow-sm"
-          >
-            <LogOut size={16} /> Terminate Root Session
-          </button>
+          <div className="flex w-full gap-2 lg:w-auto">
+            <button
+              onClick={toggleLockdown}
+              className={`flex-1 sm:flex-none flex items-center justify-center gap-3 px-8 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all border ${
+                isLockdown
+                  ? "bg-red-600 border-red-600 text-white shadow-2xl animate-pulse"
+                  : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-red-600 hover:bg-red-50"
+              }`}
+            >
+              <Power size={16} />{" "}
+              {isLockdown ? "TERMINATE LOCKDOWN" : "PROTOCOL LOCKDOWN"}
+            </button>
+            <button
+              onClick={onLogout}
+              className="flex-1 p-4 transition-all border sm:flex-none bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800 rounded-2xl text-slate-400 hover:text-red-600"
+            >
+              <LogOut size={18} />
+            </button>
+          </div>
 
           <div className="w-full px-4 pb-2 -mx-4 overflow-x-auto lg:w-auto scrollbar-hide lg:p-0 lg:overflow-visible">
             <div className="flex gap-2 p-1.5 bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl min-w-max shadow-sm">
               <TabButton
                 active={activeTab === "monitor"}
                 onClick={() => setActiveTab("monitor")}
-                label="System"
+                label="Pulse"
                 icon={<Activity size={14} />}
+              />
+              <TabButton
+                active={activeTab === "users"}
+                onClick={() => setActiveTab("users")}
+                label="Registry"
+                icon={<Users size={14} />}
               />
               <TabButton
                 active={activeTab === "intercept"}
@@ -213,16 +290,10 @@ const AdminPage: React.FC<AdminPageProps> = ({
                 icon={<Radio size={14} />}
               />
               <TabButton
-                active={activeTab === "articles"}
-                onClick={() => setActiveTab("articles")}
-                label="Articles"
-                icon={<FileText size={14} />}
-              />
-              <TabButton
-                active={activeTab === "users"}
-                onClick={() => setActiveTab("users")}
-                label="Registry"
-                icon={<Users size={14} />}
+                active={activeTab === "console"}
+                onClick={() => setActiveTab("console")}
+                label="Console"
+                icon={<Code size={14} />}
               />
             </div>
           </div>
@@ -233,91 +304,79 @@ const AdminPage: React.FC<AdminPageProps> = ({
         {activeTab === "monitor" && (
           <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
             <MonitorCard
-              label="Broadcast Volume"
+              label="Data Packets"
               value={localArticles.length}
-              desc="Active Intelligence"
+              desc="Active Intelligent Nodes"
               icon={<Newspaper size={20} />}
             />
             <MonitorCard
-              label="Verified Nodes"
+              label="Auth Nodes"
               value={localUsers.length}
-              desc="Operator Registry"
-              icon={<Users size={20} />}
+              desc="Verified Identities"
+              icon={<User2 size={20} />}
             />
             <MonitorCard
-              label="Network Health"
-              value="99.9%"
+              label="Integrity"
+              value="100%"
               color="text-emerald-500"
-              desc="Uptime Verified"
-              icon={<ActivityIcon size={20} />}
+              desc="System Shield: Active"
+              icon={<ShieldCheck size={20} />}
             />
             <MonitorCard
-              label="Database Sync"
-              value="REALTIME"
+              label="Supabase Sync"
+              value="STABLE"
               color="text-blue-500"
-              desc="Supabase Active"
+              desc="PostgreSQL Real-time"
               icon={<Database size={20} />}
             />
 
-            <div className="lg:col-span-4 bg-slate-950 rounded-[2.5rem] p-8 md:p-12 border border-white/10 relative overflow-hidden shadow-2xl">
+            <div className="lg:col-span-4 bg-slate-950 rounded-[3rem] p-8 md:p-12 border border-white/10 relative overflow-hidden shadow-2xl">
               <div className="absolute top-0 right-0 p-8 opacity-10">
                 <TerminalIcon size={120} className="text-white" />
               </div>
-              <div className="relative z-10 space-y-8">
-                <div className="flex items-center gap-4">
-                  <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                  <h3 className="text-[10px] font-black uppercase tracking-[0.4em] text-white">
-                    Hyper-Registry Operations Log
-                  </h3>
-                </div>
-
-                <div className="grid grid-cols-1 gap-8 md:grid-cols-3">
-                  <div className="space-y-2">
-                    <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">
-                      Active Server
-                    </p>
-                    <div className="flex items-center gap-2 text-white">
-                      <Server size={14} className="text-blue-500" />
-                      <span className="font-mono text-xs">
-                        ap-south-1.supabase.co
-                      </span>
-                    </div>
+              <div className="relative z-10 grid grid-cols-1 gap-12 md:grid-cols-2">
+                <div className="space-y-6">
+                  <div className="flex items-center gap-4">
+                    <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                    <h3 className="text-[10px] font-black uppercase tracking-[0.4em] text-white">
+                      Live Operations Log
+                    </h3>
                   </div>
-                  <div className="space-y-2">
-                    <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">
-                      Protocol Type
+                  <div className="font-mono text-[10px] space-y-3 text-slate-400 bg-white/5 p-6 rounded-2xl border border-white/5 h-48 overflow-y-auto custom-scrollbar">
+                    <p>
+                      <span className="text-blue-500">[INFO]</span> Network
+                      ping: 24ms from Global Proxy.
                     </p>
-                    <div className="flex items-center gap-2 text-white">
-                      <Lock size={14} className="text-emerald-500" />
-                      <span className="font-mono text-xs">RLS_ENFORCED_V2</span>
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">
-                      Integrity Hash
+                    <p>
+                      <span className="text-emerald-500">[AUTH]</span> Node
+                      ART-0924 established secure tunnel.
                     </p>
-                    <div className="flex items-center gap-2 text-white">
-                      <Key size={14} className="text-amber-500" />
-                      <span className="font-mono text-xs">
-                        sha256:7f8e...3b2a
-                      </span>
-                    </div>
+                    <p>
+                      <span className="text-amber-500">[WARN]</span> Restricted
+                      metadata fetch attempted by Guest.
+                    </p>
+                    <p>
+                      <span className="text-red-500">[ALRT]</span> Sync delay
+                      detected in regional shard.
+                    </p>
                   </div>
                 </div>
 
-                <div className="font-mono text-[10px] space-y-2 text-slate-400 bg-white/5 p-6 rounded-2xl border border-white/5">
-                  <p>
-                    <span className="text-emerald-500">[SYSTEM]</span> RLS
-                    Policies verified for 'profiles' table.
-                  </p>
-                  <p>
-                    <span className="text-blue-500">[INFO]</span> Broadcast
-                    Handshake: Peer link success for Node-774.
-                  </p>
-                  <p>
-                    <span className="text-emerald-500">[OK]</span> Hardware
-                    permissions audited for 100% of active nodes.
-                  </p>
+                <div className="space-y-8">
+                  <div className="space-y-4">
+                    <h4 className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-500">
+                      Security Thresholds
+                    </h4>
+                    <div className="space-y-4">
+                      <ThresholdBar label="Encrypted Traffic" val={85} />
+                      <ThresholdBar label="Node Reputation" val={92} />
+                      <ThresholdBar
+                        label="API Throughput"
+                        val={44}
+                        color="bg-blue-600"
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -332,7 +391,7 @@ const AdminPage: React.FC<AdminPageProps> = ({
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="bg-transparent border-none text-[10px] font-black uppercase tracking-[0.2em] outline-none flex-grow dark:text-white"
-                placeholder="FILTERING REGISTRY BY HASH OR SERIAL..."
+                placeholder="QUERYING IDENTITY REGISTRY..."
               />
             </div>
 
@@ -340,64 +399,58 @@ const AdminPage: React.FC<AdminPageProps> = ({
               {filteredUsers.map((user) => (
                 <div
                   key={user.id}
-                  className="bg-white dark:bg-slate-950 p-8 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-sm space-y-6 group hover:border-red-500/30 transition-all"
+                  className="bg-white dark:bg-slate-950 p-8 rounded-[3rem] border border-slate-100 dark:border-slate-800 shadow-sm space-y-6 group hover:border-blue-600 transition-all"
                 >
                   <div className="flex items-start justify-between">
                     <div className="flex items-center gap-4">
                       <div className="flex items-center justify-center w-12 h-12 rounded-2xl bg-slate-50 dark:bg-slate-800 text-slate-400">
-                        <User2 size={24} />
+                        <Fingerprint size={24} />
                       </div>
                       <div>
                         <p className="text-sm font-black leading-tight uppercase dark:text-white">
                           {user.full_name}
                         </p>
                         <p className="text-[10px] font-bold text-slate-400 italic">
-                          @{user.username}
+                          ID: {user.serial_id}
                         </p>
                       </div>
                     </div>
-                    <span
-                      className={`text-[8px] font-black uppercase px-3 py-1.5 rounded-lg border ${
-                        user.role === "admin"
-                          ? "bg-red-50 text-red-600 border-red-100"
-                          : "bg-slate-50 text-slate-400 border-slate-100"
-                      }`}
-                    >
-                      {user.role}
-                    </span>
+                    <div className="flex flex-col items-end gap-1">
+                      <span
+                        className={`text-[8px] font-black uppercase px-3 py-1.5 rounded-lg border ${
+                          user.role === "admin"
+                            ? "bg-red-50 text-red-600 border-red-100"
+                            : "bg-slate-50 text-slate-400 border-slate-100"
+                        }`}
+                      >
+                        {user.role}
+                      </span>
+                    </div>
                   </div>
 
-                  <div className="py-6 space-y-4 border-y border-slate-50 dark:border-white/5">
-                    <p className="text-[9px] font-black uppercase tracking-widest text-slate-300">
-                      Live Hardware Permissions
-                    </p>
-                    <div className="flex flex-wrap gap-4">
-                      <PermissionIndicator
-                        active={user.settings?.camera_access}
-                        icon={<Camera size={12} />}
-                        label="CAM"
-                      />
-                      <PermissionIndicator
-                        active={user.settings?.mic_access}
-                        icon={<Mic size={12} />}
-                        label="MIC"
-                      />
-                      <PermissionIndicator
-                        active={user.settings?.location_access}
-                        icon={<MapPin size={12} />}
-                        label="GEO"
-                      />
-                      <PermissionIndicator
-                        active={user.settings?.storage_access}
-                        icon={<CheckCircle2 size={12} />}
-                        label="FS"
-                      />
+                  <div className="py-6 space-y-3 border-y border-slate-50 dark:border-white/5">
+                    <div className="flex justify-between text-[9px] font-black uppercase text-slate-400">
+                      <span>Verified Channels</span>
+                      <span className="text-blue-600">
+                        {user.email || "N/A"}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-[9px] font-black uppercase text-slate-400">
+                      <span>Reputation Budget</span>
+                      <span className="text-emerald-500">
+                        {user.budget} Credits
+                      </span>
                     </div>
                   </div>
 
                   <div className="flex gap-2">
                     <button
-                      onClick={() => handleToggleAdmin(user.id, user.role)}
+                      onClick={() =>
+                        handleUpdateUserRole(
+                          user.id,
+                          user.role === "admin" ? "user" : "admin"
+                        )
+                      }
                       className="flex-1 py-4 bg-slate-50 dark:bg-slate-800 rounded-2xl text-[9px] font-black uppercase tracking-widest hover:bg-blue-600 hover:text-white transition-all flex items-center justify-center gap-2"
                     >
                       <Shield
@@ -408,7 +461,13 @@ const AdminPage: React.FC<AdminPageProps> = ({
                             : "text-blue-500"
                         }
                       />
-                      Toggle Clearance
+                      Clearance
+                    </button>
+                    <button
+                      onClick={() => handleDeleteUser(user.id)}
+                      className="p-4 text-red-400 transition-all bg-slate-50 dark:bg-slate-800 rounded-2xl hover:bg-red-600 hover:text-white"
+                    >
+                      <Trash2 size={16} />
                     </button>
                   </div>
                 </div>
@@ -419,21 +478,22 @@ const AdminPage: React.FC<AdminPageProps> = ({
 
         {activeTab === "intercept" && (
           <div className="grid grid-cols-1 gap-12 pb-20 lg:grid-cols-12">
-            <div className="space-y-8 lg:col-span-5">
+            <div className="space-y-8 lg:col-span-4">
               <div className="flex items-center justify-between">
                 <h3 className="text-[11px] font-black uppercase tracking-[0.4em] text-slate-400 flex items-center gap-3">
-                  <Zap size={16} className="text-amber-500 animate-pulse" />{" "}
-                  Signal Waves
+                  <Radio size={16} className="text-red-500 animate-pulse" />{" "}
+                  Signal Shards
                 </h3>
                 <span className="text-[9px] font-black text-white bg-red-600 px-3 py-1 rounded-full uppercase tracking-widest">
-                  {intercepts.length} Direct
+                  {intercepts.length} Captured
                 </span>
               </div>
               <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
                 {intercepts.map((i, idx) => (
+                  /* Fix: Replaced undefined 'joinIntercept' with 'setActiveInterception' */
                   <button
                     key={idx}
-                    onClick={() => joinIntercept(i.room)}
+                    onClick={() => setActiveInterception(i.room)}
                     className={`w-full p-8 rounded-[2.5rem] border transition-all flex justify-between items-center text-left ${
                       activeInterception === i.room
                         ? "bg-red-600 border-red-600 text-white shadow-2xl scale-[1.02]"
@@ -448,7 +508,7 @@ const AdminPage: React.FC<AdminPageProps> = ({
                             : "text-slate-400"
                         }`}
                       >
-                        HASH: {i.room.substring(5, 12)}
+                        CHAN: {i.room.split("_")[1]}
                       </p>
                       <div className="flex items-center gap-4">
                         <p className="text-sm font-black uppercase italic truncate max-w-[100px]">
@@ -472,16 +532,16 @@ const AdminPage: React.FC<AdminPageProps> = ({
               </div>
             </div>
 
-            <div className="lg:col-span-7 bg-slate-950 rounded-[3rem] p-8 md:p-12 min-h-[500px] flex flex-col border border-white/10 shadow-2xl relative overflow-hidden">
+            <div className="lg:col-span-8 bg-slate-950 rounded-[3rem] p-8 md:p-12 min-h-[500px] flex flex-col border border-white/10 shadow-2xl relative overflow-hidden">
               <div className="flex items-center justify-between pb-8 mb-8 border-b border-white/10">
                 <div className="flex items-center gap-4">
                   <div className="w-3 h-3 bg-red-600 rounded-full animate-pulse shadow-[0_0_15px_rgba(220,38,38,0.9)]" />
-                  <span className="text-[11px] font-black uppercase tracking-[0.5em] text-white">
-                    INTERCEPT FEED
+                  <span className="text-[11px] font-black uppercase tracking-[0.5em] text-white italic">
+                    SIGNAL_RECON
                   </span>
                 </div>
                 <span className="text-[10px] font-mono text-slate-500 uppercase italic">
-                  STATUS: DECRYPTING
+                  LEVEL: DECRYPT_ACTIVE
                 </span>
               </div>
               <div
@@ -493,14 +553,74 @@ const AdminPage: React.FC<AdminPageProps> = ({
                     key={idx}
                     className="p-6 duration-300 border bg-white/5 rounded-3xl border-white/5 animate-in slide-in-from-bottom-2"
                   >
-                    <p className="text-[11px] font-black text-red-500 uppercase tracking-widest mb-2">
-                      {m.senderName}
+                    <p className="text-[11px] font-black text-red-500 uppercase tracking-widest mb-2 flex items-center gap-2">
+                      <MessageCircle size={10} /> {m.senderName}
                     </p>
-                    <p className="text-[13px] text-slate-300 font-medium italic opacity-80">
+                    <p className="text-[14px] text-slate-300 font-medium italic opacity-80">
                       "{m.text}"
                     </p>
                   </div>
                 ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === "console" && (
+          <div className="bg-slate-950 rounded-[3rem] border border-white/10 overflow-hidden shadow-2xl animate-in zoom-in-95 duration-500">
+            <div className="flex items-center justify-between p-8 border-b border-white/10 bg-white/5">
+              <div className="flex items-center gap-4">
+                <Code size={20} className="text-blue-500" />
+                <h3 className="text-[11px] font-black uppercase tracking-[0.4em] text-white">
+                  System Command Interface
+                </h3>
+              </div>
+            </div>
+
+            <div
+              ref={terminalScrollRef}
+              className="p-10 space-y-3 overflow-y-auto font-mono text-xs h-96 custom-scrollbar"
+            >
+              {terminalOutput.map((line, idx) => (
+                <div
+                  key={idx}
+                  className={`${
+                    line.includes("[ERROR]")
+                      ? "text-red-500"
+                      : line.includes("[SUCCESS]")
+                      ? "text-emerald-500"
+                      : line.startsWith(">")
+                      ? "text-blue-400"
+                      : "text-slate-400"
+                  }`}
+                >
+                  {line}
+                </div>
+              ))}
+            </div>
+
+            <div className="p-8 border-t bg-white/5 border-white/10">
+              <div className="flex gap-4">
+                <span className="mt-3 font-bold text-blue-500">❯</span>
+                <textarea
+                  value={sqlCommand}
+                  onChange={(e) => setSqlCommand(e.target.value)}
+                  onKeyDown={(e) =>
+                    e.key === "Enter" &&
+                    !e.shiftKey &&
+                    (e.preventDefault(), runSqlCommand())
+                  }
+                  placeholder="ENTER SQL COMMAND..."
+                  className="w-full h-24 p-3 font-mono text-sm text-white bg-transparent border-none outline-none resize-none focus:ring-0 placeholder:text-slate-700"
+                />
+              </div>
+              <div className="flex justify-end pt-4">
+                <button
+                  onClick={runSqlCommand}
+                  className="px-8 py-3 bg-blue-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-white hover:text-blue-600 transition-all shadow-xl"
+                >
+                  EXECUTE_STATEMENT
+                </button>
               </div>
             </div>
           </div>
@@ -510,20 +630,8 @@ const AdminPage: React.FC<AdminPageProps> = ({
   );
 };
 
-const PermissionIndicator = ({ active, icon, label }: any) => (
-  <div
-    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-[8px] font-black uppercase tracking-widest ${
-      active
-        ? "bg-emerald-50 text-emerald-600 border-emerald-100 dark:bg-emerald-950/20 shadow-sm"
-        : "bg-slate-50 text-slate-300 border-slate-100 dark:bg-slate-900 opacity-40"
-    }`}
-  >
-    {icon} {label}
-  </div>
-);
-
 const MonitorCard = ({ label, value, color, desc, icon }: any) => (
-  <div className="p-10 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-[2.5rem] space-y-4 shadow-sm group hover:scale-[1.02] transition-all duration-300">
+  <div className="p-10 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-[3rem] space-y-4 shadow-sm group hover:scale-[1.02] transition-all duration-300">
     <div className="flex items-center justify-between">
       <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 group-hover:text-blue-600 transition-colors">
         {label}
@@ -540,6 +648,23 @@ const MonitorCard = ({ label, value, color, desc, icon }: any) => (
     <p className="text-[10px] font-bold text-slate-400 italic uppercase">
       {desc}
     </p>
+  </div>
+);
+
+const ThresholdBar = ({ label, val, color }: any) => (
+  <div className="space-y-2">
+    <div className="flex justify-between text-[9px] font-black uppercase tracking-widest text-slate-500">
+      <span>{label}</span>
+      <span>{val}%</span>
+    </div>
+    <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
+      <div
+        className={`h-full ${
+          color || "bg-emerald-500"
+        } transition-all duration-1000`}
+        style={{ width: `${val}%` }}
+      />
+    </div>
   </div>
 );
 

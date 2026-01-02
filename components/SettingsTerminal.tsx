@@ -18,9 +18,14 @@ import {
   Users as UsersIcon,
   ShieldAlert,
   Zap,
+  Key,
+  Mail,
+  Smartphone,
+  RefreshCw,
 } from "lucide-react";
 import { UserSettings } from "../types";
 import { toast } from "react-hot-toast";
+import { supabase } from "../lib/supabase";
 
 interface SettingsTerminalProps {
   settings: UserSettings;
@@ -36,13 +41,14 @@ const SettingsTerminal: React.FC<SettingsTerminalProps> = ({
   onTogglePrivate,
 }) => {
   const [activeTab, setActiveTab] = useState<
-    "privacy" | "hardware" | "network"
+    "privacy" | "hardware" | "security"
   >("privacy");
+  const [newPassword, setNewPassword] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const toggleSetting = async (key: keyof UserSettings) => {
     const newVal = !settings[key];
 
-    // Physical Permission Requests
     if (newVal) {
       try {
         if (key === "camera_access")
@@ -66,10 +72,29 @@ const SettingsTerminal: React.FC<SettingsTerminalProps> = ({
     toast.success(`Protocol ${key.replace("_", " ").toUpperCase()} updated`);
   };
 
+  const handlePasswordUpdate = async () => {
+    if (newPassword.length < 6) {
+      toast.error("Password must be at least 6 characters.");
+      return;
+    }
+    setLoading(true);
+    try {
+      const { error } = await supabase.auth.updateUser({
+        password: newPassword,
+      });
+      if (error) throw error;
+      toast.success("Security Credentials Updated.");
+      setNewPassword("");
+    } catch (err: any) {
+      toast.error(err.message || "Credential update failed.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="space-y-8 duration-500 animate-in slide-in-from-right-4">
       <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden">
-        {/* Tabs */}
         <div className="flex border-b border-slate-50 dark:border-white/5 bg-slate-50/50 dark:bg-slate-950/50">
           <TabButton
             active={activeTab === "privacy"}
@@ -84,10 +109,10 @@ const SettingsTerminal: React.FC<SettingsTerminalProps> = ({
             icon={<Camera size={12} />}
           />
           <TabButton
-            active={activeTab === "network"}
-            onClick={() => setActiveTab("network")}
-            label="System"
-            icon={<Cpu size={12} />}
+            active={activeTab === "security"}
+            onClick={() => setActiveTab("security")}
+            label="Security"
+            icon={<Key size={12} />}
           />
         </div>
 
@@ -97,22 +122,22 @@ const SettingsTerminal: React.FC<SettingsTerminalProps> = ({
               <div className="flex items-center gap-3 pb-4 border-b border-slate-100 dark:border-white/5">
                 <ShieldAlert size={18} className="text-blue-600" />
                 <h3 className="text-[11px] font-black uppercase tracking-[0.3em] text-slate-900 dark:text-white">
-                  Security Thresholds
+                  Privacy Thresholds
                 </h3>
               </div>
 
               <SettingToggle
                 icon={<EyeOff size={18} />}
-                label="Stealth Mode (Private Profile)"
-                description="Disable public discovery. Only linked nodes can view your credentials."
+                label="Stealth Mode"
+                description="Profile will not be indexed in public registry."
                 active={isPrivate}
                 onClick={() => onTogglePrivate(!isPrivate)}
               />
 
               <SettingToggle
                 icon={<Globe size={18} />}
-                label="Real-time Presence"
-                description="Broadcast active status to the global registry."
+                label="Presence Pulse"
+                description="Show live online status to verified network nodes."
                 active={settings.presence_visible}
                 onClick={() => toggleSetting("presence_visible")}
               />
@@ -122,85 +147,79 @@ const SettingsTerminal: React.FC<SettingsTerminalProps> = ({
           {activeTab === "hardware" && (
             <section className="space-y-8 duration-300 animate-in fade-in">
               <div className="flex items-center gap-3 pb-4 border-b border-slate-100 dark:border-white/5">
-                {/* Fixed missing Zap icon import from lucide-react */}
                 <Zap size={18} className="text-blue-600" />
                 <h3 className="text-[11px] font-black uppercase tracking-[0.3em] text-slate-900 dark:text-white">
-                  Hardware Authorization
+                  Operational Access
                 </h3>
               </div>
 
               <SettingToggle
                 icon={<Camera size={18} />}
-                label="Camera Control"
-                description="Enable for live visual reporting and press ID verification."
+                label="Visual Capture"
                 active={settings.camera_access}
                 onClick={() => toggleSetting("camera_access")}
               />
 
               <SettingToggle
                 icon={<Mic size={18} />}
-                label="Microphone Interface"
-                description="Required for secure voice memos and field audio capture."
+                label="Audio Interface"
                 active={settings.mic_access}
                 onClick={() => toggleSetting("mic_access")}
               />
-
-              <SettingToggle
-                icon={<MapPin size={18} />}
-                label="Geolocation Beacon"
-                description="Tag your reports with precise regional metadata."
-                active={settings.location_access}
-                onClick={() => toggleSetting("location_access")}
-              />
             </section>
           )}
 
-          {activeTab === "network" && (
+          {activeTab === "security" && (
             <section className="space-y-8 duration-300 animate-in fade-in">
               <div className="flex items-center gap-3 pb-4 border-b border-slate-100 dark:border-white/5">
-                <Database size={18} className="text-blue-600" />
+                <Key size={18} className="text-blue-600" />
                 <h3 className="text-[11px] font-black uppercase tracking-[0.3em] text-slate-900 dark:text-white">
-                  Data Sovereignty
+                  Credential Management
                 </h3>
               </div>
 
-              <SettingToggle
-                icon={<HardDrive size={18} />}
-                label="Local Storage Cache"
-                description="Enable high-speed caching of network assets for offline reporting."
-                active={settings.storage_access}
-                onClick={() => toggleSetting("storage_access")}
-              />
+              <div className="space-y-6">
+                <div className="space-y-3">
+                  <label className="text-[10px] font-black uppercase text-slate-400">
+                    Update Password
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="password"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      placeholder="••••••••"
+                      className="flex-grow px-4 py-3 text-sm font-bold border outline-none bg-slate-50 dark:bg-slate-950 border-slate-100 dark:border-slate-800 rounded-xl dark:text-white"
+                    />
+                    <button
+                      onClick={handlePasswordUpdate}
+                      disabled={loading || !newPassword}
+                      className="px-6 bg-blue-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-950 transition-all disabled:opacity-50"
+                    >
+                      {loading ? (
+                        <RefreshCw size={14} className="animate-spin" />
+                      ) : (
+                        "Update"
+                      )}
+                    </button>
+                  </div>
+                </div>
 
-              <SettingToggle
-                icon={<UsersIcon size={18} />}
-                label="Contact Pulse Sync"
-                description="Discover known colleagues on the network via secure contact hashing."
-                active={settings.contacts_sync}
-                onClick={() => toggleSetting("contacts_sync")}
-              />
-
-              <SettingToggle
-                icon={<Cpu size={18} />}
-                label="AI Analysis Engine"
-                description="Allow Gemini Pro to pre-process incoming intelligence for your briefing."
-                active={settings.ai_briefings}
-                onClick={() => toggleSetting("ai_briefings")}
-              />
+                <div className="p-6 border bg-amber-50 dark:bg-amber-950/20 rounded-2xl border-amber-100 dark:border-amber-900/30">
+                  <div className="flex gap-3">
+                    <ShieldAlert
+                      size={16}
+                      className="text-amber-600 shrink-0"
+                    />
+                    <p className="text-[10px] font-bold text-amber-700 dark:text-amber-400 uppercase leading-relaxed">
+                      Security Warning: Disconnect all active sessions after
+                      credential update. Password changes are permanent.
+                    </p>
+                  </div>
+                </div>
+              </div>
             </section>
           )}
-
-          <div className="flex items-center justify-between pt-6 border-t border-slate-50 dark:border-white/5">
-            <div className="flex items-center gap-3">
-              <Shield size={16} className="text-emerald-500" />
-              <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">
-                Node Compliance: Active
-              </span>
-            </div>
-            <p className="text-[9px] font-mono text-slate-500">
-              REV: 1.2.5-STABLE
-            </p>
-          </div>
         </div>
       </div>
     </div>
@@ -236,9 +255,11 @@ const SettingToggle = ({ icon, label, description, active, onClick }: any) => (
         <h4 className="text-[11px] font-black uppercase tracking-wider text-slate-900 dark:text-white group-hover:text-blue-600 transition-colors">
           {label}
         </h4>
-        <p className="text-[10px] font-medium text-slate-400 dark:text-slate-500 leading-relaxed max-w-sm italic">
-          {description}
-        </p>
+        {description && (
+          <p className="text-[10px] font-medium text-slate-400 dark:text-slate-500 italic">
+            {description}
+          </p>
+        )}
       </div>
     </div>
     <button

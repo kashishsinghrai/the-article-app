@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+// Fix: Added missing 'User' to the lucide-react imports
 import {
   Settings,
   LogOut,
@@ -9,17 +10,21 @@ import {
   Loader2,
   ShieldCheck,
   UserCheck,
+  User,
   Fingerprint,
   Info,
   Edit3,
   Save,
   Sliders,
   ArrowLeft,
+  Mail,
+  Smartphone,
 } from "lucide-react";
 import IDCard from "../../components/IDCard";
 import SettingsTerminal from "../../components/SettingsTerminal";
 import { Profile } from "../../types";
 import { toast } from "react-hot-toast";
+import { supabase } from "../../lib/supabase";
 
 interface ProfilePageProps {
   profile: Profile;
@@ -50,9 +55,10 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
     full_name: profile?.full_name || "",
     bio: profile?.bio || "",
     gender: profile?.gender || "",
+    email: profile?.email || "",
+    phone: profile?.phone || "",
   });
 
-  // Sync tab if initialTab changes externally
   useEffect(() => {
     setActiveTab(initialTab);
   }, [initialTab]);
@@ -66,14 +72,22 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
 
   const isOwnProfile = !isExternal || currentUserId === profile.id;
 
-  const handleSave = () => {
-    onUpdateProfile?.(editData);
+  const handleSave = async () => {
+    if (onUpdateProfile) {
+      // Sync with Auth if email changed (Note: usually requires confirmation)
+      if (editData.email !== profile.email) {
+        const { error: authErr } = await supabase.auth.updateUser({
+          email: editData.email,
+        });
+        if (authErr) toast.error("Auth sync failed: " + authErr.message);
+      }
+      onUpdateProfile(editData);
+    }
     setIsEditing(false);
   };
 
   return (
     <main className="max-w-6xl px-6 py-24 mx-auto space-y-12 md:py-32">
-      {/* Fixed Back Button Navigation */}
       <button
         onClick={onCloseExternal}
         className="flex items-center gap-2 text-slate-400 hover:text-slate-900 dark:hover:text-white font-black uppercase text-[10px] tracking-widest transition-all group"
@@ -88,7 +102,6 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
       <div className="grid grid-cols-1 gap-12 lg:grid-cols-12 lg:gap-24">
         <div className="space-y-12 lg:col-span-5">
           <div className="flex flex-col items-center space-y-6">
-            {/* ID Card Wrapper with extra padding to prevent clipping */}
             <div className="flex justify-center w-full py-4 overflow-visible">
               <IDCard profile={profile} />
             </div>
@@ -107,7 +120,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
 
           <div className="grid grid-cols-2 gap-4">
             <StatCard label="Reputation" value={profile.budget} />
-            <StatCard label="Standing" value="Verified" />
+            <StatCard label="Standing" value={profile.role.toUpperCase()} />
           </div>
 
           {isOwnProfile && (
@@ -134,7 +147,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
                     : "text-slate-400"
                 }`}
               >
-                Profile
+                Identity
               </button>
               <button
                 onClick={() => setActiveTab("settings")}
@@ -160,27 +173,60 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
                     onClick={() =>
                       isEditing ? handleSave() : setIsEditing(true)
                     }
-                    className="text-blue-600 font-black uppercase text-[10px]"
+                    className="text-blue-600 font-black uppercase text-[10px] hover:underline"
                   >
-                    {isEditing ? "Save Changes" : "Edit Profile"}
+                    {isEditing ? "Sync Changes" : "Edit Credentials"}
                   </button>
                 )}
               </div>
 
               {isEditing ? (
                 <div className="space-y-6">
-                  <div className="space-y-2">
-                    <label className="text-[9px] font-bold uppercase text-slate-400">
-                      Full Legal Name
-                    </label>
-                    <input
+                  <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                    {/* Fix: 'User' icon is now available from imports */}
+                    <EditField
+                      icon={<User size={12} />}
+                      label="Full Name"
                       value={editData.full_name}
-                      onChange={(e) =>
-                        setEditData({ ...editData, full_name: e.target.value })
+                      onChange={(v) =>
+                        setEditData({ ...editData, full_name: v })
                       }
-                      className="w-full p-4 text-sm font-bold border-none outline-none bg-slate-50 dark:bg-slate-900 rounded-xl focus:ring-1 focus:ring-blue-600 dark:text-white"
-                      placeholder="Full Name"
                     />
+                    <EditField
+                      icon={<Mail size={12} />}
+                      label="Primary Email"
+                      value={editData.email}
+                      onChange={(v) => setEditData({ ...editData, email: v })}
+                    />
+                    <EditField
+                      icon={<Smartphone size={12} />}
+                      label="Contact Phone"
+                      value={editData.phone}
+                      onChange={(v) => setEditData({ ...editData, phone: v })}
+                    />
+                    <div className="space-y-2">
+                      <label className="text-[9px] font-bold uppercase text-slate-400">
+                        Gender
+                      </label>
+                      <select
+                        value={editData.gender}
+                        onChange={(e) =>
+                          setEditData({ ...editData, gender: e.target.value })
+                        }
+                        className="w-full p-4 text-sm font-bold border-none outline-none appearance-none bg-slate-50 dark:bg-slate-900 rounded-xl focus:ring-1 focus:ring-blue-600 dark:text-white"
+                      >
+                        {[
+                          "Male",
+                          "Female",
+                          "Non-Binary",
+                          "Prefer not to say",
+                        ].map((g) => (
+                          <option key={g} value={g}>
+                            {g}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
                   <div className="space-y-2">
                     <label className="text-[9px] font-bold uppercase text-slate-400">
@@ -200,22 +246,13 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
               ) : (
                 <div className="space-y-10">
                   <div className="grid grid-cols-2 gap-8">
-                    <div>
-                      <p className="text-[9px] text-slate-300 font-black uppercase mb-1">
-                        Name
-                      </p>
-                      <p className="text-xl italic font-black uppercase text-slate-900 dark:text-white">
-                        {profile.full_name}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-[9px] text-slate-300 font-black uppercase mb-1">
-                        Gender
-                      </p>
-                      <p className="text-xl italic font-black uppercase text-slate-900 dark:text-white">
-                        {profile.gender}
-                      </p>
-                    </div>
+                    <DetailBlock label="Name" val={profile.full_name} />
+                    <DetailBlock
+                      label="Network Email"
+                      val={profile.email || "N/A"}
+                    />
+                    <DetailBlock label="Contact" val={profile.phone || "N/A"} />
+                    <DetailBlock label="Gender" val={profile.gender} />
                   </div>
                   <div>
                     <p className="text-[9px] text-slate-300 font-black uppercase mb-2">
@@ -241,6 +278,31 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
     </main>
   );
 };
+
+const DetailBlock = ({ label, val }: any) => (
+  <div>
+    <p className="text-[9px] text-slate-300 font-black uppercase mb-1">
+      {label}
+    </p>
+    <p className="text-xl italic font-black uppercase truncate text-slate-900 dark:text-white">
+      {val}
+    </p>
+  </div>
+);
+
+const EditField = ({ icon, label, value, onChange }: any) => (
+  <div className="space-y-2">
+    <label className="text-[9px] font-bold uppercase text-slate-400 flex items-center gap-1.5">
+      {icon} {label}
+    </label>
+    <input
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className="w-full p-4 text-sm font-bold border-none outline-none bg-slate-50 dark:bg-slate-900 rounded-xl focus:ring-1 focus:ring-blue-600 dark:text-white"
+      placeholder={label}
+    />
+  </div>
+);
 
 const StatCard = ({ label, value }: any) => (
   <div className="bg-slate-50 dark:bg-slate-900 p-6 rounded-[1.5rem] border border-slate-100 dark:border-slate-800 space-y-1">
