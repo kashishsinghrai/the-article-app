@@ -75,10 +75,36 @@ const App: React.FC = () => {
           .select("*")
           .eq("id", session.user.id)
           .maybeSingle();
+
+        // Check if user is marked as admin in metadata OR database
+        const isAdmin =
+          session.user.user_metadata?.role === "admin" ||
+          prof?.role === "admin";
+
         if (prof) {
           setProfile(prof);
           setIsSettingUp(false);
+        } else if (isAdmin) {
+          // If it's an admin but no profile record exists, create one silently
+          const adminProfile: Profile = {
+            id: session.user.id,
+            username: "admin_" + session.user.id.substring(0, 5),
+            full_name: "Root Administrator",
+            gender: "System",
+            serial_id: `#ART-ROOT-${session.user.id.substring(0, 4)}`,
+            budget: 9999,
+            role: "admin",
+            is_private: true,
+            bio: "Network Operations Controller.",
+            email: session.user.email,
+            is_online: true,
+          };
+          await supabase.from("profiles").upsert(adminProfile);
+          setProfile(adminProfile);
+          setIsSettingUp(false);
+          toast.success("Root Access Synchronized.");
         } else {
+          // Regular user with no profile record must set up
           setIsSettingUp(true);
         }
       } else {
@@ -107,8 +133,31 @@ const App: React.FC = () => {
           .select("*")
           .eq("id", session.user.id)
           .maybeSingle();
+
+        const isAdmin =
+          session.user.user_metadata?.role === "admin" ||
+          prof?.role === "admin";
+
         if (prof) {
           setProfile(prof);
+          setIsSettingUp(false);
+        } else if (isAdmin) {
+          // Handle admin auto-init on auth change too
+          const adminProfile: Profile = {
+            id: session.user.id,
+            username: "admin_" + session.user.id.substring(0, 5),
+            full_name: "Root Administrator",
+            gender: "System",
+            serial_id: `#ART-ROOT-${session.user.id.substring(0, 4)}`,
+            budget: 9999,
+            role: "admin",
+            is_private: true,
+            bio: "Network Operations Controller.",
+            email: session.user.email,
+            is_online: true,
+          };
+          await supabase.from("profiles").upsert(adminProfile);
+          setProfile(adminProfile);
           setIsSettingUp(false);
         } else {
           setIsSettingUp(true);
