@@ -245,26 +245,34 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
                     icon={<User size={12} />}
                     label="Legal Name"
                     value={editData.full_name}
-                    onChange={(v) => setEditData({ ...editData, full_name: v })}
+                    onChange={(v: string) =>
+                      setEditData({ ...editData, full_name: v })
+                    }
                   />
                   <EditField
                     icon={<Info size={12} />}
                     label="Network Bio"
                     value={editData.bio}
-                    onChange={(v) => setEditData({ ...editData, bio: v })}
+                    onChange={(v: string) =>
+                      setEditData({ ...editData, bio: v })
+                    }
                   />
                   <div className="grid grid-cols-2 gap-4">
                     <EditField
                       icon={<Mail size={12} />}
                       label="Email"
                       value={editData.email}
-                      onChange={(v) => setEditData({ ...editData, email: v })}
+                      onChange={(v: string) =>
+                        setEditData({ ...editData, email: v })
+                      }
                     />
                     <EditField
                       icon={<Smartphone size={12} />}
                       label="Phone"
                       value={editData.phone}
-                      onChange={(v) => setEditData({ ...editData, phone: v })}
+                      onChange={(v: string) =>
+                        setEditData({ ...editData, phone: v })
+                      }
                     />
                   </div>
                 </div>

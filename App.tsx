@@ -53,9 +53,22 @@ const App: React.FC = () => {
     }
   }, []);
 
+  const fetchMyProfile = useCallback(async (userId: string) => {
+    const { data: prof, error } = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("id", userId)
+      .maybeSingle();
+    if (prof && !error) {
+      setProfile(prof);
+      return prof;
+    }
+    return null;
+  }, []);
+
   const listenForChatRequests = useCallback((userId: string) => {
     const channel = supabase
-      .channel("schema-db-changes")
+      .channel("chat_notifications_global")
       .on(
         "postgres_changes",
         {
@@ -66,12 +79,34 @@ const App: React.FC = () => {
         },
         (payload) => {
           const newReq = payload.new as ChatRequest;
-          setChatRequests((prev) => [...prev, newReq]);
-          toast("Incoming Network Connection Request", { icon: "📡" });
+          setChatRequests((prev) => {
+            if (prev.find((r) => r.id === newReq.id)) return prev;
+            return [...prev, newReq];
+          });
+          toast("📡 New Secure Handshake Request Received");
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "chat_requests",
+          filter: `to_id=eq.${userId}`,
+        },
+        (payload) => {
+          const updatedReq = payload.new as ChatRequest;
+          if (updatedReq.status !== "pending") {
+            setChatRequests((prev) =>
+              prev.filter((r) => r.id !== updatedReq.id)
+            );
+          }
         }
       )
       .subscribe();
-    return () => channel.unsubscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const checkUserStatus = useCallback(
@@ -83,27 +118,20 @@ const App: React.FC = () => {
       }
       setIsLoggedIn(true);
       try {
-        const { data: prof } = await supabase
-          .from("profiles")
+        await fetchMyProfile(user.id);
+        listenForChatRequests(user.id);
+
+        const { data: reqs } = await supabase
+          .from("chat_requests")
           .select("*")
-          .eq("id", user.id)
-          .maybeSingle();
-        if (prof) {
-          setProfile(prof);
-          listenForChatRequests(user.id);
-          // Fetch existing pending requests
-          const { data: reqs } = await supabase
-            .from("chat_requests")
-            .select("*")
-            .eq("to_id", user.id)
-            .eq("status", "pending");
-          if (reqs) setChatRequests(reqs);
-        }
+          .eq("to_id", user.id)
+          .eq("status", "pending");
+        if (reqs) setChatRequests(reqs);
       } catch (err) {
-        console.error("Identity check failure.");
+        console.error("Identity sync failure.");
       }
     },
-    [listenForChatRequests]
+    [listenForChatRequests, fetchMyProfile]
   );
 
   const initApp = useCallback(async () => {
@@ -127,11 +155,12 @@ const App: React.FC = () => {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === "SIGNED_IN") {
+      if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
         if (session?.user) await checkUserStatus(session.user);
       } else if (event === "SIGNED_OUT") {
         setIsLoggedIn(false);
         setProfile(null);
+        setChatRequests([]);
         setCurrentPage("home");
       }
     });
@@ -145,14 +174,16 @@ const App: React.FC = () => {
   }, [isDarkMode]);
 
   const handleFollow = async (targetId: string) => {
-    if (!profile) return toast.error("Sign in to follow.");
+    if (!profile) return toast.error("Sign in to link identities.");
     const isFollowing = profile.following?.includes(targetId);
 
-    // 1. Update following list
+    // Update local state optimistically
+    const currentFollowing = profile.following || [];
     const newFollowing = isFollowing
-      ? profile.following?.filter((id) => id !== targetId)
-      : [...(profile.following || []), targetId];
+      ? currentFollowing.filter((id) => id !== targetId)
+      : [...currentFollowing, targetId];
 
+    // 1. Update MY following list
     const { error: pError } = await supabase
       .from("profiles")
       .update({
@@ -161,32 +192,33 @@ const App: React.FC = () => {
       })
       .eq("id", profile.id);
 
-    if (pError) return toast.error("Sync Error");
+    if (pError) return toast.error("Social sync failed.");
 
-    // 2. Update target user's followers count
-    const target = users.find((u) => u.id === targetId);
-    if (target) {
+    // 2. Update TARGET's followers count
+    const targetUser = users.find((u) => u.id === targetId);
+    if (targetUser) {
       const newFollowersCount = isFollowing
-        ? (target.followers_count || 1) - 1
-        : (target.followers_count || 0) + 1;
+        ? Math.max(0, (targetUser.followers_count || 1) - 1)
+        : (targetUser.followers_count || 0) + 1;
       await supabase
         .from("profiles")
-        .update({ followers_count: Math.max(0, newFollowersCount) })
+        .update({ followers_count: newFollowersCount })
         .eq("id", targetId);
     }
 
-    setProfile({
-      ...profile,
-      following: newFollowing,
-      following_count: newFollowing.length,
-    });
-    toast.success(isFollowing ? "Disconnected" : "Handshake Verified");
-    fetchGlobalData();
+    toast.success(
+      isFollowing ? "Identity Unlinked" : "Node Connection Secured"
+    );
+
+    // Forced Refetch
+    await fetchMyProfile(profile.id);
+    await fetchGlobalData();
   };
 
   const handleChatInitiate = async (target: Profile) => {
-    if (!profile) return toast.error("Login to message.");
-    // Check if request already exists
+    if (!profile) return toast.error("Auth required.");
+
+    // Check if channel is already open
     const { data: existing } = await supabase
       .from("chat_requests")
       .select("*")
@@ -198,13 +230,13 @@ const App: React.FC = () => {
     if (existing?.status === "accepted") {
       setActiveChat(target);
     } else if (existing?.status === "pending") {
-      // Fix: replaced non-existent toast.info with base toast function
-      toast("Connection Pending Verification.");
+      toast("Channel Handshake Pending Verification.");
     } else {
       const { error } = await supabase
         .from("chat_requests")
-        .insert({ from_id: profile.id, to_id: target.id });
-      if (!error) toast.success("Access Request Transmitted.");
+        .insert({ from_id: profile.id, to_id: target.id, status: "pending" });
+      if (!error) toast.success("Secure Handshake Dispatched.");
+      else toast.error("Channel Establishment Failed.");
     }
   };
 
@@ -217,7 +249,7 @@ const App: React.FC = () => {
       setChatRequests((prev) => prev.filter((r) => r.id !== req.id));
       const sender = users.find((u) => u.id === req.from_id);
       if (sender) setActiveChat(sender);
-      toast.success("Identity Verified. Channel Open.");
+      toast.success("Identity Verified. Comm Link: ACTIVE.");
     }
   };
 
@@ -274,7 +306,7 @@ const App: React.FC = () => {
             profileAvatar={profile?.avatar_url}
           />
 
-          <div className="pt-24">
+          <div className="min-h-screen pt-24">
             {currentPage === "home" && (
               <HomePage
                 articles={articles}
@@ -289,6 +321,8 @@ const App: React.FC = () => {
                 onReadArticle={setActiveArticle}
                 onRefresh={fetchGlobalData}
                 onInteraction={async (type, id) => {
+                  if (!isLoggedIn)
+                    return toast.error("Identity verification required.");
                   const art = articles.find((a) => a.id === id);
                   if (!art) return;
                   const col =
@@ -364,9 +398,9 @@ const App: React.FC = () => {
                 <div className="py-40 text-center">
                   <button
                     onClick={() => setShowAuth("login")}
-                    className="px-8 py-3 text-white bg-slate-900 rounded-xl"
+                    className="px-8 py-3 font-bold text-white bg-slate-900 rounded-xl"
                   >
-                    Identify First
+                    IDENTITY REQUIRED
                   </button>
                 </div>
               ))}
@@ -384,6 +418,19 @@ const App: React.FC = () => {
                 onChat={handleChatInitiate}
                 onRefresh={fetchGlobalData}
                 onFollow={handleFollow}
+              />
+            )}
+
+            {currentPage === "support" && (
+              <SupportPage onBack={() => setCurrentPage("home")} />
+            )}
+            {currentPage === "admin" && profile?.role === "admin" && (
+              <AdminPage
+                articles={articles}
+                users={users}
+                currentUserId={profile.id}
+                onUpdateArticles={fetchGlobalData}
+                onUpdateUsers={fetchGlobalData}
               />
             )}
           </div>
