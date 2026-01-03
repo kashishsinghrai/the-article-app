@@ -20,9 +20,7 @@ Follow these exact steps to run the app on your computer:
 1.  Folder ke root mein (jahan package.json hai) ek nayi file banayein jiska naam `.env` rakhein.
 2.  Uss file ke andar ye lines copy-paste karein:
     ```env
-    VITE_API_KEY=AIzaSyBvM4x_OucBWsOQLai7j_oDWf3c7Tm2vrU
-    VITE_SUPABASE_URL=https://cqkgnklumxnlvnrnbttg.supabase.co
-    VITE_SUPABASE_ANON_KEY=sb_publishable_9YcOKZA_OHwz_we3rhMWBQ_vbHivctV
+    
     ```
 
 ### 4. Launch (App Chalayein)
