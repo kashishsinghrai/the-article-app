@@ -3,7 +3,6 @@ import {
   Shield,
   User,
   Globe,
-  PenSquare,
   Users,
   LifeBuoy,
   Bell,
@@ -13,7 +12,6 @@ import {
   ChevronDown,
   LayoutGrid,
   Radio,
-  Settings,
   LogOut,
   Menu,
   X,
@@ -21,6 +19,9 @@ import {
   FileText,
   Terminal,
   Lock,
+  Zap,
+  // Fix: Added missing PenSquare import
+  PenSquare,
 } from "lucide-react";
 import { ChatRequest, Profile } from "../types";
 import { useStore } from "../lib/store";
@@ -37,7 +38,6 @@ interface NavbarProps {
   chatRequests: ChatRequest[];
   onAcceptRequest: (req: ChatRequest) => void;
   profileAvatar?: string;
-  userName?: string;
 }
 
 const Navbar: React.FC<NavbarProps> = ({
@@ -52,10 +52,10 @@ const Navbar: React.FC<NavbarProps> = ({
   chatRequests,
   onAcceptRequest,
   profileAvatar,
-  userName,
 }) => {
   const [isNavDropdownOpen, setIsNavDropdownOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const users = useStore((s) => s.users);
   const [searchResults, setSearchResults] = useState<Profile[]>([]);
@@ -65,6 +65,7 @@ const Navbar: React.FC<NavbarProps> = ({
     onNavigate(page, id);
     setIsNavDropdownOpen(false);
     setIsSidebarOpen(false);
+    setIsNotificationsOpen(false);
   };
 
   useEffect(() => {
@@ -122,7 +123,6 @@ const Navbar: React.FC<NavbarProps> = ({
                   }`}
                 />
               </button>
-
               {isNavDropdownOpen && (
                 <>
                   <div
@@ -251,12 +251,83 @@ const Navbar: React.FC<NavbarProps> = ({
 
             {isLoggedIn && (
               <div className="relative">
-                <button className="p-2.5 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5 rounded-xl transition-all relative">
+                <button
+                  onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
+                  className="p-2.5 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5 rounded-xl transition-all relative"
+                >
                   <Bell size={20} />
                   {chatRequests.length > 0 && (
-                    <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full animate-pulse border-2 border-white dark:border-[#0a0a0a]" />
+                    <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-red-500 rounded-full animate-pulse border-2 border-white dark:border-[#0a0a0a]" />
                   )}
                 </button>
+                {isNotificationsOpen && (
+                  <>
+                    <div
+                      className="fixed inset-0 z-[-1]"
+                      onClick={() => setIsNotificationsOpen(false)}
+                    />
+                    <div className="absolute top-full right-0 mt-3 w-[320px] bg-white dark:bg-[#1e293b] border border-slate-200 dark:border-white/10 rounded-[2rem] shadow-2xl p-6 animate-in fade-in slide-in-from-top-2 duration-200">
+                      <div className="flex items-center justify-between mb-6">
+                        <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-900 dark:text-white">
+                          Active Handshaks
+                        </h4>
+                        <span className="text-[8px] font-black uppercase text-[#00BFFF] bg-[#00BFFF]/10 px-2 py-1 rounded-full">
+                          {chatRequests.length} Signals
+                        </span>
+                      </div>
+                      <div className="space-y-4 max-h-[400px] overflow-y-auto no-scrollbar">
+                        {chatRequests.length === 0 ? (
+                          <div className="py-10 space-y-3 text-center opacity-30">
+                            <Zap size={24} className="mx-auto" />
+                            <p className="text-[9px] font-black uppercase tracking-widest">
+                              Buffer Empty
+                            </p>
+                          </div>
+                        ) : (
+                          chatRequests.map((req) => (
+                            <div
+                              key={req.id}
+                              className="p-4 space-y-4 border bg-slate-50 dark:bg-white/5 rounded-2xl border-slate-100 dark:border-white/5"
+                            >
+                              <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 overflow-hidden rounded-xl bg-slate-200 dark:bg-slate-800">
+                                  {req.from_node?.avatar_url ? (
+                                    <img
+                                      src={req.from_node.avatar_url}
+                                      className="object-cover w-full h-full"
+                                    />
+                                  ) : (
+                                    <User
+                                      className="m-2.5 text-slate-400"
+                                      size={20}
+                                    />
+                                  )}
+                                </div>
+                                <div className="overflow-hidden">
+                                  <p className="text-[11px] font-black uppercase text-slate-900 dark:text-white truncate">
+                                    {req.from_node?.full_name}
+                                  </p>
+                                  <p className="text-[8px] font-bold text-[#00BFFF] uppercase tracking-tighter">
+                                    {req.from_node?.serial_id}
+                                  </p>
+                                </div>
+                              </div>
+                              <button
+                                onClick={() => {
+                                  onAcceptRequest(req);
+                                  setIsNotificationsOpen(false);
+                                }}
+                                className="w-full py-2.5 bg-[#00BFFF] text-white rounded-xl text-[9px] font-black uppercase tracking-widest shadow-lg shadow-[#00BFFF]/20 hover:brightness-110 active:scale-95 transition-all"
+                              >
+                                Accept Handshake
+                              </button>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
             )}
 

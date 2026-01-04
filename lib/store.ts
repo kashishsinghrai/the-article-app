@@ -1,3 +1,4 @@
+
 import { create } from 'zustand';
 import { Profile, Article, ChatRequest } from '../types';
 import { supabase } from './supabase';
@@ -8,6 +9,7 @@ interface AppState {
   articles: Article[];
   users: Profile[];
   chatRequests: ChatRequest[];
+  activeHandshake: ChatRequest | null;
   isSyncing: boolean;
   isInitialized: boolean;
   isHydrating: boolean;
@@ -17,6 +19,7 @@ interface AppState {
   setArticles: (articles: Article[]) => void;
   setUsers: (users: Profile[]) => void;
   setChatRequests: (chatRequests: ChatRequest[]) => void;
+  setActiveHandshake: (req: ChatRequest | null) => void;
   
   syncAll: () => Promise<void>;
   hydrate: () => Promise<void>;
@@ -30,6 +33,7 @@ export const useStore = create<AppState>((set, get) => ({
   articles: [],
   users: [],
   chatRequests: [],
+  activeHandshake: null,
   isSyncing: false,
   isInitialized: false,
   isHydrating: false,
@@ -39,6 +43,7 @@ export const useStore = create<AppState>((set, get) => ({
   setArticles: (articles) => set({ articles }),
   setUsers: (users) => set({ users }),
   setChatRequests: (chatRequests) => set({ chatRequests }),
+  setActiveHandshake: (activeHandshake) => set({ activeHandshake }),
 
   syncAll: async () => {
     if (get().isSyncing) return;
@@ -70,7 +75,7 @@ export const useStore = create<AppState>((set, get) => ({
       
       if (session?.user) {
         set({ isLoggedIn: true });
-        const { data: profile, error } = await supabase
+        const { data: profile } = await supabase
           .from('profiles')
           .select('*')
           .eq('id', session.user.id)
@@ -78,8 +83,9 @@ export const useStore = create<AppState>((set, get) => ({
           
         if (profile) {
           set({ profile });
+          // Fetch pending requests for this user
           const { data: reqs } = await supabase.from('chat_requests')
-            .select('*')
+            .select('*, from_node:from_id(*)')
             .eq('to_id', profile.id)
             .eq('status', 'pending');
           if (reqs) set({ chatRequests: reqs });
@@ -91,7 +97,6 @@ export const useStore = create<AppState>((set, get) => ({
       console.error("Hydration Error:", e.message);
     } finally {
       set({ isInitialized: true, isHydrating: false });
-      // Non-blocking sync
       get().syncAll();
     }
   },
@@ -104,7 +109,49 @@ export const useStore = create<AppState>((set, get) => ({
         set({ profile: null, isLoggedIn: false, chatRequests: [], articles: [], users: [] });
       }
     });
-    return () => subscription.unsubscribe();
+
+    // Real-time listener for chat requests
+    const channel = supabase.channel('global_handshakes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_requests' }, async (payload) => {
+        const me = get().profile;
+        if (!me) return;
+
+        const newReq = payload.new as ChatRequest;
+        
+        // CASE 1: Incoming pending request for me
+        if (newReq.to_id === me.id && newReq.status === 'pending') {
+          // Refresh my notifications list
+          const { data: reqs } = await supabase.from('chat_requests')
+            .select('*, from_node:from_id(*)')
+            .eq('to_id', me.id)
+            .eq('status', 'pending');
+          if (reqs) set({ chatRequests: reqs });
+        }
+
+        // CASE 2: A request I sent was accepted
+        if (newReq.from_id === me.id && newReq.status === 'accepted') {
+          const { data: fullReq } = await supabase.from('chat_requests')
+            .select('*, to_node:to_id(*)')
+            .eq('id', newReq.id)
+            .single();
+          if (fullReq) set({ activeHandshake: fullReq });
+        }
+
+        // CASE 3: A request sent to me was accepted (by me)
+        if (newReq.to_id === me.id && newReq.status === 'accepted') {
+          const { data: fullReq } = await supabase.from('chat_requests')
+            .select('*, from_node:from_id(*)')
+            .eq('id', newReq.id)
+            .single();
+          if (fullReq) set({ activeHandshake: fullReq });
+        }
+      })
+      .subscribe();
+
+    return () => {
+      subscription.unsubscribe();
+      channel.unsubscribe();
+    };
   },
 
   logout: async () => {
@@ -112,7 +159,7 @@ export const useStore = create<AppState>((set, get) => ({
       await supabase.auth.signOut();
     } finally {
       localStorage.clear();
-      set({ profile: null, isLoggedIn: false, chatRequests: [] });
+      set({ profile: null, isLoggedIn: false, chatRequests: [], activeHandshake: null });
     }
   }
 }));

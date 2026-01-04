@@ -23,6 +23,9 @@ const App: React.FC = () => {
   const isLoggedIn = useStore((s) => s.isLoggedIn);
   const users = useStore((s) => s.users);
   const chatRequests = useStore((s) => s.chatRequests);
+  const activeHandshake = useStore((s) => s.activeHandshake);
+  const setActiveHandshake = useStore((s) => s.setActiveHandshake);
+  const setChatRequests = useStore((s) => s.setChatRequests);
   const articles = useStore((s) => s.articles);
   const isInitialized = useStore((s) => s.isInitialized);
 
@@ -35,52 +38,36 @@ const App: React.FC = () => {
   const [showAuth, setShowAuth] = useState<"login" | "register" | null>(null);
   const [viewingProfile, setViewingProfile] = useState<Profile | null>(null);
   const [activeArticle, setActiveArticle] = useState<Article | null>(null);
-  const [activeChat, setActiveChat] = useState<{
-    profile: Profile;
-    handshakeId: string;
-  } | null>(null);
   const [isDarkMode, setIsDarkMode] = useState(true);
 
-  // Parse Hash for Routing
   const handleRouting = () => {
     const hash = window.location.hash.replace("#/", "");
     if (!hash || hash === "") {
       setCurrentPage("home");
       return;
     }
-
     const segments = hash.split("/");
     const page = segments[0];
     const id = segments[1];
-
     setCurrentPage(page);
-
-    // Handle Profile Deep Linking
     if (page === "profile" && id) {
       const targetUser = users.find((u) => u.id === id || u.username === id);
-      if (targetUser) {
-        setViewingProfile(targetUser);
-      }
+      if (targetUser) setViewingProfile(targetUser);
     } else if (page === "profile" && !id) {
-      setViewingProfile(null); // Own profile
+      setViewingProfile(null);
     }
   };
 
   useEffect(() => {
     hydrate();
     const unsub = initAuthListener();
-
-    // Initial Route
     handleRouting();
-
-    // Listen for hash changes
     window.addEventListener("hashchange", handleRouting);
-
     return () => {
       if (unsub) unsub();
       window.removeEventListener("hashchange", handleRouting);
     };
-  }, [users.length]); // Dependency on users to ensure profile lookup works on deep link
+  }, [users.length]);
 
   useEffect(() => {
     if (isDarkMode) document.documentElement.classList.add("dark");
@@ -92,29 +79,20 @@ const App: React.FC = () => {
     window.location.hash = target;
   };
 
-  const handleUpdateProfile = async (data: Partial<Profile>) => {
-    if (!profile) return;
+  const handleAcceptRequest = async (req: ChatRequest) => {
     const { error } = await supabase
-      .from("profiles")
-      .update(data)
-      .eq("id", profile.id);
+      .from("chat_requests")
+      .update({ status: "accepted" })
+      .eq("id", req.id);
+
     if (!error) {
-      toast.success("Identity Updated");
-      hydrate();
+      toast.success("Handshake Established", { icon: "🤝" });
+      // Remove from notifications
+      setChatRequests(chatRequests.filter((r) => r.id !== req.id));
+    } else {
+      toast.error("Handshake Protocol Failure");
     }
   };
-
-  const handleLogout = async () => {
-    await logout();
-    navigate("home");
-    setViewingProfile(null);
-    toast.success("Disconnected");
-  };
-
-  const personalArticles = useMemo(() => {
-    if (!profile) return [];
-    return articles.filter((a) => a.author_id === profile.id);
-  }, [articles, profile]);
 
   const handleInteraction = async (type: "like" | "dislike", id: string) => {
     if (!isLoggedIn) return setShowAuth("login");
@@ -129,35 +107,21 @@ const App: React.FC = () => {
       .update({ [field]: (data?.[field] || 0) + 1 })
       .eq("id", id);
     syncAll();
-    toast.success("Signal Interacted", { id: "interact" });
   };
 
   const AccessDenied = () => (
-    <div className="flex flex-col items-center justify-center min-h-[70vh] px-6 text-center space-y-8 animate-in fade-in zoom-in-95 duration-500">
-      <div className="relative">
-        <div className="absolute inset-0 bg-red-500/20 blur-[60px] rounded-full animate-pulse" />
-        <div className="relative p-10 bg-slate-900/50 rounded-[3rem] border border-red-500/30 shadow-2xl">
-          <ShieldAlert
-            size={80}
-            className="mx-auto text-red-500"
-            strokeWidth={1.5}
-          />
-        </div>
+    <div className="flex flex-col items-center justify-center min-h-[70vh] px-6 text-center space-y-8">
+      <div className="relative p-10 bg-slate-900/50 rounded-[3rem] border border-red-500/30">
+        <ShieldAlert size={80} className="mx-auto text-red-500" />
       </div>
-      <div className="max-w-md space-y-4">
-        <h2 className="text-4xl italic font-black tracking-tighter uppercase text-slate-950 dark:text-white">
-          Access_Denied
-        </h2>
-        <p className="text-sm font-bold leading-relaxed tracking-widest uppercase text-slate-500 dark:text-slate-400">
-          The requested shard requires verified identity credentials. Initialize
-          your node session to continue.
-        </p>
-      </div>
+      <h2 className="text-4xl italic font-black text-white uppercase">
+        Access_Denied
+      </h2>
       <button
         onClick={() => setShowAuth("login")}
-        className="px-12 py-5 bg-slate-900 dark:bg-white text-white dark:text-black rounded-[2rem] font-black uppercase text-xs tracking-[0.3em] hover:scale-105 active:scale-95 transition-all shadow-2xl flex items-center gap-4"
+        className="px-12 py-5 text-xs font-black tracking-widest text-black uppercase bg-white rounded-full"
       >
-        <Key size={18} /> Initialize Session
+        Initialize Session
       </button>
     </div>
   );
@@ -171,21 +135,8 @@ const App: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-[#050505] text-slate-900 dark:text-[#e5e7eb] font-sans selection:bg-[#00BFFF]/30">
-      <Toaster
-        position="top-right"
-        toastOptions={{
-          style: {
-            background: "#111",
-            color: "#fff",
-            borderRadius: "1.5rem",
-            border: "1px solid rgba(255,255,255,0.1)",
-            fontSize: "10px",
-            textTransform: "uppercase",
-            fontWeight: "900",
-          },
-        }}
-      />
+    <div className="min-h-screen bg-slate-50 dark:bg-[#050505] text-slate-900 dark:text-[#e5e7eb] font-sans">
+      <Toaster position="top-right" />
 
       {showAuth === "login" && (
         <LoginPage
@@ -207,14 +158,17 @@ const App: React.FC = () => {
           <Navbar
             onNavigate={navigate}
             onLogin={() => setShowAuth("login")}
-            onLogout={handleLogout}
+            onLogout={async () => {
+              await logout();
+              navigate("home");
+            }}
             currentPage={currentPage}
             isLoggedIn={isLoggedIn}
             userRole={profile?.role || "user"}
             isDarkMode={isDarkMode}
             onToggleDarkMode={() => setIsDarkMode(!isDarkMode)}
             chatRequests={chatRequests}
-            onAcceptRequest={(req) => toast.success("Handshake Accepted")}
+            onAcceptRequest={handleAcceptRequest}
             profileAvatar={profile?.avatar_url}
           />
 
@@ -236,7 +190,22 @@ const App: React.FC = () => {
                   users={users}
                   currentUserId={profile?.id}
                   onViewProfile={(u) => navigate("profile", u.id)}
-                  onChat={(u) => toast.success("Handshake established")}
+                  onChat={async (u) => {
+                    const { error } = await supabase
+                      .from("chat_requests")
+                      .insert([
+                        {
+                          from_id: profile?.id,
+                          to_id: u.id,
+                          status: "pending",
+                        },
+                      ]);
+                    if (!error)
+                      toast.success(
+                        "Handshake Dispatched. Waiting for node response...",
+                        { icon: "📡" }
+                      );
+                  }}
                 />
               ) : (
                 <AccessDenied />
@@ -246,10 +215,12 @@ const App: React.FC = () => {
               (isLoggedIn ? (
                 <PostPage
                   profile={profile}
-                  personalArticles={personalArticles}
+                  personalArticles={articles.filter(
+                    (a) => a.author_id === profile?.id
+                  )}
                   onBack={() => window.history.back()}
                   onPublish={async (data) => {
-                    const { error } = await supabase
+                    await supabase
                       .from("articles")
                       .insert([
                         {
@@ -259,11 +230,8 @@ const App: React.FC = () => {
                           author_name: profile?.full_name,
                         },
                       ]);
-                    if (!error) {
-                      toast.success("Transmission Dispatched");
-                      syncAll();
-                      navigate("home");
-                    }
+                    syncAll();
+                    navigate("home");
                   }}
                 />
               ) : (
@@ -275,12 +243,32 @@ const App: React.FC = () => {
                 profile ? (
                   <ProfilePage
                     profile={viewingProfile || profile}
-                    onLogout={handleLogout}
+                    onLogout={async () => {
+                      await logout();
+                      navigate("home");
+                    }}
                     isExternal={!!viewingProfile}
                     onCloseExternal={() => window.history.back()}
                     currentUserId={profile.id}
-                    onUpdateProfile={handleUpdateProfile}
-                    onChat={(u) => toast.success("Handshake established")}
+                    onUpdateProfile={async (d) => {
+                      await supabase
+                        .from("profiles")
+                        .update(d)
+                        .eq("id", profile.id);
+                      hydrate();
+                    }}
+                    onChat={async (u) => {
+                      await supabase
+                        .from("chat_requests")
+                        .insert([
+                          {
+                            from_id: profile?.id,
+                            to_id: u.id,
+                            status: "pending",
+                          },
+                        ]);
+                      toast.success("Handshake Dispatched");
+                    }}
                   />
                 ) : (
                   <SetupProfilePage
@@ -297,7 +285,6 @@ const App: React.FC = () => {
             {currentPage === "support" && (
               <SupportPage onBack={() => window.history.back()} />
             )}
-
             {currentPage === "admin" &&
               (isLoggedIn && profile?.role === "admin" ? (
                 <AdminPage
@@ -306,7 +293,10 @@ const App: React.FC = () => {
                   currentUserId={profile.id}
                   onUpdateUsers={syncAll}
                   onUpdateArticles={syncAll}
-                  onLogout={handleLogout}
+                  onLogout={async () => {
+                    await logout();
+                    navigate("home");
+                  }}
                 />
               ) : (
                 <AccessDenied />
@@ -325,12 +315,16 @@ const App: React.FC = () => {
             />
           )}
 
-          {activeChat && (
+          {activeHandshake && (
             <ChatOverlay
-              recipient={activeChat.profile}
+              recipient={
+                activeHandshake.from_id === profile?.id
+                  ? activeHandshake.to_node!
+                  : activeHandshake.from_node!
+              }
               currentUserId={profile?.id || ""}
-              handshakeId={activeChat.handshakeId}
-              onClose={() => setActiveChat(null)}
+              handshakeId={activeHandshake.id}
+              onClose={() => setActiveHandshake(null)}
             />
           )}
           <Footer onNavigate={navigate} />
