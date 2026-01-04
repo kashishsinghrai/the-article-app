@@ -1,57 +1,67 @@
 import React, { useMemo, useState } from "react";
 import {
-  ArrowRight,
   Globe,
-  ShieldCheck,
-  PenSquare,
-  MessageSquare,
-  Volume2,
-  Newspaper,
-  Hash,
-  UserPlus,
-  Fingerprint,
-  Network as NetworkIcon,
-  Trash2,
-  Edit,
   RefreshCcw,
-  ThumbsUp,
-  ThumbsDown,
-  MessageCircle,
-  Filter,
+  WifiOff,
+  Zap,
+  Fingerprint,
+  Network,
+  ShieldCheck,
+  ArrowRight,
+  Star,
+  Loader2,
+  Activity,
 } from "lucide-react";
-import { Article, Category, Profile } from "../types";
+import { Article, Category } from "../types";
+import TrendingTopics from "../components/TrendingTopics";
 import NewsTerminal from "../components/NewsTerminal";
 
 interface HomePageProps {
   articles: Article[];
   isLoggedIn: boolean;
   onLogin: () => void;
-  userRole: string;
-  onDelete: (id: string) => void;
-  onEdit: (article: Article) => void;
-  onViewProfile?: (id: string) => void;
   onReadArticle?: (article: Article) => void;
-  isArchive?: boolean;
   onRefresh?: () => void;
-  onInteraction?: (type: "like" | "dislike", articleId: string) => void;
 }
 
+const InstructionBlock = ({
+  num,
+  icon,
+  title,
+  desc,
+}: {
+  num: string;
+  icon: React.ReactNode;
+  title: string;
+  desc: string;
+}) => (
+  <div className="space-y-10 p-12 bg-slate-50 dark:bg-slate-900 rounded-[3.5rem] border border-white/5 transition-all hover:border-blue-500/50 group hover:shadow-2xl">
+    <div className="flex items-start justify-between">
+      <div className="text-blue-600 transition-transform duration-700 group-hover:scale-125">
+        {icon}
+      </div>
+      <span className="text-5xl italic font-black text-slate-800">{num}</span>
+    </div>
+    <div className="space-y-5">
+      <h4 className="text-3xl italic font-black tracking-tighter uppercase dark:text-white">
+        {title}
+      </h4>
+      <p className="text-sm font-bold leading-relaxed uppercase text-slate-400">
+        {desc}
+      </p>
+    </div>
+  </div>
+);
+
 const HomePage: React.FC<HomePageProps> = ({
-  articles,
+  articles = [],
   isLoggedIn,
   onLogin,
-  userRole,
-  onDelete,
-  onEdit,
-  onViewProfile,
   onReadArticle,
-  isArchive = false,
   onRefresh,
-  onInteraction,
 }) => {
   const [activeCategory, setActiveCategory] = useState<Category>("All");
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const isAdmin = userRole === "admin";
 
   const filteredArticles = useMemo(() => {
     if (activeCategory === "All") return articles;
@@ -61,244 +71,196 @@ const HomePage: React.FC<HomePageProps> = ({
   const handleRefresh = async () => {
     if (onRefresh) {
       setIsRefreshing(true);
-      await onRefresh();
-      setTimeout(() => setIsRefreshing(false), 800);
+      try {
+        await onRefresh();
+      } finally {
+        setTimeout(() => setIsRefreshing(false), 800);
+      }
     }
   };
 
-  const handleImgError = (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
-    e.currentTarget.src =
-      "https://images.unsplash.com/photo-1504711432869-efd597cdd0bf?auto=format&fit=crop&q=80&w=1000";
-  };
-
-  if (!isLoggedIn && !isArchive) {
+  if (!isLoggedIn) {
     return (
-      <main className="flex flex-col min-h-screen bg-white dark:bg-slate-950">
-        <section className="flex flex-col items-center max-w-5xl px-8 pt-40 pb-32 mx-auto space-y-12 text-center">
-          <div className="flex items-center gap-2 px-3 py-1 border rounded-full border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900">
-            <Volume2 size={12} className="text-slate-500" />
-            <span className="text-[9px] font-bold uppercase tracking-widest text-slate-400">
-              Restoring Authority Through Presence
+      <div className="px-8 pb-40 space-y-32 duration-1000 animate-in fade-in">
+        <div className="max-w-5xl pt-24 space-y-10">
+          <div className="flex items-center gap-3 bg-blue-50 dark:bg-blue-900/20 px-5 py-2.5 rounded-full w-fit">
+            <ShieldCheck size={16} className="text-blue-600" />
+            <span className="text-[10px] font-black uppercase tracking-[0.4em] text-blue-600">
+              Entry Protocol
             </span>
           </div>
-          <h1 className="text-6xl md:text-9xl font-bold text-slate-950 dark:text-white tracking-tight leading-[0.9]">
-            The platform <br /> for{" "}
-            <span className="text-slate-400">truth.</span>
+          <h1 className="text-6xl md:text-9xl font-black tracking-tighter leading-[0.85] dark:text-white uppercase italic">
+            ThE-ARTICLES <br />
+            <span className="text-slate-800">CITIZEN FRONT.</span>
           </h1>
-          <p className="max-w-xl text-lg font-medium leading-relaxed text-slate-500 dark:text-slate-400 md:text-xl">
-            A high-end, minimal space where the youth publishes perspectives and
-            connects through private, secure dialogue.
+          <p className="max-w-2xl text-xl italic font-bold text-slate-400 md:text-2xl">
+            The truth is decentralized. Join the global registry of verified
+            correspondents bypassing gatekeeper control.
           </p>
-          <div className="flex w-full max-w-sm gap-4">
+          <div className="flex flex-col gap-5 pt-6 sm:flex-row">
             <button
               onClick={onLogin}
-              className="flex-1 py-4 text-sm font-bold tracking-widest text-white uppercase transition-all bg-slate-950 dark:bg-white dark:text-slate-950 rounded-xl hover:opacity-90"
+              className="px-12 py-6 text-xs font-black tracking-widest transition-all bg-white text-slate-950 rounded-2xl hover:scale-105 active:scale-95"
             >
-              Join Now
+              Initialize Identity
             </button>
-            <button
-              onClick={() =>
-                document
-                  .getElementById("journey")
-                  ?.scrollIntoView({ behavior: "smooth" })
-              }
-              className="flex-1 py-4 text-sm font-bold tracking-widest uppercase transition-all border border-slate-100 dark:border-slate-800 text-slate-600 dark:text-slate-300 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-900"
-            >
-              Instruction
+            <button className="px-12 py-6 text-xs font-black tracking-widest uppercase bg-transparent border-2 border-white/10 text-slate-400 rounded-2xl">
+              Ethics Charter
             </button>
           </div>
-        </section>
-
-        <section
-          id="journey"
-          className="px-8 py-40 overflow-hidden bg-slate-50/50 dark:bg-slate-950 border-y border-slate-100 dark:border-slate-900"
-        >
-          <div className="max-w-6xl mx-auto space-y-24">
-            <div className="space-y-4 text-center">
-              <h2 className="text-xs font-black uppercase tracking-[0.5em] text-blue-600">
-                The Operations Cycle
-              </h2>
-              <h3 className="text-4xl italic font-black tracking-tighter uppercase md:text-6xl dark:text-white">
-                How it works
-              </h3>
-            </div>
-            <div className="relative flex flex-col items-center justify-between gap-16 md:flex-row md:gap-4">
-              <JourneyStep
-                num="01"
-                icon={<UserPlus size={24} />}
-                label="Register"
-                desc="Establish your node in the network via encrypted signup."
-              />
-              <JourneyStep
-                num="02"
-                icon={<Fingerprint size={24} />}
-                label="Identify"
-                desc="Download your unique Digital Press ID to verify presence."
-              />
-              <JourneyStep
-                num="03"
-                icon={<PenSquare size={24} />}
-                label="Publish"
-                desc="Release field reports with AI-powered objectivity checks."
-              />
-              <JourneyStep
-                num="04"
-                icon={<NetworkIcon size={24} />}
-                label="Connect"
-                desc="Establish secure P2P links for private correspondence."
-              />
-            </div>
+        </div>
+        <section className="space-y-16">
+          <div className="pb-8 border-b-4 border-white">
+            <h2 className="text-4xl italic font-black uppercase md:text-6xl dark:text-white">
+              Briefing
+            </h2>
+          </div>
+          <div className="grid grid-cols-1 gap-10 md:grid-cols-3">
+            <InstructionBlock
+              num="01"
+              icon={<Fingerprint size={32} />}
+              title="Forge"
+              desc="Establish a Node Signature encrypted by the platform core."
+            />
+            <InstructionBlock
+              num="02"
+              icon={<Network size={32} />}
+              title="Transmit"
+              desc="Broadcast directly to the global wire, bypassing gatekeepers."
+            />
+            <InstructionBlock
+              num="03"
+              icon={<Zap size={32} />}
+              title="Validate"
+              desc="Earn reputation through factual peer-reviewed accuracy."
+            />
           </div>
         </section>
-      </main>
+      </div>
     );
   }
 
   return (
-    <main className="px-8 py-24 mx-auto space-y-24 max-w-7xl">
-      <div className="pt-10">
-        <NewsTerminal />
-      </div>
-
-      <section className="space-y-12">
-        <div className="flex flex-col items-start justify-between gap-8 pb-10 border-b md:flex-row md:items-end border-slate-50 dark:border-slate-900">
-          <div className="space-y-6">
-            <h2 className="text-5xl italic font-bold tracking-tighter uppercase dark:text-white">
-              Feed
-            </h2>
-            <div className="flex flex-wrap items-center gap-2">
-              {(
-                ["All", "Investigative", "Economic", "Regional"] as Category[]
-              ).map((cat) => (
-                <button
-                  key={cat}
-                  onClick={() => setActiveCategory(cat)}
-                  className={`px-6 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest border transition-all ${
-                    activeCategory === cat
-                      ? "bg-slate-950 dark:bg-white text-white dark:text-slate-950 border-slate-950"
-                      : "bg-transparent text-slate-400 border-slate-100 dark:border-slate-800"
-                  }`}
-                >
-                  {cat}
-                </button>
-              ))}
-            </div>
+    <div className="px-6 pb-40 space-y-24">
+      <header className="flex flex-col items-end justify-between gap-10 pt-12 md:flex-row">
+        <div className="space-y-4">
+          <h2 className="text-7xl md:text-8xl font-black italic uppercase dark:text-white leading-[0.85]">
+            Intelligence <br />
+            <span className="text-blue-600">Hub</span>
+          </h2>
+          <div className="flex items-center gap-5">
+            <Activity size={12} className="text-emerald-500" />
+            <span className="text-[10px] font-black text-emerald-500 uppercase">
+              Network Operational
+            </span>
           </div>
-          <button
-            onClick={handleRefresh}
-            disabled={isRefreshing}
-            className="flex items-center gap-3 px-6 py-3 bg-slate-50 dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 text-[10px] font-black uppercase tracking-widest text-slate-600 dark:text-white hover:bg-slate-100 transition-all shadow-sm"
-          >
-            <RefreshCcw
-              size={14}
-              className={isRefreshing ? "animate-spin" : ""}
-            />
-            {isRefreshing ? "Syncing..." : "Refresh Feed"}
-          </button>
         </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-20">
+        <button
+          onClick={handleRefresh}
+          disabled={isRefreshing}
+          className={`flex items-center gap-3 px-10 py-5 bg-slate-900 border border-white/5 rounded-2xl transition-all shadow-sm hover:shadow-xl ${
+            isRefreshing ? "opacity-50" : ""
+          }`}
+        >
+          <span className="text-[10px] font-black uppercase text-slate-400">
+            Sync Shards
+          </span>
+          {isRefreshing ? (
+            <Loader2 size={18} className="text-blue-600 animate-spin" />
+          ) : (
+            <RefreshCcw
+              size={18}
+              className="transition-transform text-slate-400"
+            />
+          )}
+        </button>
+      </header>
+      <TrendingTopics />
+      <NewsTerminal />
+      <section className="space-y-20">
+        <div className="flex flex-col justify-between gap-10 pb-12 border-b-4 border-white md:flex-row">
+          <div className="space-y-3">
+            <h3 className="text-5xl italic font-black uppercase dark:text-white">
+              Field Reports
+            </h3>
+            <p className="text-[10px] font-bold text-slate-500 uppercase">
+              Peer-verified internal documentation
+            </p>
+          </div>
+          <div className="flex gap-2 pb-2 overflow-x-auto no-scrollbar">
+            {(
+              ["All", "Investigative", "Economic", "Regional"] as Category[]
+            ).map((cat) => (
+              <button
+                key={cat}
+                onClick={() => setActiveCategory(cat)}
+                className={`px-8 py-3 rounded-xl text-[10px] font-black uppercase border transition-all ${
+                  activeCategory === cat
+                    ? "bg-white text-slate-950 shadow-2xl"
+                    : "text-slate-400 border-white/10"
+                }`}
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-20 gap-y-32">
           {filteredArticles.length === 0 ? (
             <div className="py-40 text-center col-span-full opacity-20">
-              <p className="text-xs font-black tracking-widest uppercase">
-                No dispatches found in this sector.
-              </p>
+              <WifiOff size={64} className="mx-auto" />
+              <p className="text-sm font-black uppercase">Local Shard Empty</p>
             </div>
           ) : (
             filteredArticles.map((article) => (
-              <div key={article.id} className="relative space-y-6 group">
-                {article.image_url && article.image_url.trim() !== "" ? (
-                  <div
-                    className="aspect-[16/9] overflow-hidden rounded-[2.5rem] bg-slate-100 dark:bg-slate-900 border border-slate-50 dark:border-slate-800 relative cursor-pointer"
-                    onClick={() => onReadArticle?.(article)}
-                  >
+              <div
+                key={article.id}
+                className="space-y-8 cursor-pointer group"
+                onClick={() => onReadArticle?.(article)}
+              >
+                <div className="relative aspect-[16/10] rounded-[3.5rem] overflow-hidden border border-white/5 bg-slate-900 shadow-sm transition-all duration-700">
+                  {article.image_url ? (
                     <img
                       src={article.image_url}
-                      alt={article.title}
-                      className="object-cover w-full h-full transition-all duration-700 group-hover:scale-105"
-                      onError={handleImgError}
+                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-[2s]"
+                      alt=""
                     />
-
-                    {isAdmin && (
-                      <div
-                        className="absolute flex gap-2 top-4 right-4"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <button
-                          onClick={() => onEdit(article)}
-                          className="p-3 text-blue-600 transition-all shadow-xl bg-white/90 dark:bg-slate-950/90 rounded-2xl backdrop-blur-md hover:scale-110"
-                        >
-                          <Edit size={16} />
-                        </button>
-                        <button
-                          onClick={() => onDelete(article.id)}
-                          className="p-3 text-red-600 transition-all shadow-xl bg-white/90 dark:bg-slate-950/90 rounded-2xl backdrop-blur-md hover:scale-110"
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  isAdmin && (
-                    <div className="flex justify-end gap-2 mb-2">
-                      <button
-                        onClick={() => onEdit(article)}
-                        className="p-2 text-blue-600 border bg-slate-50 dark:bg-slate-900 rounded-xl border-slate-100 dark:border-slate-800"
-                      >
-                        <Edit size={14} />
-                      </button>
-                      <button
-                        onClick={() => onDelete(article.id)}
-                        className="p-2 text-red-600 border bg-slate-50 dark:bg-slate-900 rounded-xl border-slate-100 dark:border-slate-800"
-                      >
-                        <Trash2 size={14} />
-                      </button>
+                  ) : (
+                    <div className="flex items-center justify-center w-full h-full">
+                      <Globe size={64} className="text-slate-800" />
                     </div>
-                  )
-                )}
-
-                <div className="px-2 space-y-4">
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div className="flex items-center gap-3">
-                      <span className="text-[9px] font-black text-blue-600 uppercase tracking-widest">
-                        {article.category}
-                      </span>
-                      <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">
-                        {new Date(article.created_at).toLocaleDateString()}
+                  )}
+                  <div className="absolute top-10 left-10">
+                    <span className="px-6 py-2 bg-slate-950/95 backdrop-blur-xl rounded-full text-[10px] font-black text-blue-600 uppercase border border-white/20">
+                      {article.category}
+                    </span>
+                  </div>
+                </div>
+                <div className="px-4 space-y-6">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-black text-slate-400 uppercase">
+                      NODE: {article.author_serial}
+                    </span>
+                    <span className="text-[10px] font-bold text-slate-500 uppercase italic">
+                      {new Date(article.created_at).toLocaleDateString()}
+                    </span>
+                  </div>
+                  <h3 className="text-4xl italic font-black leading-tight uppercase transition-colors md:text-5xl dark:text-white group-hover:text-blue-600">
+                    {article.title}
+                  </h3>
+                  <p className="pl-8 text-xl italic font-medium border-l-4 text-slate-400 line-clamp-2 border-slate-800">
+                    "{article.content}"
+                  </p>
+                  <div className="flex items-center justify-between pt-6">
+                    <div className="flex items-center gap-2.5">
+                      <Star size={16} className="fill-current text-amber-500" />
+                      <span className="text-[10px] font-black uppercase text-slate-400">
+                        Verified Dispatch
                       </span>
                     </div>
-
-                    <div className="flex items-center gap-4 text-slate-400 text-[9px] font-black">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onInteraction?.("like", article.id);
-                        }}
-                        className="flex items-center gap-1.5 hover:text-blue-600 transition-colors"
-                      >
-                        <ThumbsUp size={12} /> {article.likes_count || 0}
-                      </button>
-                      <div
-                        className="flex items-center gap-1.5 cursor-pointer"
-                        onClick={() => onReadArticle?.(article)}
-                      >
-                        <MessageCircle size={12} />{" "}
-                        {article.comments_count || 0}
-                      </div>
+                    <div className="flex items-center gap-3 text-blue-600 font-black text-[11px] uppercase opacity-0 group-hover:opacity-100 transition-all">
+                      Packet <ArrowRight size={16} />
                     </div>
-                  </div>
-
-                  <div
-                    className="space-y-4 cursor-pointer"
-                    onClick={() => onReadArticle?.(article)}
-                  >
-                    <h3 className="text-3xl italic font-black leading-tight tracking-tighter uppercase transition-colors md:text-4xl dark:text-white group-hover:text-blue-600">
-                      {article.title}
-                    </h3>
-                    <p className="italic font-medium leading-relaxed text-slate-500 dark:text-slate-400 line-clamp-3">
-                      "{article.content}"
-                    </p>
                   </div>
                 </div>
               </div>
@@ -306,24 +268,8 @@ const HomePage: React.FC<HomePageProps> = ({
           )}
         </div>
       </section>
-    </main>
+    </div>
   );
 };
-
-const JourneyStep = ({ num, icon, label, desc }: any) => (
-  <div className="relative z-10 flex flex-col items-center text-center space-y-6 max-w-[200px]">
-    <div className="w-16 h-16 rounded-[1.5rem] bg-white dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-800 shadow-xl flex items-center justify-center text-slate-900 dark:text-white">
-      {icon}
-    </div>
-    <div className="space-y-2">
-      <h4 className="text-[10px] font-black text-blue-600 uppercase tracking-widest">
-        {num} // {label}
-      </h4>
-      <p className="text-[11px] font-medium text-slate-400 dark:text-slate-500 uppercase leading-relaxed">
-        {desc}
-      </p>
-    </div>
-  </div>
-);
 
 export default HomePage;

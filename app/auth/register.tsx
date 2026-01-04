@@ -2,174 +2,116 @@ import React, { useState } from "react";
 import {
   ShieldCheck,
   ArrowLeft,
-  Smartphone,
   Mail,
-  Loader2,
-  Fingerprint,
   Lock,
+  Fingerprint,
+  Loader2,
 } from "lucide-react";
 import { supabase } from "../../lib/supabase";
 import { toast } from "react-hot-toast";
 
-interface RegisterPageProps {
+const RegisterPage: React.FC<{
   onBack: () => void;
-  onSuccess: (user: any) => void;
+  onSuccess: (u: any) => void;
   onGoToLogin: () => void;
-}
-
-const RegisterPage: React.FC<RegisterPageProps> = ({
-  onBack,
-  onSuccess,
-  onGoToLogin,
-}) => {
-  const [loading, setLoading] = useState(false);
+}> = ({ onBack, onSuccess, onGoToLogin }) => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [phone, setPhone] = useState("");
-
-  const validateEmail = (e: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
+  const [loading, setLoading] = useState(false);
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email || !password || !phone) {
-      toast.error("Network entry requires all credentials.");
-      return;
-    }
-    if (!validateEmail(email)) {
-      toast.error("Invalid email architecture.");
-      return;
-    }
-    if (password.length < 6) {
-      toast.error("Security risk: Weak password.");
-      return;
-    }
-
+    if (password.length < 6) return toast.error("Security weak: 6 chars min.");
     setLoading(true);
-
     try {
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            phone: phone,
-            role: "user",
-            setup_complete: false,
-          },
-        },
-      });
-
+      const { data, error } = await supabase.auth.signUp({ email, password });
       if (error) throw error;
-
       if (data.user && !data.session) {
-        toast.success(
-          "Identity reserved. Please verify your email to activate node.",
-          { duration: 6000 }
-        );
+        toast.success("Node identity reserved. Verify email.");
         onGoToLogin();
       } else if (data.user) {
-        toast.success("Access granted. Initializing setup.");
+        toast.success("Access Granted.");
         onSuccess(data.user);
       }
     } catch (err: any) {
-      toast.error(err.message || "Registration protocol failed.");
+      toast.error(err.message);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-[600] flex flex-col bg-white dark:bg-slate-950 animate-in fade-in duration-300 overflow-y-auto">
-      <div className="flex items-center justify-between w-full max-w-5xl px-6 py-8 mx-auto">
+    <div className="fixed inset-0 z-[600] flex flex-col bg-slate-950 animate-in fade-in duration-300 overflow-y-auto p-8 text-white">
+      <div className="flex items-center justify-between w-full max-w-5xl py-10 mx-auto">
         <button
           onClick={onBack}
-          className="text-slate-400 hover:text-slate-900 dark:hover:text-white transition-all text-[11px] font-bold uppercase tracking-widest flex items-center gap-2"
+          className="text-slate-400 hover:text-white uppercase text-[11px] font-bold flex items-center gap-2"
         >
-          <ArrowLeft size={16} /> Cancel
+          <ArrowLeft size={16} /> Exit
         </button>
         <div className="flex items-center gap-2">
-          <ShieldCheck className="text-slate-900 dark:text-white" size={20} />
-          <span className="text-xs font-black tracking-[0.2em] uppercase dark:text-white">
+          <ShieldCheck className="text-white" size={20} />
+          <span className="text-xs font-black text-white uppercase">
             ThE-ARTICLES
           </span>
         </div>
         <div className="w-10" />
       </div>
-
-      <div className="flex items-center justify-center flex-grow px-6 pb-20">
-        <div className="w-full max-w-[380px] space-y-12">
-          <div className="space-y-4 text-center">
-            <h1 className="text-4xl font-semibold leading-none tracking-tight text-slate-900 dark:text-white">
-              Node Registration
+      <div className="flex items-center justify-center flex-grow">
+        <div className="w-full max-w-[340px] space-y-12">
+          <div className="space-y-3">
+            <h1 className="text-4xl italic font-black leading-none text-white uppercase">
+              Identity Forge
             </h1>
-            <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.3em]">
-              Phase 01: Auth Shard Creation
+            <p className="text-sm text-slate-500">
+              Initialize node registration protocols.
             </p>
           </div>
-
-          <form onSubmit={handleRegister} className="space-y-6">
+          <form onSubmit={handleRegister} className="space-y-5">
             <div className="space-y-2">
-              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 flex items-center gap-2">
-                <Mail size={12} /> Email Interface
+              <label className="text-[10px] font-black uppercase text-slate-500">
+                <Mail size={12} className="inline mr-2" />
+                Email Shard
               </label>
               <input
+                required
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3.5 text-sm font-bold outline-none dark:text-white"
-                placeholder="identity@network.org"
+                className="w-full p-4 text-sm text-white border-none rounded-lg outline-none bg-slate-900 focus:ring-1 focus:ring-blue-600"
+                placeholder="node@network.org"
               />
             </div>
-
             <div className="space-y-2">
-              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 flex items-center gap-2">
-                <Smartphone size={12} /> Comms Link (Phone)
+              <label className="text-[10px] font-black uppercase text-slate-500">
+                <Lock size={12} className="inline mr-2" />
+                Security Key
               </label>
               <input
-                type="tel"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3.5 text-sm font-bold outline-none dark:text-white"
-                placeholder="+1 000 000 000"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 flex items-center gap-2">
-                <Lock size={12} /> Security Hash (Password)
-              </label>
-              <input
+                required
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3.5 text-sm font-bold outline-none dark:text-white"
+                className="w-full p-4 text-sm text-white border-none rounded-lg outline-none bg-slate-900 focus:ring-1 focus:ring-blue-600"
                 placeholder="••••••••"
               />
             </div>
-
-            <div className="pt-4">
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full py-5 bg-slate-950 dark:bg-white text-white dark:text-slate-950 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl flex items-center justify-center gap-3 disabled:opacity-30 transition-all hover:scale-[1.01]"
-              >
-                {loading ? (
-                  <Loader2 className="animate-spin" size={18} />
-                ) : (
-                  "Establish Auth Link"
-                )}
-                <Fingerprint size={18} />
-              </button>
-            </div>
+            <button
+              type="submit"
+              disabled={loading}
+              className="flex items-center justify-center w-full gap-3 py-4 text-sm font-black uppercase transition-all bg-white rounded-lg shadow-xl text-slate-950 hover:scale-105 disabled:opacity-50"
+            >
+              {loading ? <Loader2 className="animate-spin" /> : <Fingerprint />}{" "}
+              Forge Identity
+            </button>
           </form>
-
-          <p className="text-xs text-center text-slate-400">
-            Registered already?{" "}
+          <p className="text-xs text-center text-slate-500">
+            Identity exists?{" "}
             <button
               onClick={onGoToLogin}
-              className="font-bold text-slate-900 dark:text-white hover:underline"
+              className="font-bold text-white hover:underline"
             >
-              Sign In
+              Sign into shard
             </button>
           </p>
         </div>

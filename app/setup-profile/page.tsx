@@ -1,7 +1,6 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useRef } from "react";
 import {
   Check,
-  ShieldCheck,
   User,
   Fingerprint,
   Info,
@@ -9,178 +8,141 @@ import {
   Loader2,
   Camera,
 } from "lucide-react";
-import { Profile } from "../../types";
-import { supabase } from "../../lib/supabase";
+import { supabase } from "../../lib/supabase.ts";
 import { toast } from "react-hot-toast";
 
 interface SetupProfilePageProps {
-  onComplete: (data: Profile) => Promise<void>;
+  onComplete: () => Promise<void>;
 }
 
 const SetupProfilePage: React.FC<SetupProfilePageProps> = ({ onComplete }) => {
   const [name, setName] = useState("");
   const [username, setUsername] = useState("");
-  const [gender, setGender] = useState("");
+  const [gender, setGender] = useState("Masked");
   const [bio, setBio] = useState("");
   const [avatar, setAvatar] = useState("");
   const [loading, setLoading] = useState(false);
-  const [isEncoding, setIsEncoding] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleAvatarUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      if (file.size > 1 * 1024 * 1024) {
-        toast.error("Identity visual too large (Max 1MB).");
-        return;
-      }
-      setIsEncoding(true);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setAvatar(reader.result as string);
-        setIsEncoding(false);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
   const handleFinish = async () => {
-    if (!name.trim() || !username.trim() || !gender) {
-      toast.error("Identity requires name, handle, and gender.");
-      return;
+    if (!name.trim() || !username.trim()) {
+      return toast.error("Identity requires name and handle.");
     }
-
     setLoading(true);
     try {
       const {
         data: { session },
       } = await supabase.auth.getSession();
-      const currentId = session?.user?.id;
+      if (!session?.user?.id) throw new Error("Verification failed.");
 
-      if (!currentId) {
-        toast.error(
-          "Critical: Identity verification failed. Re-login required."
-        );
-        setLoading(false);
-        return;
-      }
+      const serialId = `#ART-${Math.floor(1000 + Math.random() * 9000)}-IND`;
 
-      const profileData: Profile = {
-        id: currentId,
+      const { error } = await supabase.from("profiles").upsert({
+        id: session.user.id,
         full_name: name.trim(),
         username: username.toLowerCase().trim().replace(/\s/g, "_"),
         gender: gender,
         avatar_url: avatar,
-        serial_id: `#ART-0${Math.floor(1000 + Math.random() * 9000)}-IND`,
+        bio: bio.trim() || "Verified correspondent node.",
+        serial_id: serialId,
         budget: 150,
         role: "user",
         is_private: false,
-        bio:
-          bio.trim() || "Verified correspondent for the ThE-ARTICLES Network.",
-        email: session?.user?.email || "",
-        phone: session?.user?.user_metadata?.phone || "",
-        is_online: true,
-        settings: {
-          notifications_enabled: true,
-          presence_visible: true,
-          data_sharing: true,
-          ai_briefings: true,
-          secure_mode: false,
-          camera_access: false,
-          mic_access: false,
-          location_access: false,
-          storage_access: false,
-          contacts_sync: false,
-        },
-      };
+        email: session.user.email,
+      });
 
-      await onComplete(profileData);
-    } catch (err) {
+      if (error) throw error;
+
+      toast.success("Identity Forge Complete.");
+      await onComplete();
+    } catch (err: any) {
       console.error(err);
-      toast.error("Establishment Protocol Failed.");
+      toast.error("Profile update failed.");
     } finally {
       setLoading(false);
     }
   };
 
-  const genders = ["Male", "Female", "Non-Binary", "Prefer not to say"];
-
   return (
     <main className="min-h-[80vh] flex items-center justify-center p-6 bg-white dark:bg-slate-950">
-      <div className="w-full max-w-2xl bg-white dark:bg-slate-900 rounded-[3rem] p-10 md:p-16 shadow-2xl border border-slate-100 dark:border-slate-800 animate-in zoom-in duration-500">
-        <div className="mb-12 space-y-4 text-center">
-          <div className="relative w-24 h-24 mx-auto mb-6">
-            <div
-              onClick={() => fileInputRef.current?.click()}
-              className="flex items-center justify-center w-full h-full overflow-hidden text-white transition-all bg-blue-600 border-2 border-white shadow-xl cursor-pointer rounded-3xl dark:border-slate-800 hover:scale-105"
-            >
-              {avatar ? (
-                <img src={avatar} className="object-cover w-full h-full" />
-              ) : (
-                <Camera size={32} />
-              )}
-              {isEncoding && (
-                <div className="absolute inset-0 flex items-center justify-center bg-black/50">
-                  <Loader2 className="animate-spin" size={20} />
-                </div>
-              )}
-            </div>
+      <div className="w-full max-w-2xl bg-slate-50 dark:bg-slate-900 rounded-[3rem] p-10 md:p-16 shadow-2xl border border-slate-200 dark:border-white/5 animate-in zoom-in duration-500">
+        <div className="mb-12 space-y-6 text-center">
+          <div
+            onClick={() => fileInputRef.current?.click()}
+            className="relative flex items-center justify-center w-24 h-24 mx-auto overflow-hidden transition-all bg-blue-600 shadow-xl cursor-pointer rounded-3xl hover:scale-105"
+          >
+            {avatar ? (
+              <img
+                src={avatar}
+                className="object-cover w-full h-full"
+                alt="Preview"
+              />
+            ) : (
+              <Camera className="text-white" size={32} />
+            )}
             <input
               type="file"
               ref={fileInputRef}
-              onChange={handleAvatarUpload}
-              accept="image/*"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) {
+                  const r = new FileReader();
+                  r.onloadend = () => setAvatar(r.result as string);
+                  r.readAsDataURL(f);
+                }
+              }}
               className="hidden"
+              accept="image/*"
             />
           </div>
-          <h1 className="text-4xl italic font-black tracking-tighter uppercase text-slate-900 dark:text-white">
+          <h1 className="text-4xl italic font-black tracking-tighter uppercase text-slate-950 dark:text-white">
             Identity Forge
           </h1>
-          <p className="text-slate-400 font-black uppercase tracking-[0.3em] text-[10px]">
-            Establishing Global Press Credentials
+          <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500">
+            Establishing Official Press Credentials
           </p>
         </div>
 
         <div className="space-y-8">
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
             <div className="space-y-2">
-              <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 flex items-center gap-2">
-                <User size={12} /> Legal Identity
+              <label className="text-[10px] font-black uppercase text-slate-500 flex items-center gap-2">
+                <User size={12} /> Name
               </label>
               <input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="w-full bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 rounded-xl px-5 py-3.5 text-sm font-bold dark:text-white outline-none focus:ring-1 focus:ring-blue-600"
-                placeholder="Full Name"
+                className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-white/5 rounded-xl px-5 py-3.5 text-slate-950 dark:text-white text-sm outline-none focus:ring-1 focus:ring-blue-600 shadow-sm"
+                placeholder="Full Legal Name"
               />
             </div>
             <div className="space-y-2">
-              <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 flex items-center gap-2">
-                <Fingerprint size={12} /> Network Alias
+              <label className="text-[10px] font-black uppercase text-slate-500 flex items-center gap-2">
+                <Fingerprint size={12} /> Handle
               </label>
               <input
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                className="w-full bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 rounded-xl px-5 py-3.5 text-sm font-bold dark:text-white outline-none focus:ring-1 focus:ring-blue-600"
-                placeholder="alex_dispatch"
+                className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-white/5 rounded-xl px-5 py-3.5 text-slate-950 dark:text-white text-sm outline-none focus:ring-1 focus:ring-blue-600 shadow-sm"
+                placeholder="alex_report"
               />
             </div>
           </div>
 
           <div className="space-y-4">
-            <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 flex items-center gap-2">
-              <Globe size={12} /> Gender Signature
+            <label className="text-[10px] font-black uppercase text-slate-500 flex items-center gap-2">
+              <Globe size={12} /> Sector
             </label>
-            <div className="flex flex-wrap gap-2">
-              {genders.map((g) => (
+            <div className="flex gap-2">
+              {["Male", "Female", "Masked"].map((g) => (
                 <button
                   key={g}
                   type="button"
                   onClick={() => setGender(g)}
-                  className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest border transition-all ${
+                  className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase border transition-all ${
                     gender === g
-                      ? "bg-slate-950 dark:bg-white text-white dark:text-slate-950 border-slate-950"
-                      : "bg-transparent text-slate-400 border-slate-100 dark:border-slate-800 hover:border-slate-300"
+                      ? "bg-slate-950 dark:bg-white text-white dark:text-slate-950 border-transparent shadow-md"
+                      : "text-slate-500 border-slate-200 dark:border-white/5"
                   }`}
                 >
                   {g}
@@ -190,38 +152,30 @@ const SetupProfilePage: React.FC<SetupProfilePageProps> = ({ onComplete }) => {
           </div>
 
           <div className="space-y-2">
-            <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 flex items-center gap-2">
-              <Info size={12} /> Personal Manifesto
+            <label className="text-[10px] font-black uppercase text-slate-500 flex items-center gap-2">
+              <Info size={12} /> Manifesto
             </label>
             <textarea
               value={bio}
               onChange={(e) => setBio(e.target.value)}
-              className="w-full bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 rounded-xl px-5 py-3.5 text-sm font-medium dark:text-white outline-none focus:ring-1 focus:ring-blue-600"
-              placeholder="Journalistic mission statement..."
+              className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-white/5 rounded-xl px-5 py-3.5 text-slate-950 dark:text-white text-sm outline-none focus:ring-1 focus:ring-blue-600 shadow-sm"
               rows={4}
+              placeholder="Your mission statement as a node..."
             />
           </div>
 
-          <div className="pt-8 border-t border-slate-50 dark:border-slate-800">
-            <button
-              onClick={handleFinish}
-              disabled={
-                !name.trim() ||
-                !username.trim() ||
-                !gender ||
-                loading ||
-                isEncoding
-              }
-              className="w-full py-5 bg-slate-950 dark:bg-white dark:text-slate-900 text-white rounded-2xl font-black uppercase tracking-widest shadow-2xl hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-30"
-            >
-              {loading ? (
-                <Loader2 className="animate-spin" size={20} />
-              ) : (
-                "Establish Dispatcher Node"
-              )}
-              {!loading && <Check size={20} />}
-            </button>
-          </div>
+          <button
+            onClick={handleFinish}
+            disabled={loading}
+            className="w-full py-5 bg-slate-950 dark:bg-white text-white dark:text-slate-950 rounded-2xl font-black uppercase tracking-widest flex items-center justify-center gap-3 disabled:opacity-30 shadow-2xl hover:scale-[1.02] active:scale-95 transition-all"
+          >
+            {loading ? (
+              <Loader2 className="animate-spin" size={20} />
+            ) : (
+              <Check size={20} />
+            )}{" "}
+            Establish Identity
+          </button>
         </div>
       </div>
     </main>

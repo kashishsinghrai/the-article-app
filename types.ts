@@ -1,3 +1,4 @@
+
 export type Role = 'user' | 'admin';
 export type Category = 'Investigative' | 'Economic' | 'Regional' | 'All';
 
@@ -47,7 +48,7 @@ export interface ChatRequest {
   to_id: string;
   status: 'pending' | 'accepted' | 'rejected';
   created_at: string;
-  from_name?: string; // Virtual field for UI
+  from_name?: string;
 }
 
 export interface LiveMessage {

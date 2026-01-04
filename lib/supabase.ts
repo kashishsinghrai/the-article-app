@@ -1,3 +1,4 @@
+
 import { createClient } from '@supabase/supabase-js';
 
 const getEnv = (key: string): string => {
@@ -12,14 +13,10 @@ const getEnv = (key: string): string => {
   return '';
 };
 
-// These are placeholders. In production, ensure these are set in your environment variables.
-const DEFAULT_URL = 'https://cqkgnklumxnlvnrnbttg.supabase.co';
-const DEFAULT_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.dummy'; // Standardized prefix to avoid warnings
+// Use provided or fallback URL/Key
+const supabaseUrl = getEnv('VITE_SUPABASE_URL') || getEnv('SUPABASE_URL') || 'https://cqkgnklumxnlvnrnbttg.supabase.co';
+const supabaseAnonKey = getEnv('VITE_SUPABASE_ANON_KEY') || getEnv('SUPABASE_ANON_KEY') || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.dummy';
 
-const supabaseUrl = getEnv('VITE_SUPABASE_URL') || getEnv('SUPABASE_URL') || DEFAULT_URL;
-const supabaseAnonKey = getEnv('VITE_SUPABASE_ANON_KEY') || getEnv('SUPABASE_ANON_KEY') || DEFAULT_KEY;
-
-// Exporting a safe client
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     persistSession: true,
@@ -29,19 +26,13 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     flowType: 'pkce'
   },
   global: {
-    // Add a small timeout for global requests to prevent infinite "ghoomna" (spinning)
     fetch: (url, options) => {
       return Promise.race([
         fetch(url, options),
         new Promise<Response>((_, reject) => 
-          setTimeout(() => reject(new Error('Network Timeout')), 8000)
+          setTimeout(() => reject(new Error('Network Timeout')), 10000)
         )
       ]);
     }
   }
 });
-
-export const isAuthReady = () => {
-  const isDefault = supabaseAnonKey === DEFAULT_KEY || !supabaseAnonKey.startsWith('eyJ');
-  return !isDefault;
-};

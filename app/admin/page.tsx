@@ -1,34 +1,28 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import {
   ShieldAlert,
   Search,
-  FileText,
   Users,
   Activity,
-  Zap,
-  Trash2,
   RefreshCw,
-  Code,
   Fingerprint,
-  MessageSquare,
-  Power,
+  Radio,
   Newspaper,
   LogOut,
   Camera,
   Mic,
   Smartphone,
-  Eye,
-  EyeOff,
   ShieldCheck,
-  Database,
-  Radio,
   MapPin,
-  List,
   Eye as EyeIcon,
+  MessageSquare,
+  Zap,
+  Target,
 } from "lucide-react";
-import { Article, Profile } from "../../types";
+import { Article, Profile, ChatRequest } from "../../types";
 import { supabase } from "../../lib/supabase";
 import { toast } from "react-hot-toast";
+import ChatOverlay from "../../components/ChatOverlay.tsx";
 
 interface AdminPageProps {
   articles: Article[];
@@ -38,6 +32,53 @@ interface AdminPageProps {
   onUpdateArticles?: () => void;
   onLogout?: () => void;
 }
+
+const StatItem = ({
+  label,
+  value,
+  icon,
+}: {
+  label: string;
+  value: string | number;
+  icon: React.ReactNode;
+}) => (
+  <div className="bg-white dark:bg-slate-950 p-10 rounded-[2.5rem] border border-slate-100 dark:border-white/5 space-y-4 hover:scale-[1.02] transition-transform shadow-sm">
+    <div className="p-3 text-blue-500 border bg-slate-50 dark:bg-slate-900 w-fit rounded-2xl border-slate-100 dark:border-white/5">
+      {icon}
+    </div>
+    <div className="space-y-1">
+      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+        {label}
+      </p>
+      <p className="text-3xl italic font-black leading-none tracking-tighter uppercase text-slate-950 dark:text-white">
+        {value}
+      </p>
+    </div>
+  </div>
+);
+
+const HardwareNode = ({
+  icon,
+  label,
+  active,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  active: boolean;
+}) => (
+  <div
+    className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border transition-all ${
+      active
+        ? "bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-500/20 text-emerald-600 dark:text-emerald-500"
+        : "bg-slate-50 dark:bg-slate-900 border-slate-100 dark:border-white/5 text-slate-300 dark:text-slate-700"
+    }`}
+  >
+    {icon}
+    <span className="text-[7px] font-black uppercase tracking-widest">
+      {label}
+    </span>
+  </div>
+);
 
 const AdminPage: React.FC<AdminPageProps> = ({
   articles,
@@ -52,14 +93,12 @@ const AdminPage: React.FC<AdminPageProps> = ({
   >("users");
   const [searchTerm, setSearchTerm] = useState("");
   const [isSyncing, setIsSyncing] = useState(false);
+  const [activeSignals, setActiveSignals] = useState<any[]>([]);
+  const [interceptChat, setInterceptChat] = useState<{
+    profile: Profile;
+    handshakeId: string;
+  } | null>(null);
 
-  const filteredArticles = useMemo(
-    () =>
-      articles.filter((a) =>
-        a.title.toLowerCase().includes(searchTerm.toLowerCase())
-      ),
-    [articles, searchTerm]
-  );
   const filteredUsers = useMemo(
     () =>
       users.filter(
@@ -70,47 +109,58 @@ const AdminPage: React.FC<AdminPageProps> = ({
     [users, searchTerm]
   );
 
-  const forceResync = async () => {
-    setIsSyncing(true);
-    if (onUpdateArticles) await onUpdateArticles();
-    if (onUpdateUsers) await onUpdateUsers();
-    setIsSyncing(false);
-    toast.success("Root Re-Sync Complete");
-  };
+  useEffect(() => {
+    if (activeTab === "intercepts") {
+      const fetchSignals = async () => {
+        const { data } = await supabase
+          .from("chat_requests")
+          .select(
+            "*, from_node:from_id(id, full_name, serial_id, avatar_url), to_node:to_id(id, full_name, serial_id, avatar_url)"
+          )
+          .eq("status", "accepted")
+          .order("created_at", { ascending: false });
+        if (data) setActiveSignals(data);
+      };
+      fetchSignals();
+
+      // Real-time listener for new signals
+      const channel = supabase
+        .channel("admin_signals")
+        .on(
+          "postgres_changes",
+          {
+            event: "UPDATE",
+            schema: "public",
+            table: "chat_requests",
+            filter: "status=eq.accepted",
+          },
+          () => {
+            fetchSignals();
+            toast("New Node Connection Detected", { icon: "🔔" });
+          }
+        )
+        .subscribe();
+
+      return () => {
+        channel.unsubscribe();
+      };
+    }
+  }, [activeTab]);
 
   const handleDeleteUser = async (id: string) => {
-    if (id === currentUserId)
-      return toast.error("SELF-PURGE PROTECTION ACTIVE.");
-    if (
-      confirm(
-        "🚨 PERMANENT IDENTITY PURGE: Are you sure you want to erase this node from the global network?"
-      )
-    ) {
+    if (id === currentUserId) return toast.error("SELF-PURGE PROTECTED.");
+    if (confirm("🚨 PURGE IDENTITY: Remove node from registry?")) {
       const { error } = await supabase.from("profiles").delete().eq("id", id);
       if (!error) {
         toast.success("Identity Purged.");
         onUpdateUsers?.();
-      } else {
-        toast.error("Identity Protection Active. Check RLS.");
-      }
-    }
-  };
-
-  const handleDeleteArticle = async (id: string) => {
-    if (confirm("🚨 PURGE DISPATCH: Erase this report from the global feed?")) {
-      const { error } = await supabase.from("articles").delete().eq("id", id);
-      if (!error) {
-        toast.success("Dispatch Erased.");
-        onUpdateArticles?.();
-      } else {
-        toast.error("Dispatch Locked.");
       }
     }
   };
 
   return (
     <main className="max-w-[1600px] mx-auto px-6 py-24 md:py-32 space-y-12">
-      <div className="flex flex-col items-start justify-between gap-8 pb-10 border-b lg:flex-row border-slate-100 dark:border-white/5">
+      <div className="flex flex-col items-start justify-between gap-8 pb-10 border-b border-slate-100 dark:border-white/5 lg:flex-row">
         <div className="space-y-4">
           <div className="flex items-center gap-3 text-red-600 animate-pulse">
             <ShieldAlert size={20} />
@@ -118,14 +168,14 @@ const AdminPage: React.FC<AdminPageProps> = ({
               ROOT COMMAND TERMINAL
             </span>
           </div>
-          <h1 className="text-6xl italic font-black leading-none tracking-tighter uppercase md:text-9xl dark:text-white">
+          <h1 className="text-6xl italic font-black leading-none tracking-tighter uppercase md:text-9xl text-slate-900 dark:text-white">
             ROOT
           </h1>
           <div className="flex items-center gap-6">
             <div className="flex items-center gap-2">
               <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
-              <span className="text-[9px] font-black uppercase text-slate-400 tracking-widest">
-                Platform Bypass: Active
+              <span className="text-[9px] font-black uppercase text-slate-400">
+                Totalitarian Bypass: Active
               </span>
             </div>
             <button
@@ -139,34 +189,26 @@ const AdminPage: React.FC<AdminPageProps> = ({
             </button>
           </div>
         </div>
-
-        <div className="flex flex-wrap items-center gap-2 p-1.5 bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-white/5 rounded-[2rem] shadow-sm">
-          <TabButton
-            active={activeTab === "monitor"}
-            onClick={() => setActiveTab("monitor")}
-            label="System"
-            icon={<Activity size={14} />}
-          />
-          <TabButton
-            active={activeTab === "intercepts"}
-            onClick={() => setActiveTab("intercepts")}
-            label="Signals"
-            icon={<Radio size={14} />}
-          />
-          <TabButton
-            active={activeTab === "articles"}
-            onClick={() => setActiveTab("articles")}
-            label="Feeds"
-            icon={<Newspaper size={14} />}
-          />
-          <TabButton
-            active={activeTab === "users"}
-            onClick={() => setActiveTab("users")}
-            label="Registry"
-            icon={<Users size={14} />}
-          />
+        <div className="flex flex-wrap items-center gap-2 p-1.5 bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-white/5 rounded-[2rem]">
+          {["monitor", "intercepts", "articles", "users"].map((tab: any) => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={`px-8 py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${
+                activeTab === tab
+                  ? "bg-white dark:bg-slate-800 text-blue-600 shadow-xl"
+                  : "text-slate-400 hover:text-slate-600"
+              }`}
+            >
+              {tab === "intercepts" ? "Signals" : tab}
+            </button>
+          ))}
           <button
-            onClick={forceResync}
+            onClick={async () => {
+              setIsSyncing(true);
+              await onUpdateUsers?.();
+              setIsSyncing(false);
+            }}
             className="p-3 text-blue-600 transition-transform hover:scale-110"
           >
             <RefreshCw size={18} className={isSyncing ? "animate-spin" : ""} />
@@ -174,13 +216,13 @@ const AdminPage: React.FC<AdminPageProps> = ({
         </div>
       </div>
 
-      <div className="flex items-center gap-4 px-8 py-5 bg-white dark:bg-slate-900 rounded-[2.5rem] border border-slate-100 dark:border-white/5 shadow-sm focus-within:ring-2 focus-within:ring-red-500 transition-all">
+      <div className="flex items-center gap-4 px-8 py-5 bg-white dark:bg-slate-900 rounded-[2.5rem] border border-slate-100 dark:border-white/5 focus-within:ring-2 focus-within:ring-red-600/30 transition-all shadow-sm">
         <Search size={20} className="text-slate-300" />
         <input
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className="bg-transparent border-none text-[11px] font-black uppercase tracking-[0.3em] outline-none flex-grow dark:text-white placeholder:text-slate-200"
-          placeholder="QUERING GLOBAL DATABASE..."
+          className="bg-transparent border-none text-[11px] font-black uppercase outline-none flex-grow text-slate-950 dark:text-white"
+          placeholder="QUERYING DATABASE..."
         />
       </div>
 
@@ -193,11 +235,11 @@ const AdminPage: React.FC<AdminPageProps> = ({
             >
               <div className="flex items-start justify-between">
                 <div className="flex items-center gap-4">
-                  <div className="flex items-center justify-center w-12 h-12 border bg-slate-50 dark:bg-slate-900 rounded-2xl border-slate-100 dark:border-white/5">
-                    <Fingerprint size={24} className="text-slate-300" />
+                  <div className="flex items-center justify-center w-12 h-12 border bg-slate-50 dark:bg-slate-900 rounded-2xl border-slate-100 dark:border-white/5 text-slate-300">
+                    <Fingerprint size={24} />
                   </div>
                   <div>
-                    <p className="font-black leading-none tracking-tight uppercase text-slate-900 dark:text-white">
+                    <p className="font-black leading-none uppercase text-slate-950 dark:text-white">
                       {u.full_name}
                     </p>
                     <p className="text-[9px] font-bold text-slate-400 italic">
@@ -205,64 +247,46 @@ const AdminPage: React.FC<AdminPageProps> = ({
                     </p>
                   </div>
                 </div>
-                <div
-                  className={`px-3 py-1 rounded-lg text-[8px] font-black uppercase ${
-                    u.is_online
-                      ? "bg-emerald-50 text-emerald-600 border border-emerald-100"
-                      : "bg-slate-50 text-slate-400"
-                  }`}
-                >
-                  {u.is_online ? "ONLINE" : "IDLE"}
+                <div className="px-3 py-1 rounded-lg text-[8px] font-black uppercase bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-500">
+                  Live
                 </div>
               </div>
-
               <div className="p-6 space-y-4 bg-slate-50 dark:bg-slate-900 rounded-2xl">
-                <p className="text-[8px] font-black uppercase tracking-widest text-slate-400 border-b border-slate-200 dark:border-white/5 pb-2">
-                  Remote Node Surveillance
+                <p className="text-[8px] font-black uppercase text-slate-400 border-b border-slate-100 dark:border-white/5 pb-2">
+                  Surveillance
                 </p>
                 <div className="grid grid-cols-4 gap-4">
                   <HardwareNode
                     icon={<Camera size={14} />}
                     label="CAM"
-                    active={u.is_online}
+                    active={true}
                   />
                   <HardwareNode
                     icon={<Mic size={14} />}
                     label="MIC"
-                    active={u.is_online}
+                    active={true}
                   />
                   <HardwareNode
                     icon={<MapPin size={14} />}
                     label="GPS"
-                    active={u.is_online}
+                    active={true}
                   />
                   <HardwareNode
                     icon={<Smartphone size={14} />}
                     label="DATA"
-                    active={u.is_online}
-                    onClick={() =>
-                      toast.success(
-                        `Extracted ${Math.floor(
-                          Math.random() * 500
-                        )} local contacts from mobile.`
-                      )
-                    }
+                    active={true}
                   />
                 </div>
               </div>
-
               <div className="flex gap-2">
                 <button
                   onClick={() => handleDeleteUser(u.id)}
-                  className="flex-1 py-4 bg-red-50 dark:bg-red-950/20 text-red-600 rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-red-600 hover:text-white transition-all border border-red-100 dark:border-red-900/30"
+                  className="flex-1 py-4 bg-red-50 dark:bg-red-950/20 text-red-600 rounded-xl text-[9px] font-black uppercase hover:bg-red-600 hover:text-white transition-all border border-red-100"
                 >
-                  PURGE
+                  Purge
                 </button>
-                <button
-                  onClick={() => toast.success("Identity Verified.")}
-                  className="flex-[3] py-4 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-xl text-[9px] font-black uppercase tracking-widest flex items-center justify-center gap-2"
-                >
-                  <ShieldCheck size={14} /> INSPECT PROFILE
+                <button className="flex-[3] py-4 bg-slate-950 dark:bg-white text-white dark:text-slate-950 rounded-xl text-[9px] font-black uppercase flex items-center justify-center gap-2 hover:opacity-90">
+                  <ShieldCheck size={14} /> Inspect Node
                 </button>
               </div>
             </div>
@@ -271,97 +295,99 @@ const AdminPage: React.FC<AdminPageProps> = ({
       )}
 
       {activeTab === "intercepts" && (
-        <div className="bg-slate-950 rounded-[3rem] border border-white/10 p-10 space-y-8 shadow-2xl">
+        <div className="bg-slate-950 rounded-[3rem] border border-white/5 p-10 space-y-8 animate-in slide-in-from-bottom-4 duration-500 shadow-2xl">
           <div className="flex items-center justify-between pb-6 border-b border-white/5">
             <div className="flex items-center gap-4">
               <Radio className="text-red-500 animate-pulse" />
-              <h3 className="font-black text-white uppercase tracking-[0.3em]">
+              <h3 className="text-xl italic font-black tracking-tighter text-white uppercase">
                 Live Signal Intercepts
               </h3>
             </div>
-            <span className="text-[9px] font-black text-slate-500 uppercase">
-              Monitoring 128 Active Comms Channels
+            <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
+              {activeSignals.length} Active Pairs
             </span>
           </div>
-          <div className="space-y-4">
-            {[1, 2, 3, 4].map((i) => (
-              <div
-                key={i}
-                className="flex items-center justify-between p-6 transition-all border bg-white/5 rounded-2xl border-white/5 hover:bg-white/10 cursor-crosshair group"
-              >
-                <div className="flex items-center gap-10">
-                  <div className="flex items-center gap-3">
-                    <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                    <span className="text-[10px] font-black text-white uppercase tracking-widest">
-                      NODE_
-                      {Math.random().toString(36).substr(2, 4).toUpperCase()}
-                    </span>
-                  </div>
-                  <div className="w-12 h-px transition-colors bg-white/10 group-hover:bg-red-500" />
-                  <div className="flex items-center gap-3">
-                    <div className="w-2 h-2 bg-blue-500 rounded-full" />
-                    <span className="text-[10px] font-black text-white uppercase tracking-widest">
-                      NODE_
-                      {Math.random().toString(36).substr(2, 4).toUpperCase()}
-                    </span>
-                  </div>
-                </div>
-                <div className="flex items-center gap-6">
-                  <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">
-                    LATENCY: 1.{i}ms
-                  </span>
-                  <button
-                    onClick={() =>
-                      toast(
-                        "Signal Decryption Initiated. Monitoring Live Stream...",
-                        { icon: "🔐" }
-                      )
-                    }
-                    className="px-8 py-2.5 bg-red-600 text-white rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-white hover:text-red-600 transition-all"
-                  >
-                    INTERCEPT CHAT
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
 
-      {activeTab === "articles" && (
-        <div className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-3">
-          {filteredArticles.map((a) => (
-            <div
-              key={a.id}
-              className="bg-white dark:bg-slate-950 p-6 rounded-[2.5rem] border border-slate-100 dark:border-white/5 space-y-4 shadow-sm hover:border-blue-500/30 transition-all"
-            >
-              <div className="overflow-hidden border aspect-video rounded-3xl bg-slate-900 border-slate-100 dark:border-white/5">
-                <img
-                  src={a.image_url}
-                  className="object-cover w-full h-full transition-opacity opacity-70 group-hover:opacity-100"
-                />
-              </div>
-              <div className="space-y-1">
-                <h4 className="italic font-black leading-tight uppercase truncate text-slate-900 dark:text-white">
-                  {a.title}
-                </h4>
-                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
-                  AUTHOR: {a.author_name} // {a.category.toUpperCase()}
+          <div className="space-y-4">
+            {activeSignals.length === 0 ? (
+              <div className="py-20 space-y-4 text-center opacity-30">
+                <Zap size={48} className="mx-auto text-slate-500" />
+                <p className="text-xs font-black uppercase tracking-[0.4em] text-white">
+                  No Communications Detected
                 </p>
               </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => handleDeleteArticle(a.id)}
-                  className="flex-1 py-4 bg-red-50 dark:bg-red-950/20 text-red-600 rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-red-600 hover:text-white transition-all border border-red-100 dark:border-red-900/30"
+            ) : (
+              activeSignals.map((signal) => (
+                <div
+                  key={signal.id}
+                  className="flex flex-col items-center justify-between gap-6 p-6 transition-all border md:flex-row bg-white/5 border-white/5 rounded-2xl group hover:bg-white/10"
                 >
-                  PURGE FEED
-                </button>
-                <button className="flex-1 py-4 bg-slate-50 dark:bg-slate-900 text-slate-500 rounded-xl text-[9px] font-black uppercase tracking-widest flex items-center justify-center gap-2">
-                  <EyeIcon size={14} /> VIEW DISPATCH
-                </button>
-              </div>
-            </div>
-          ))}
+                  <div className="flex items-center gap-6">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 overflow-hidden border rounded-xl bg-slate-800 border-white/10">
+                        {signal.from_node?.avatar_url && (
+                          <img
+                            src={signal.from_node.avatar_url}
+                            className="object-cover w-full h-full"
+                          />
+                        )}
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-[10px] font-black text-white uppercase">
+                          {signal.from_node?.full_name}
+                        </span>
+                        <span className="text-[8px] font-bold text-slate-500">
+                          {signal.from_node?.serial_id}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex flex-col items-center">
+                      <Target
+                        size={14}
+                        className="text-red-600 animate-pulse"
+                      />
+                      <div className="w-12 h-px mt-2 bg-white/10" />
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="flex flex-col text-right">
+                        <span className="text-[10px] font-black text-white uppercase">
+                          {signal.to_node?.full_name}
+                        </span>
+                        <span className="text-[8px] font-bold text-slate-500">
+                          {signal.to_node?.serial_id}
+                        </span>
+                      </div>
+                      <div className="w-10 h-10 overflow-hidden border rounded-xl bg-slate-800 border-white/10">
+                        {signal.to_node?.avatar_url && (
+                          <img
+                            src={signal.to_node.avatar_url}
+                            className="object-cover w-full h-full"
+                          />
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <div className="px-4 py-1.5 bg-red-950 text-red-500 rounded-lg text-[8px] font-black uppercase tracking-widest border border-red-500/20">
+                      Active Transmission
+                    </div>
+                    <button
+                      onClick={() => {
+                        setInterceptChat({
+                          profile: signal.to_node,
+                          handshakeId: signal.id,
+                        });
+                        toast.success("Broadcast Channel Intercepted");
+                      }}
+                      className="px-6 py-2.5 bg-white text-slate-950 rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-red-600 hover:text-white transition-all flex items-center gap-2"
+                    >
+                      <EyeIcon size={14} /> Intercept
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
         </div>
       )}
 
@@ -370,72 +396,37 @@ const AdminPage: React.FC<AdminPageProps> = ({
           <StatItem
             label="Active Nodes"
             value={users.length}
-            icon={<Users className="text-blue-500" />}
+            icon={<Users />}
           />
           <StatItem
-            label="Global Dispatches"
+            label="Global Reports"
             value={articles.length}
-            icon={<Newspaper className="text-emerald-500" />}
+            icon={<Newspaper />}
           />
           <StatItem
-            label="Root Clearance"
-            value="LEVEL_MAX"
-            icon={<ShieldCheck className="text-red-500" />}
+            label="Clearance"
+            value="LEVEL_ROOT"
+            icon={<ShieldCheck />}
           />
           <StatItem
-            label="Network Health"
-            value="OPTIMAL"
-            icon={<Activity className="text-emerald-500" />}
+            label="Active Signals"
+            value={activeSignals.length}
+            icon={<Activity />}
           />
         </div>
+      )}
+
+      {interceptChat && (
+        <ChatOverlay
+          recipient={interceptChat.profile}
+          currentUserId="admin-surveillance"
+          handshakeId={interceptChat.handshakeId}
+          onClose={() => setInterceptChat(null)}
+          isAdminMode={true}
+        />
       )}
     </main>
   );
 };
-
-const HardwareNode = ({ icon, label, active, onClick }: any) => (
-  <button
-    onClick={onClick}
-    className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border transition-all group ${
-      active
-        ? "bg-emerald-50 border-emerald-100 text-emerald-600 hover:bg-emerald-600 hover:text-white"
-        : "bg-slate-50 border-slate-100 text-slate-400 cursor-not-allowed opacity-30"
-    }`}
-  >
-    {icon}
-    <span className="text-[7px] font-black uppercase tracking-widest">
-      {label}
-    </span>
-  </button>
-);
-
-const StatItem = ({ label, value, icon }: any) => (
-  <div className="bg-white dark:bg-slate-950 p-10 rounded-[2.5rem] border border-slate-100 dark:border-white/5 space-y-4 shadow-sm hover:scale-[1.02] transition-transform">
-    <div className="p-3 border bg-slate-50 dark:bg-slate-900 w-fit rounded-2xl border-slate-100 dark:border-white/5">
-      {icon}
-    </div>
-    <div className="space-y-1">
-      <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">
-        {label}
-      </p>
-      <p className="text-3xl italic font-black leading-none tracking-tighter uppercase dark:text-white">
-        {value}
-      </p>
-    </div>
-  </div>
-);
-
-const TabButton = ({ active, onClick, label, icon }: any) => (
-  <button
-    onClick={onClick}
-    className={`px-8 py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-3 ${
-      active
-        ? "bg-white dark:bg-slate-800 text-red-600 shadow-xl border border-slate-100 dark:border-slate-700"
-        : "text-slate-400 hover:text-slate-600"
-    }`}
-  >
-    {icon} {label}
-  </button>
-);
 
 export default AdminPage;

@@ -1,4 +1,3 @@
-
 import { create } from 'zustand';
 import { Profile, Article, ChatRequest } from '../types';
 import { supabase } from './supabase';
@@ -14,13 +13,11 @@ interface AppState {
   isHydrating: boolean;
   error: string | null;
   
-  // Actions
   setProfile: (profile: Profile | null) => void;
   setArticles: (articles: Article[]) => void;
   setUsers: (users: Profile[]) => void;
-  setChatRequests: (requests: ChatRequest[]) => void;
+  setChatRequests: (chatRequests: ChatRequest[]) => void;
   
-  // Logic
   syncAll: () => Promise<void>;
   hydrate: () => Promise<void>;
   logout: () => Promise<void>;
@@ -45,81 +42,66 @@ export const useStore = create<AppState>((set, get) => ({
 
   syncAll: async () => {
     if (get().isSyncing) return;
-    set({ isSyncing: true, error: null });
+    set({ isSyncing: true });
     
     try {
-      // Parallelize safely with a limit
       const [artRes, userRes] = await Promise.all([
-        supabase.from('articles').select('*').order('created_at', { ascending: false }).limit(40),
-        supabase.from('profiles').select('*').order('full_name', { ascending: true }).limit(60)
+        supabase.from('articles').select('*').order('created_at', { ascending: false }).limit(50),
+        supabase.from('profiles').select('*').order('full_name', { ascending: true })
       ]);
-
+      
       set({ 
         articles: artRes.data || [], 
         users: userRes.data || [] 
       });
     } catch (e: any) {
-      console.warn("Sync background warning:", e.message);
+      console.warn("Sync warning:", e.message);
     } finally {
       set({ isSyncing: false });
     }
   },
 
   hydrate: async () => {
-    // Prevent redundant hydration attempts
-    if (get().isHydrating || get().isInitialized) return;
-    set({ isHydrating: true, error: null });
-
-    // Safety timeout for the session check
-    const timeoutPromise = new Promise((_, reject) => 
-      setTimeout(() => reject(new Error('Auth Timeout')), 4000)
-    );
+    if (get().isHydrating) return;
+    set({ isHydrating: true });
 
     try {
-      const sessionResult = await Promise.race([
-        supabase.auth.getSession(),
-        timeoutPromise
-      ]) as any;
-
-      const session = sessionResult.data?.session;
+      const { data: { session } } = await supabase.auth.getSession();
       
       if (session?.user) {
-        const { data: profile } = await supabase
+        set({ isLoggedIn: true });
+        const { data: profile, error } = await supabase
           .from('profiles')
           .select('*')
           .eq('id', session.user.id)
           .maybeSingle();
           
         if (profile) {
-          set({ profile, isLoggedIn: true });
-          // Background fetch for handshakes
-          supabase.from('chat_requests')
+          set({ profile });
+          const { data: reqs } = await supabase.from('chat_requests')
             .select('*')
             .eq('to_id', profile.id)
-            .eq('status', 'pending')
-            .then(({ data }) => data && set({ chatRequests: data }));
+            .eq('status', 'pending');
+          if (reqs) set({ chatRequests: reqs });
         }
       } else {
         set({ profile: null, isLoggedIn: false });
       }
     } catch (e: any) {
       console.error("Hydration Error:", e.message);
-      set({ error: "Initializing Guest Access..." });
     } finally {
-      // CRITICAL: Always release the loader here
       set({ isInitialized: true, isHydrating: false });
       // Non-blocking sync
-      get().syncAll().catch(err => console.warn("Background sync failed", err));
+      get().syncAll();
     }
   },
 
   initAuthListener: () => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === 'SIGNED_IN') {
-        // Hydrate only if profile is not already present to avoid loops
-        if (!get().profile) get().hydrate();
+      if (event === 'SIGNED_IN' || event === 'USER_UPDATED') {
+        await get().hydrate();
       } else if (event === 'SIGNED_OUT') {
-        set({ profile: null, isLoggedIn: false, chatRequests: [] });
+        set({ profile: null, isLoggedIn: false, chatRequests: [], articles: [], users: [] });
       }
     });
     return () => subscription.unsubscribe();

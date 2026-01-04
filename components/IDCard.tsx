@@ -1,20 +1,16 @@
 import React, { useRef } from "react";
-import {
-  Shield,
-  Fingerprint,
-  Globe,
-  Download,
-  CheckCircle2,
-  User,
-} from "lucide-react";
+import { Shield, Fingerprint, Globe, Download } from "lucide-react";
 import { Profile } from "../types";
 import html2canvas from "html2canvas";
+// Fix: Added missing import for toast
+import { toast } from "react-hot-toast";
 
 interface IDCardProps {
   profile: Profile;
+  isOwn?: boolean;
 }
 
-const IDCard: React.FC<IDCardProps> = ({ profile }) => {
+const IDCard: React.FC<IDCardProps> = ({ profile, isOwn = false }) => {
   const cardRef = useRef<HTMLDivElement>(null);
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https://the-articles.network/verify/${profile.serial_id}&bgcolor=ffffff&color=000000`;
 
@@ -26,7 +22,7 @@ const IDCard: React.FC<IDCardProps> = ({ profile }) => {
         backgroundColor: "#ffffff",
         useCORS: true,
         logging: false,
-        x: -4, // Larger safety offset
+        x: -4,
         y: -4,
         width: cardRef.current.offsetWidth + 8,
         height: cardRef.current.offsetHeight + 8,
@@ -37,81 +33,84 @@ const IDCard: React.FC<IDCardProps> = ({ profile }) => {
       link.click();
     } catch (e) {
       console.error("Export failed", e);
+      toast.error("Handshake failed. Visual export interrupted.");
     }
   };
 
   return (
-    <div className="flex flex-col items-center w-full gap-8 px-4 overflow-visible">
-      <div className="flex justify-center w-full p-4 overflow-visible bg-transparent">
+    <div className="flex flex-col items-center w-full gap-6 overflow-visible">
+      <div className="flex justify-center w-full overflow-visible bg-transparent">
         <div
           ref={cardRef}
-          className="relative w-full max-w-[340px] md:max-w-[360px] aspect-[1.6/1] bg-white dark:bg-slate-900 rounded-[2rem] md:rounded-[2.5rem] overflow-hidden shadow-2xl border border-slate-200 dark:border-slate-800 flex flex-col p-6 md:p-8 select-none transition-transform active:scale-[0.98]"
+          className="relative w-full max-w-[360px] aspect-[1.6/1] bg-white dark:bg-slate-900 rounded-[2rem] overflow-hidden shadow-2xl border border-slate-200 dark:border-white/10 flex flex-col p-6 md:p-7 select-none"
         >
-          {/* Security Watermark */}
-          <div className="absolute inset-0 opacity-[0.04] pointer-events-none overflow-hidden text-[7px] font-black uppercase rotate-[-12deg] leading-none whitespace-pre italic">
-            {Array(40).fill("VERIFIED PRESS PASS NETWORK NODE ").join("\n")}
+          {/* Security Layer */}
+          <div className="absolute inset-0 opacity-[0.03] pointer-events-none overflow-hidden text-[6px] font-black uppercase rotate-[-12deg] leading-none whitespace-pre italic">
+            {Array(50).fill("VERIFIED PRESS PASS NETWORK NODE ").join("\n")}
           </div>
 
-          <div className="relative z-10 flex items-start justify-between mb-4 md:mb-6">
+          <div className="relative z-10 flex items-start justify-between mb-4">
             <div className="space-y-1">
               <div className="flex items-center gap-2">
-                <Shield size={14} className="text-blue-600" />
-                <p className="text-[8px] md:text-[9px] font-bold text-slate-400 tracking-[0.25em] uppercase">
+                <Shield size={12} className="text-blue-600" />
+                <p className="text-[8px] font-bold text-slate-400 tracking-[0.2em] uppercase">
                   Operations Node
                 </p>
               </div>
-              <h2 className="text-lg italic font-black leading-none tracking-tighter uppercase md:text-xl text-slate-950 dark:text-white">
+              <h2 className="text-base italic font-black leading-none tracking-tighter uppercase text-slate-950 dark:text-white">
                 ThE-ARTICLES
               </h2>
             </div>
             <div className="text-right">
-              <p className="text-[7px] md:text-[8px] font-bold text-slate-400 uppercase tracking-widest">
+              <p className="text-[7px] font-bold text-slate-500 uppercase tracking-widest">
                 Serial Index
               </p>
-              <p className="text-[10px] md:text-[12px] font-black text-slate-950 dark:text-white uppercase tracking-tight">
+              <p className="text-[10px] font-black text-slate-950 dark:text-white uppercase tracking-tight">
                 {profile.serial_id?.split("-")[1] || "00000"}
               </p>
             </div>
           </div>
 
-          <div className="relative z-10 flex items-center flex-grow gap-4 md:gap-6">
-            <div className="w-16 h-16 md:w-20 md:h-20 rounded-[1.2rem] md:rounded-[1.5rem] bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 flex items-center justify-center flex-shrink-0 shadow-inner overflow-hidden">
+          <div className="relative z-10 flex items-center flex-grow gap-4">
+            <div className="flex items-center justify-center flex-shrink-0 w-16 h-16 overflow-hidden border shadow-inner rounded-2xl bg-slate-50 dark:bg-slate-800 border-slate-100 dark:border-white/5">
               {profile.avatar_url ? (
                 <img
                   src={profile.avatar_url}
                   className="object-cover w-full h-full"
+                  alt="Profile"
                 />
               ) : (
-                <Fingerprint size={28} className="text-slate-200" />
+                <Fingerprint
+                  size={24}
+                  className="text-slate-300 dark:text-slate-600"
+                />
               )}
             </div>
-
-            <div className="flex-grow space-y-2 overflow-hidden md:space-y-3">
+            <div className="flex-grow space-y-2 overflow-hidden">
               <div className="space-y-0.5">
-                <p className="text-[7px] md:text-[8px] text-slate-300 font-bold uppercase tracking-widest">
-                  Operator Name
+                <p className="text-[7px] text-slate-400 font-bold uppercase tracking-widest">
+                  Node Operator
                 </p>
-                <p className="text-[14px] md:text-[16px] font-black text-slate-950 dark:text-white uppercase truncate tracking-tight">
+                <p className="text-[14px] font-black text-slate-950 dark:text-white uppercase truncate tracking-tight">
                   {profile.full_name || "PENDING IDENTITY"}
                 </p>
               </div>
-
-              <div className="flex items-center justify-between gap-2 md:gap-4">
+              <div className="flex items-center justify-between gap-2">
                 <div className="space-y-0.5">
-                  <p className="text-[7px] md:text-[8px] text-slate-300 font-bold uppercase tracking-widest">
-                    UID
+                  <p className="text-[7px] text-slate-400 font-bold uppercase tracking-widest">
+                    Hash ID
                   </p>
-                  <p className="text-[9px] md:text-[10px] font-bold text-slate-500 dark:text-slate-400 italic tracking-tighter">
+                  <p className="text-[9px] font-bold text-slate-500 italic tracking-tighter">
                     {profile.serial_id}
                   </p>
                 </div>
                 <div className="space-y-0.5 text-right">
-                  <p className="text-[7px] md:text-[8px] text-slate-300 font-bold uppercase tracking-widest">
+                  <p className="text-[7px] text-slate-400 font-bold uppercase tracking-widest">
                     Status
                   </p>
                   <div className="flex items-center justify-end gap-1">
                     <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full" />
-                    <p className="text-[8px] md:text-[9px] font-black text-emerald-500 uppercase tracking-widest italic">
+                    <p className="text-[8px] font-black text-emerald-500 uppercase tracking-widest italic">
                       Live
                     </p>
                   </div>
@@ -120,7 +119,7 @@ const IDCard: React.FC<IDCardProps> = ({ profile }) => {
             </div>
           </div>
 
-          <div className="relative z-10 flex items-end justify-between pt-4 mt-4 border-t border-slate-100 dark:border-slate-800">
+          <div className="relative z-10 flex items-end justify-between pt-3 mt-4 border-t border-slate-100 dark:border-white/5">
             <div className="space-y-1">
               <div className="flex items-center gap-1.5 text-slate-300 dark:text-slate-600">
                 <Globe size={10} />
@@ -128,25 +127,27 @@ const IDCard: React.FC<IDCardProps> = ({ profile }) => {
                   Verified Correspondent
                 </span>
               </div>
-              <p className="text-[6px] font-medium text-slate-300 uppercase truncate max-w-[120px]">
-                Hash: {profile.id?.substring(0, 16)}
+              <p className="text-[6px] font-medium text-slate-300 dark:text-slate-600 uppercase truncate max-w-[100px]">
+                Root: {profile.id?.substring(0, 12)}
               </p>
             </div>
             <img
               src={qrUrl}
               alt="QR"
-              className="w-8 h-8 rounded-md md:w-10 md:h-10 opacity-60 dark:invert"
+              className="w-8 h-8 rounded-md opacity-40 dark:invert"
             />
           </div>
         </div>
       </div>
 
-      <button
-        onClick={downloadPass}
-        className="flex items-center gap-3 px-8 md:px-10 py-4 bg-slate-950 dark:bg-white text-white dark:text-slate-950 text-[10px] md:text-[11px] font-black uppercase tracking-widest rounded-2xl hover:scale-105 active:scale-95 transition-all shadow-xl"
-      >
-        <Download size={16} /> Export Digital Pass
-      </button>
+      {isOwn && (
+        <button
+          onClick={downloadPass}
+          className="flex items-center gap-3 px-8 py-3.5 bg-slate-950 dark:bg-white text-white dark:text-slate-950 text-[10px] font-black uppercase tracking-widest rounded-2xl hover:scale-105 active:scale-95 transition-all shadow-xl"
+        >
+          <Download size={14} /> Export Digital Pass
+        </button>
+      )}
     </div>
   );
 };

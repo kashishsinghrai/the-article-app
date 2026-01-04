@@ -1,21 +1,26 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import {
   Camera,
   ArrowLeft,
   Lock,
+  Unlock,
   User,
   Info,
-  Mail,
-  Smartphone,
   MessageSquare,
   LogOut,
   ShieldAlert,
   Fingerprint,
+  Mail,
+  Smartphone,
+  Globe,
+  Shield,
+  Activity,
+  Calendar,
+  Binary,
 } from "lucide-react";
-import IDCard from "../../components/IDCard";
-import SettingsTerminal from "../../components/SettingsTerminal";
 import { Profile } from "../../types";
 import { toast } from "react-hot-toast";
+import IDCard from "../../components/IDCard.tsx";
 
 interface ProfilePageProps {
   profile: Profile;
@@ -25,349 +30,393 @@ interface ProfilePageProps {
   onCloseExternal: () => void;
   isLoggedIn?: boolean;
   currentUserId?: string;
-  currentUserProfile?: Profile | null;
   onChat?: (user: Profile) => void;
-  initialTab?: "intel" | "settings";
 }
 
 const ProfilePage: React.FC<ProfilePageProps> = ({
   profile,
   onLogout,
   onUpdateProfile,
-  isExternal = false,
+  isExternal,
   onCloseExternal,
   currentUserId,
   onChat,
-  initialTab = "intel",
 }) => {
-  const [activeTab, setActiveTab] = useState<"intel" | "settings">(initialTab);
   const [isEditing, setIsEditing] = useState(false);
-  const [isUploading, setIsUploading] = useState(false);
+  const [editData, setEditData] = useState({
+    full_name: profile.full_name,
+    bio: profile.bio,
+    avatar_url: profile.avatar_url || "",
+    gender: profile.gender || "Masked",
+    phone: profile.phone || "",
+    email: profile.email || "",
+    is_private: profile.is_private || false,
+  });
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [editData, setEditData] = useState({
-    full_name: profile?.full_name || "",
-    bio: profile?.bio || "",
-    gender: profile?.gender || "",
-    email: profile?.email || "",
-    phone: profile?.phone || "",
-    avatar_url: profile?.avatar_url || "",
-  });
-
-  const isOwnProfile = !isExternal || currentUserId === profile.id;
-  const canSeeDetails = isOwnProfile || !profile.is_private;
+  // Strict check if this profile belongs to the logged-in user
+  const isOwn = currentUserId === profile.id;
+  const canSeeDetails = isOwn || !profile.is_private;
 
   useEffect(() => {
-    setActiveTab(initialTab);
-  }, [initialTab]);
-
-  const handleSave = async () => {
-    if (onUpdateProfile) onUpdateProfile(editData);
-    setIsEditing(false);
-  };
+    setEditData({
+      full_name: profile.full_name,
+      bio: profile.bio,
+      avatar_url: profile.avatar_url || "",
+      gender: profile.gender || "Masked",
+      phone: profile.phone || "",
+      email: profile.email || "",
+      is_private: profile.is_private || false,
+    });
+  }, [profile]);
 
   const handleAvatarUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.size > 1 * 1024 * 1024)
-        return toast.error("Avatar exceeds 1MB threshold.");
-      setIsUploading(true);
+      if (file.size > 1024 * 1024) {
+        toast.error("Asset size exceeds 1MB protocol.");
+        return;
+      }
       const reader = new FileReader();
-      reader.onloadend = () => {
-        const base64 = reader.result as string;
-        setEditData((prev) => ({ ...prev, avatar_url: base64 }));
-        setIsUploading(false);
-      };
+      reader.onloadend = () =>
+        setEditData((p) => ({ ...p, avatar_url: reader.result as string }));
       reader.readAsDataURL(file);
     }
   };
 
-  if (!profile || !profile.id) return null;
+  const handleSave = async () => {
+    if (onUpdateProfile) {
+      await onUpdateProfile(editData);
+      setIsEditing(false);
+    }
+  };
 
   return (
-    <main className="max-w-6xl px-6 py-24 mx-auto space-y-12 duration-700 md:py-32 animate-in fade-in">
-      <div className="flex items-center justify-between">
-        <button
-          onClick={onCloseExternal}
-          className="flex items-center gap-3 text-slate-400 hover:text-slate-900 dark:hover:text-white font-black uppercase text-[10px] tracking-[0.3em] transition-all group"
-        >
-          <ArrowLeft
-            size={16}
-            className="transition-transform group-hover:-translate-x-1"
-          />{" "}
-          Exit Identity
-        </button>
-
-        {isOwnProfile && (
+    <main className="max-w-6xl px-4 py-10 mx-auto space-y-12 duration-500 md:px-6 md:py-16 animate-in fade-in">
+      <div className="flex flex-col items-start justify-between gap-6 pb-10 border-b md:flex-row md:items-center border-slate-100 dark:border-white/5">
+        <div className="space-y-4">
           <button
-            onClick={() => {
-              if (
-                confirm(
-                  "TERMINATE SESSION: This will disconnect your identity node. Continue?"
-                )
-              )
-                onLogout();
-            }}
-            className="flex items-center gap-3 px-6 py-3 bg-red-50 dark:bg-red-950 text-red-600 rounded-xl font-black uppercase text-[10px] tracking-widest hover:bg-red-600 hover:text-white transition-all shadow-sm border border-red-100 dark:border-red-900/20"
+            onClick={onCloseExternal}
+            className="flex items-center gap-2 text-slate-400 hover:text-blue-600 uppercase text-[9px] font-black tracking-[0.3em] transition-all group"
           >
-            <LogOut size={16} /> Terminate Protocol
+            <ArrowLeft
+              size={14}
+              className="transition-transform group-hover:-translate-x-1"
+            />{" "}
+            {isExternal ? "Back to Registry" : "Return to Hub"}
           </button>
-        )}
-      </div>
-
-      <div className="grid grid-cols-1 gap-16 lg:grid-cols-12 lg:gap-24">
-        <div className="space-y-12 lg:col-span-5">
-          <div className="flex flex-col items-center space-y-8">
-            {canSeeDetails ? (
-              <IDCard
-                profile={{
-                  ...profile,
-                  avatar_url: editData.avatar_url || profile.avatar_url,
-                }}
-              />
-            ) : (
-              <div className="w-full aspect-[1.6/1] bg-slate-50 dark:bg-slate-900 rounded-[3rem] border-2 border-dashed border-slate-200 dark:border-slate-800 flex flex-col items-center justify-center text-center p-12 space-y-6">
-                <div className="p-6 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-400">
-                  <Lock size={48} />
-                </div>
-                <div className="space-y-2">
-                  <p className="text-xs font-black uppercase tracking-[0.4em] text-slate-400">
-                    Locked Node
-                  </p>
-                  <p className="text-[10px] font-bold text-slate-500 uppercase italic">
-                    Identity is currently private
-                  </p>
-                </div>
-              </div>
-            )}
-
-            <div className="flex w-full gap-3">
-              {!isOwnProfile && (
-                <button
-                  onClick={() => onChat?.(profile)}
-                  className="flex-1 py-5 rounded-2xl bg-blue-600 text-white text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-3 shadow-xl hover:bg-blue-700 shadow-blue-600/20"
-                >
-                  <MessageSquare size={18} /> Secure Handshake
-                </button>
-              )}
-              {isOwnProfile && (isEditing || !profile.avatar_url) && (
-                <button
-                  onClick={() => fileInputRef.current?.click()}
-                  className="w-full py-5 rounded-2xl bg-slate-950 dark:bg-white text-white dark:text-slate-950 text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-3 shadow-xl"
-                >
-                  <Camera size={18} />{" "}
-                  {isUploading ? "Syncing..." : "Update Visual"}
-                </button>
-              )}
+          <div className="flex items-center gap-4">
+            <div className="p-2.5 bg-blue-600 rounded-xl shadow-lg shadow-blue-600/20">
+              <Shield size={22} className="text-white" />
             </div>
-            <input
-              type="file"
-              ref={fileInputRef}
-              onChange={handleAvatarUpload}
-              accept="image/*"
-              className="hidden"
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <StatCard
-              label="Protocol"
-              value={profile.role?.toUpperCase() || "USER"}
-            />
-            <StatCard label="Reputation" value={profile.budget || 0} />
+            <h1 className="text-3xl italic font-black tracking-tighter uppercase md:text-4xl text-slate-950 dark:text-white">
+              Node_Identity
+            </h1>
           </div>
         </div>
 
-        <div className="space-y-12 lg:col-span-7">
-          <div className="flex flex-col items-center justify-between gap-8 pb-10 border-b md:flex-row border-slate-100 dark:border-slate-900">
-            <h2 className="text-4xl italic font-black leading-none tracking-tighter uppercase md:text-7xl text-slate-900 dark:text-white">
-              Identity
-            </h2>
-            {isOwnProfile && (
-              <div className="flex gap-1 p-1.5 bg-slate-50 dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800">
-                <button
-                  onClick={() => setActiveTab("intel")}
-                  className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
-                    activeTab === "intel"
-                      ? "bg-white dark:bg-slate-800 text-blue-600 shadow-sm"
-                      : "text-slate-400"
-                  }`}
-                >
-                  Node Stats
-                </button>
-                <button
-                  onClick={() => setActiveTab("settings")}
-                  className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
-                    activeTab === "settings"
-                      ? "bg-white dark:bg-slate-800 text-blue-600 shadow-sm"
-                      : "text-slate-400"
-                  }`}
-                >
-                  Protocol
-                </button>
-              </div>
-            )}
-          </div>
+        <div className="flex items-center w-full gap-3 md:w-auto">
+          {!isOwn && (
+            <button
+              onClick={() => onChat?.(profile)}
+              className="flex-1 md:flex-none flex items-center justify-center gap-2 px-8 py-3.5 bg-blue-600 text-white rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-blue-700 transition-all shadow-xl shadow-blue-600/20"
+            >
+              <MessageSquare size={14} /> Establish Signal
+            </button>
+          )}
+          {isOwn && (
+            <button
+              onClick={onLogout}
+              className="flex-1 md:flex-none flex items-center justify-center gap-2 px-8 py-3.5 bg-red-600 dark:bg-red-500/10 dark:text-red-500 rounded-2xl font-black uppercase text-[10px] tracking-widest border border-red-100 dark:border-red-500/20 hover:bg-red-600 hover:text-white transition-all"
+            >
+              <LogOut size={14} /> Terminate
+            </button>
+          )}
+        </div>
+      </div>
 
-          {activeTab === "intel" ? (
-            <div className="bg-white dark:bg-slate-950 p-8 md:p-14 rounded-[3rem] border border-slate-200 dark:border-slate-800 shadow-sm space-y-12">
-              <div className="flex items-center justify-between pb-6 border-b border-slate-50 dark:border-white/5">
-                <div className="flex items-center gap-3 text-slate-400">
-                  <Fingerprint size={18} />
-                  <label className="text-[10px] font-black uppercase tracking-widest">
-                    Metadata Registry
-                  </label>
+      <div className="grid grid-cols-1 gap-8 lg:grid-cols-12 md:gap-12">
+        <div className="space-y-8 lg:col-span-4">
+          <IDCard profile={{ ...profile, ...editData }} isOwn={isOwn} />
+
+          <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] border border-slate-100 dark:border-white/5 p-8 space-y-8 shadow-sm">
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">
+                  Network Pulse
+                </span>
+                <span className="flex items-center gap-2 text-[10px] font-black uppercase text-emerald-500 italic">
+                  <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />{" "}
+                  Active_Node
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="p-5 text-center border bg-slate-50 dark:bg-slate-950/50 rounded-3xl border-slate-100 dark:border-white/5">
+                  <p className="text-[8px] font-black text-slate-400 uppercase mb-1">
+                    Clearance
+                  </p>
+                  <p className="text-lg font-black text-blue-600 uppercase">
+                    {profile.role}
+                  </p>
                 </div>
-                {isOwnProfile && (
-                  <button
-                    onClick={() =>
-                      isEditing ? handleSave() : setIsEditing(true)
-                    }
-                    className="text-blue-600 font-black uppercase text-[10px] tracking-widest hover:underline"
-                  >
-                    {isEditing ? "Sync Changes" : "Update Identity"}
-                  </button>
-                )}
+                <div className="p-5 text-center border bg-slate-50 dark:bg-slate-950/50 rounded-3xl border-slate-100 dark:border-white/5">
+                  <p className="text-[8px] font-black text-slate-400 uppercase mb-1">
+                    Reputation
+                  </p>
+                  <p className="text-lg font-black text-blue-600">
+                    {profile.budget || 0}
+                  </p>
+                </div>
               </div>
+            </div>
 
+            <div className="pt-6 border-t border-slate-50 dark:border-white/5">
+              <div className="flex items-center gap-3 mb-4 text-slate-400">
+                <Activity size={14} />
+                <span className="text-[10px] font-black uppercase tracking-widest">
+                  Sync Integrity
+                </span>
+              </div>
+              <div className="h-1.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-blue-600 rounded-full"
+                  style={{ width: "92%" }}
+                />
+              </div>
+              <p className="text-[9px] font-bold text-slate-400 uppercase mt-3">
+                Node Alpha Verification: 92%
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="lg:col-span-8">
+          <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] border border-slate-100 dark:border-white/5 shadow-sm overflow-hidden min-h-[500px]">
+            <div className="flex flex-col items-start justify-between gap-4 px-8 py-8 border-b md:px-10 border-slate-50 dark:border-white/5 bg-slate-50/30 dark:bg-slate-950/50 sm:flex-row sm:items-center">
+              <div className="flex items-center gap-3">
+                <Binary size={18} className="text-blue-600" />
+                <h3 className="text-xl italic font-black tracking-tighter uppercase dark:text-white">
+                  Dossier_Files
+                </h3>
+              </div>
+              {isOwn && (
+                <button
+                  onClick={() =>
+                    isEditing ? handleSave() : setIsEditing(true)
+                  }
+                  className="w-full sm:w-auto px-6 py-2.5 bg-slate-950 dark:bg-white text-white dark:text-slate-950 rounded-xl text-[10px] font-black uppercase tracking-widest hover:scale-105 active:scale-95 transition-all shadow-md"
+                >
+                  {isEditing ? "Sync Data" : "Edit Dossier"}
+                </button>
+              )}
+            </div>
+
+            <div className="p-8 md:p-10">
               {isEditing ? (
-                <div className="space-y-8 animate-in slide-in-from-bottom-4">
-                  <EditField
-                    icon={<User size={14} />}
-                    label="Node Designation (Name)"
-                    value={editData.full_name}
-                    onChange={(v: string) =>
-                      setEditData((prev) => ({ ...prev, full_name: v }))
-                    }
-                  />
-                  <EditField
-                    icon={<Info size={14} />}
-                    label="Operational Manifesto (Bio)"
-                    value={editData.bio}
-                    onChange={(v: string) =>
-                      setEditData((prev) => ({ ...prev, bio: v }))
-                    }
-                  />
-                  <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-                    <EditField
-                      icon={<Mail size={14} />}
-                      label="Signal Hub (Email)"
-                      value={editData.email}
-                      onChange={(v: string) =>
-                        setEditData((prev) => ({ ...prev, email: v }))
+                <div className="space-y-10 duration-500 animate-in slide-in-from-bottom-2">
+                  <div className="grid grid-cols-1 gap-8 sm:grid-cols-2">
+                    <div className="space-y-3">
+                      <label className="text-[10px] font-black uppercase text-slate-400 flex items-center gap-2">
+                        <User size={12} /> Handle Name
+                      </label>
+                      <input
+                        value={editData.full_name}
+                        onChange={(e) =>
+                          setEditData((p) => ({
+                            ...p,
+                            full_name: e.target.value,
+                          }))
+                        }
+                        className="w-full px-6 py-4 font-bold transition-all border shadow-inner outline-none bg-slate-50 dark:bg-slate-950 border-slate-100 dark:border-white/5 rounded-2xl text-slate-900 dark:text-white focus:ring-1 focus:ring-blue-600/50"
+                      />
+                    </div>
+                    <div className="space-y-3">
+                      <label className="text-[10px] font-black uppercase text-slate-400 flex items-center gap-2">
+                        <Globe size={12} /> Assigned Sector
+                      </label>
+                      <div className="flex gap-2 p-1.5 bg-slate-50 dark:bg-slate-950 rounded-2xl border border-slate-100 dark:border-white/5">
+                        {["Male", "Female", "Masked"].map((g) => (
+                          <button
+                            key={g}
+                            onClick={() =>
+                              setEditData((p) => ({ ...p, gender: g }))
+                            }
+                            className={`flex-1 py-3 rounded-xl text-[9px] font-black uppercase transition-all ${
+                              editData.gender === g
+                                ? "bg-white dark:bg-slate-800 text-blue-600 shadow-sm"
+                                : "text-slate-400"
+                            }`}
+                          >
+                            {g}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-8 sm:grid-cols-2">
+                    <div className="space-y-3">
+                      <label className="text-[10px] font-black uppercase text-slate-400 flex items-center gap-2">
+                        <Mail size={12} /> Signal Inbox
+                      </label>
+                      <input
+                        value={editData.email}
+                        onChange={(e) =>
+                          setEditData((p) => ({ ...p, email: e.target.value }))
+                        }
+                        className="w-full px-6 py-4 font-bold transition-all border shadow-inner outline-none bg-slate-50 dark:bg-slate-950 border-slate-100 dark:border-white/5 rounded-2xl text-slate-900 dark:text-white focus:ring-1 focus:ring-blue-600/50"
+                      />
+                    </div>
+                    <div className="space-y-3">
+                      <label className="text-[10px] font-black uppercase text-slate-400 flex items-center gap-2">
+                        <Smartphone size={12} /> Comms ID
+                      </label>
+                      <input
+                        value={editData.phone}
+                        onChange={(e) =>
+                          setEditData((p) => ({ ...p, phone: e.target.value }))
+                        }
+                        className="w-full px-6 py-4 font-bold transition-all border shadow-inner outline-none bg-slate-50 dark:bg-slate-950 border-slate-100 dark:border-white/5 rounded-2xl text-slate-900 dark:text-white focus:ring-1 focus:ring-blue-600/50"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <label className="text-[10px] font-black uppercase text-slate-400 flex items-center gap-2">
+                      <Info size={12} /> Operational Manifesto
+                    </label>
+                    <textarea
+                      value={editData.bio}
+                      onChange={(e) =>
+                        setEditData((p) => ({ ...p, bio: e.target.value }))
                       }
+                      rows={5}
+                      className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-white/5 rounded-[2rem] px-6 py-5 text-slate-900 dark:text-white font-bold outline-none focus:ring-1 focus:ring-blue-600/50 transition-all resize-none shadow-inner"
+                      placeholder="Node professional goals..."
                     />
-                    <EditField
-                      icon={<Smartphone size={14} />}
-                      label="Comms Link (Phone)"
-                      value={editData.phone}
-                      onChange={(v: string) =>
-                        setEditData((prev) => ({ ...prev, phone: v }))
+                  </div>
+
+                  <div className="flex items-center gap-5 p-6 bg-slate-50 dark:bg-slate-950 rounded-[2rem] border border-slate-100 dark:border-white/5">
+                    <button
+                      onClick={() =>
+                        setEditData((p) => ({
+                          ...p,
+                          is_private: !p.is_private,
+                        }))
                       }
-                    />
+                      className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-all shadow-xl ${
+                        editData.is_private
+                          ? "bg-red-600 text-white"
+                          : "bg-emerald-500 text-white"
+                      }`}
+                    >
+                      {editData.is_private ? (
+                        <Lock size={22} />
+                      ) : (
+                        <Unlock size={22} />
+                      )}
+                    </button>
+                    <div className="flex-grow">
+                      <p className="text-[11px] font-black uppercase dark:text-white">
+                        {editData.is_private
+                          ? "Stealth Protocol Enabled"
+                          : "Public Transmission Active"}
+                      </p>
+                      <p className="text-[9px] font-bold text-slate-400 uppercase">
+                        Hide dossier from the network registry index.
+                      </p>
+                    </div>
                   </div>
                 </div>
               ) : (
                 <div className="space-y-12">
                   {canSeeDetails ? (
                     <>
-                      <div className="grid grid-cols-2 gap-x-12 gap-y-10">
-                        <DetailBlock
-                          label="Node Operator"
-                          val={profile.full_name}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-10 gap-x-12">
+                        <DossierItem
+                          icon={Fingerprint}
+                          label="Node Alias"
+                          value={`@${profile.username}`}
                         />
-                        <DetailBlock
-                          label="Network Hash"
-                          val={`@${profile.username}`}
+                        <DossierItem
+                          icon={Calendar}
+                          label="Registered"
+                          value={new Date(
+                            profile.last_seen || Date.now()
+                          ).toLocaleDateString()}
                         />
-                        <DetailBlock
-                          label="Signal Link"
-                          val={profile.phone || "Classified"}
+                        <DossierItem
+                          icon={Mail}
+                          label="Signal Hub"
+                          value={profile.email || "CLASSIFIED"}
                         />
-                        <DetailBlock
-                          label="Registry Gender"
-                          val={profile.gender}
+                        <DossierItem
+                          icon={Smartphone}
+                          label="Direct Comms"
+                          value={profile.phone || "OFFLINE"}
                         />
                       </div>
-                      <div className="space-y-3">
-                        <p className="text-[9px] text-slate-300 font-black uppercase tracking-[0.3em]">
-                          Operational Manifesto
-                        </p>
-                        <p className="text-xl italic font-medium leading-relaxed text-slate-500 dark:text-slate-400">
-                          "{profile.bio || "Verified correspondent node."}"
+
+                      <div className="pt-10 space-y-5 border-t border-slate-50 dark:border-white/5">
+                        <div className="flex items-center gap-2 text-slate-400">
+                          <Info size={14} />
+                          <span className="text-[10px] font-black uppercase tracking-widest">
+                            Node Manifesto
+                          </span>
+                        </div>
+                        <p className="text-lg italic font-medium leading-relaxed text-slate-600 dark:text-slate-400">
+                          "
+                          {profile.bio ||
+                            "This node has not provided an operational mission statement."}
+                          "
                         </p>
                       </div>
                     </>
                   ) : (
-                    <div className="flex flex-col items-center justify-center py-24 space-y-6 text-center opacity-30">
-                      <ShieldAlert size={48} className="text-slate-300" />
-                      <p className="text-xs font-black uppercase tracking-[0.5em] leading-loose">
-                        Access Restricted.
-                        <br />
-                        Identity Masked.
-                      </p>
+                    <div className="flex flex-col items-center justify-center h-full py-20 space-y-6 text-center opacity-30">
+                      <ShieldAlert size={64} className="text-slate-400" />
+                      <div className="space-y-2">
+                        <p className="text-xl font-black uppercase tracking-[0.2em] dark:text-white">
+                          Dossier Locked
+                        </p>
+                        <p className="text-xs font-bold tracking-widest uppercase text-slate-500">
+                          Access requires stealth-clearance handshake.
+                        </p>
+                      </div>
                     </div>
                   )}
                 </div>
               )}
             </div>
-          ) : (
-            <SettingsTerminal
-              settings={profile.settings || ({} as any)}
-              onUpdate={(s) => onUpdateProfile?.({ settings: s })}
-              isPrivate={profile.is_private}
-              onTogglePrivate={(p) => onUpdateProfile?.({ is_private: p })}
-            />
-          )}
+          </div>
         </div>
       </div>
     </main>
   );
 };
 
-const DetailBlock: React.FC<{ label: string; val: string | number }> = ({
-  label,
-  val,
-}) => (
-  <div className="space-y-1.5 overflow-hidden">
-    <p className="text-[9px] text-slate-300 font-black uppercase tracking-widest">
-      {label}
-    </p>
-    <p className="text-2xl italic font-black leading-none tracking-tighter uppercase truncate text-slate-900 dark:text-white">
-      {val || "PENDING"}
-    </p>
-  </div>
-);
-
-const EditField: React.FC<{
-  icon: React.ReactNode;
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-}> = ({ icon, label, value, onChange }) => (
-  <div className="space-y-3">
-    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 flex items-center gap-2">
-      {icon} {label}
-    </label>
-    <input
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className="w-full p-4 text-sm font-bold border-none outline-none bg-slate-50 dark:bg-slate-900/50 rounded-xl focus:ring-2 focus:ring-blue-600/20 dark:text-white placeholder:text-slate-400"
-    />
-  </div>
-);
-
-const StatCard: React.FC<{ label: string; value: string | number }> = ({
+const DossierItem = ({
+  icon: Icon,
   label,
   value,
+}: {
+  icon: any;
+  label: string;
+  value: string;
 }) => (
-  <div className="bg-slate-50 dark:bg-slate-900 p-8 rounded-[2rem] border border-slate-100 dark:border-slate-800 space-y-2 text-center shadow-sm">
-    <p className="text-[9px] font-black uppercase text-slate-400 tracking-[0.2em]">
-      {label}
-    </p>
-    <p className="text-3xl italic font-black tracking-tighter uppercase text-slate-900 dark:text-white">
-      {value}
-    </p>
+  <div className="flex items-start gap-4">
+    <div className="p-3.5 bg-slate-50 dark:bg-slate-950 rounded-2xl border border-slate-100 dark:border-white/5">
+      <Icon size={18} className="text-slate-400" />
+    </div>
+    <div className="overflow-hidden">
+      <p className="text-[9px] font-black uppercase text-slate-400 tracking-widest mb-1">
+        {label}
+      </p>
+      <p className="text-base italic font-black tracking-tight uppercase truncate dark:text-white">
+        {value}
+      </p>
+    </div>
   </div>
 );
 

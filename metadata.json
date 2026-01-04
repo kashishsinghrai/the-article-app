@@ -1,10 +1,5 @@
-
 {
-  "name": "ThE-ARTICLES | Decentralized Global Press Network",
-  "description": "High-end citizen journalism platform with reputation rewards and digital press credentials.",
-  "requestFramePermissions": [
-    "camera",
-    "microphone",
-    "geolocation"
-  ]
+  "name": "ThE-ARTICLES Network",
+  "description": "A decentralized investigative journalism platform where verified nodes share intelligence dispatches bypassing centralized control.",
+  "requestFramePermissions": ["camera", "microphone", "geolocation"]
 }
