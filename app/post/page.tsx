@@ -14,8 +14,8 @@ import {
   Zap,
 } from "lucide-react";
 import { toast } from "react-hot-toast";
-import { Article, Category, Profile } from "../../types";
-import NetworkMonitor from "../../components/NetworkMonitor";
+import { Article, Category, Profile } from "../../types.ts";
+import NetworkMonitor from "../../components/NetworkMonitor.tsx";
 
 interface PostPageProps {
   onPublish: (data: Partial<Article>) => Promise<void>;
@@ -88,8 +88,7 @@ const PostPage: React.FC<PostPageProps> = ({
   };
 
   return (
-    <main className="flex flex-col gap-8 px-4 py-16 mx-auto overflow-x-hidden duration-500 md:gap-12 md:py-24 max-w-7xl md:px-8 lg:flex-row animate-in fade-in">
-      {/* Primary Interaction Column */}
+    <main className="flex flex-col gap-8 px-4 py-24 mx-auto overflow-x-hidden duration-500 md:gap-12 max-w-7xl md:px-8 lg:flex-row animate-in fade-in">
       <div className="flex-1 space-y-8 md:space-y-12">
         <button
           onClick={onBack}
@@ -118,9 +117,7 @@ const PostPage: React.FC<PostPageProps> = ({
           </p>
         </div>
 
-        {/* Form Container */}
         <div className="bg-white dark:bg-slate-900 p-5 md:p-10 lg:p-14 rounded-[2.5rem] md:rounded-[4rem] border border-slate-200 dark:border-white/5 space-y-10 md:space-y-12 shadow-2xl relative">
-          {/* Section 01: Headline */}
           <div className="space-y-4">
             <label className="flex items-center gap-2 text-[10px] font-black uppercase text-slate-500 dark:text-slate-400 tracking-[0.2em] border-b border-slate-100 dark:border-white/5 pb-2">
               <Type size={14} /> 01. Primary Headline
@@ -134,7 +131,6 @@ const PostPage: React.FC<PostPageProps> = ({
           </div>
 
           <div className="grid grid-cols-1 gap-8 md:grid-cols-2 md:gap-10">
-            {/* Section 02: Classification */}
             <div className="space-y-4">
               <label className="flex items-center gap-2 text-[10px] font-black uppercase text-slate-500 dark:text-slate-400 tracking-[0.2em] border-b border-slate-100 dark:border-white/5 pb-2">
                 02. Sector
@@ -156,7 +152,6 @@ const PostPage: React.FC<PostPageProps> = ({
               </div>
             </div>
 
-            {/* Section 03: Protocol */}
             <div className="space-y-4">
               <label className="flex items-center gap-2 text-[10px] font-black uppercase text-slate-500 dark:text-slate-400 tracking-[0.2em] border-b border-slate-100 dark:border-white/5 pb-2">
                 03. Protocol
@@ -186,7 +181,6 @@ const PostPage: React.FC<PostPageProps> = ({
             </div>
           </div>
 
-          {/* Section 04: Media Asset */}
           <div className="space-y-4">
             <label className="flex items-center gap-2 text-[10px] font-black uppercase text-slate-500 dark:text-slate-400 tracking-[0.2em] border-b border-slate-100 dark:border-white/5 pb-2">
               <ImageIcon size={14} /> 04. Media Shard
@@ -223,7 +217,6 @@ const PostPage: React.FC<PostPageProps> = ({
             </div>
           </div>
 
-          {/* Section 05: Hashtags */}
           <div className="space-y-4">
             <label className="flex items-center gap-2 text-[10px] font-black uppercase text-slate-500 dark:text-slate-400 tracking-[0.2em] border-b border-slate-100 dark:border-white/5 pb-2">
               <Hash size={14} /> 05. Indexing Hash Tags
@@ -236,7 +229,6 @@ const PostPage: React.FC<PostPageProps> = ({
             />
           </div>
 
-          {/* Section 06: Content */}
           <div className="space-y-4">
             <label className="flex items-center gap-2 text-[10px] font-black uppercase text-slate-500 dark:text-slate-400 tracking-[0.2em] border-b border-slate-100 dark:border-white/5 pb-2">
               <FileText size={14} /> 06. Intelligence Narrative
@@ -250,7 +242,6 @@ const PostPage: React.FC<PostPageProps> = ({
             />
           </div>
 
-          {/* Action Footer */}
           <div className="flex flex-col items-center justify-between gap-8 pt-8 border-t md:pt-12 border-slate-200 dark:border-white/10 md:flex-row">
             <div className="flex items-center gap-4 text-center text-slate-400 md:text-left">
               <ShieldCheck size={24} className="text-emerald-500 shrink-0" />
@@ -281,7 +272,6 @@ const PostPage: React.FC<PostPageProps> = ({
         </div>
       </div>
 
-      {/* Right Sidebar - Repositioned for mobile stack */}
       <div className="w-full lg:w-[420px] shrink-0 pt-0 lg:pt-32">
         <div className="space-y-6">
           <div className="flex items-center gap-3 px-6 lg:px-0">

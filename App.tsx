@@ -56,8 +56,13 @@ const App: React.FC = () => {
     } else {
       setViewingProfile(null);
     }
+    setActiveArticle(null); // Reset article when navigating away
     setCurrentPage(page);
-    // Keep URL clean on Vercel: https://the-article-app.vercel.app/
+  };
+
+  const handleReadArticle = (article: Article) => {
+    setActiveArticle(article);
+    setCurrentPage("article-view");
   };
 
   const handleAcceptRequest = async (req: ChatRequest) => {
@@ -137,8 +142,19 @@ const App: React.FC = () => {
                 articles={useStore.getState().articles}
                 isLoggedIn={isLoggedIn}
                 onLogin={() => setShowAuth("login")}
-                onReadArticle={setActiveArticle}
+                onReadArticle={handleReadArticle}
                 onRefresh={syncAll}
+              />
+            )}
+
+            {currentPage === "article-view" && activeArticle && (
+              <ArticleDetail
+                article={activeArticle}
+                onClose={() => handleNavigate("home")}
+                isLoggedIn={isLoggedIn}
+                currentUserId={profile?.id}
+                currentUserProfile={profile}
+                onUpdateArticles={syncAll}
               />
             )}
 
@@ -253,17 +269,6 @@ const App: React.FC = () => {
                 </div>
               ))}
           </main>
-
-          {activeArticle && (
-            <ArticleDetail
-              article={activeArticle}
-              onClose={() => setActiveArticle(null)}
-              isLoggedIn={isLoggedIn}
-              currentUserId={profile?.id}
-              currentUserProfile={profile}
-              onUpdateArticles={syncAll}
-            />
-          )}
 
           {activeHandshake && (
             <ChatOverlay

@@ -1,19 +1,18 @@
 import React, { useState, useEffect, useCallback } from "react";
 import {
   ArrowLeft,
-  Languages,
   ThumbsUp,
   ThumbsDown,
   MessageCircle,
   Send,
   Loader2,
   Fingerprint,
-  Hash,
-  ShieldAlert,
-  Trash2,
   Share2,
   Target,
-  Zap,
+  MoreHorizontal,
+  Bookmark,
+  // Added missing User icon import
+  User,
 } from "lucide-react";
 import { Article, Comment, Profile } from "../types";
 import { toast } from "react-hot-toast";
@@ -70,14 +69,12 @@ const ArticleDetail: React.FC<ArticleDetailProps> = ({
     if (!commentText.trim()) return;
     setIsSending(true);
     try {
-      const { error } = await supabase
-        .from("comments")
-        .insert({
-          article_id: article.id,
-          user_id: currentUserId,
-          user_name: currentUserProfile.full_name,
-          text: commentText.trim(),
-        });
+      const { error } = await supabase.from("comments").insert({
+        article_id: article.id,
+        user_id: currentUserId,
+        user_name: currentUserProfile.full_name,
+        text: commentText.trim(),
+      });
       if (!error) {
         setCommentText("");
         await fetchComments();
@@ -90,200 +87,237 @@ const ArticleDetail: React.FC<ArticleDetailProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-[400] flex items-center justify-center animate-in fade-in zoom-in-95 duration-300">
-      <div
-        className="absolute inset-0 bg-white/60 dark:bg-[#050505]/95 backdrop-blur-3xl"
-        onClick={onClose}
-      />
-
-      <div className="relative w-full max-w-6xl h-full md:h-[95vh] bg-white dark:bg-[#0a0a0a] md:rounded-[4rem] shadow-[0_50px_100px_-20px_rgba(0,0,0,0.5)] overflow-hidden flex flex-col border border-slate-200 dark:border-white/5">
-        {/* Dossier Header */}
-        <div className="flex items-center justify-between px-8 py-6 border-b border-slate-100 dark:border-white/5 bg-white/90 dark:bg-[#0a0a0a]/90 backdrop-blur-xl z-10">
+    <div className="max-w-3xl mx-auto min-h-screen bg-white dark:bg-[#050505] animate-in fade-in duration-300 flex flex-col pb-20">
+      {/* Top sticky navigation bar - LinkedIn Style */}
+      <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 dark:border-white/5 sticky top-[4rem] z-40 bg-white/95 dark:bg-[#050505]/95 backdrop-blur-xl">
+        <button
+          onClick={onClose}
+          className="text-slate-500 hover:text-[#00BFFF] transition-all flex items-center gap-2"
+        >
+          <ArrowLeft size={20} />
+          <span className="hidden text-xs font-bold tracking-widest uppercase md:font-black sm:inline">
+            Back
+          </span>
+        </button>
+        <div className="flex items-center gap-2">
           <button
-            onClick={onClose}
-            className="text-slate-400 hover:text-[#00BFFF] transition-all text-[10px] font-black uppercase tracking-[0.4em] flex items-center gap-3"
+            onClick={() => toast.success("Dispatch Saved")}
+            className="p-2 text-slate-400 hover:text-blue-500"
           >
-            <ArrowLeft size={16} /> Close Shard
+            <Bookmark size={20} />
           </button>
-          <div className="flex items-center gap-6">
-            <div className="hidden sm:flex items-center gap-2 px-4 py-1.5 bg-[#00BFFF]/5 rounded-full border border-[#00BFFF]/10">
-              <Target size={14} className="text-[#00BFFF]" />
-              <span className="text-[9px] font-black text-[#00BFFF] uppercase tracking-widest">
-                Protocol: Investigative
-              </span>
-            </div>
-            <button
-              onClick={() => toast.success("Dispatch Hashed")}
-              className="p-3 bg-slate-50 dark:bg-white/5 rounded-2xl text-slate-500 hover:text-[#00BFFF] transition-all"
-            >
-              <Share2 size={20} />
-            </button>
-          </div>
-        </div>
-
-        <div className="flex-grow p-6 overflow-y-auto md:p-20 custom-scrollbar">
-          <div className="max-w-4xl mx-auto space-y-20">
-            <header className="space-y-10">
-              <div className="space-y-6">
-                <div className="flex items-center gap-3">
-                  <div className="w-2 h-2 bg-[#00BFFF] rounded-full animate-ping" />
-                  <p className="text-[10px] font-black uppercase tracking-[0.5em] text-[#00BFFF]">
-                    Identity Verified: {article.author_serial}
-                  </p>
-                </div>
-                <h1
-                  className={`text-4xl md:text-8xl font-black text-slate-900 dark:text-white tracking-tighter leading-[0.9] uppercase italic transition-all duration-1000 ${
-                    isDecrypted
-                      ? "opacity-100 translate-y-0"
-                      : "opacity-0 translate-y-10"
-                  }`}
-                >
-                  {article.title}
-                </h1>
-              </div>
-
-              <div className="flex flex-wrap gap-4">
-                {article.hashtags?.map((t, i) => (
-                  <span
-                    key={i}
-                    className="px-5 py-2 bg-slate-50 dark:bg-white/5 rounded-xl text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] border border-slate-100 dark:border-white/5"
-                  >
-                    #{t}
-                  </span>
-                ))}
-              </div>
-            </header>
-
-            {/* Main Content Shard */}
-            <div className="space-y-16">
-              <div className="flex items-center gap-8 py-10 border-y border-slate-100 dark:border-white/5">
-                <button
-                  onClick={() => onInteraction?.("like", article.id)}
-                  className="flex items-center gap-3 text-[10px] font-black uppercase text-slate-400 hover:text-[#00BFFF] transition-colors group"
-                >
-                  <ThumbsUp
-                    size={24}
-                    className="transition-transform group-active:scale-125"
-                  />{" "}
-                  {article.likes_count || 0} Supports
-                </button>
-                <button
-                  onClick={() => onInteraction?.("dislike", article.id)}
-                  className="flex items-center gap-3 text-[10px] font-black uppercase text-slate-400 hover:text-red-500 transition-colors group"
-                >
-                  <ThumbsDown
-                    size={24}
-                    className="transition-transform group-active:scale-125"
-                  />{" "}
-                  {article.dislikes_count || 0} Conflicts
-                </button>
-                <div className="flex items-center gap-3 text-[10px] font-black uppercase text-slate-400">
-                  <MessageCircle size={24} /> {article.comments_count || 0}{" "}
-                  Analysis Notes
-                </div>
-              </div>
-
-              <div className="space-y-12">
-                <p
-                  className={`text-2xl md:text-4xl font-medium text-slate-600 dark:text-slate-400 leading-relaxed italic transition-opacity duration-1000 ${
-                    isDecrypted ? "opacity-100" : "opacity-10"
-                  }`}
-                >
-                  "{article.content}"
-                </p>
-
-                {article.image_url && (
-                  <div className="aspect-video w-full rounded-[4rem] overflow-hidden border border-slate-200 dark:border-white/10 shadow-2xl relative group">
-                    <img
-                      src={article.image_url}
-                      className="w-full h-full object-cover transition-transform duration-[3s] group-hover:scale-110"
-                      alt="Evidence Asset"
-                    />
-                    <div className="absolute inset-0 transition-opacity opacity-0 bg-gradient-to-t from-black/40 to-transparent group-hover:opacity-100" />
-                  </div>
-                )}
-              </div>
-
-              {/* Note Input */}
-              <div className="pt-24 pb-20 space-y-12">
-                <div className="space-y-3">
-                  <h3 className="text-2xl italic font-black uppercase text-slate-900 dark:text-white">
-                    Field Intelligence
-                  </h3>
-                  <p className="text-[10px] font-black text-[#00BFFF] uppercase tracking-[0.4em]">
-                    Broadcast your peer-verified analysis
-                  </p>
-                </div>
-
-                <div className="flex gap-4">
-                  <input
-                    value={commentText}
-                    onChange={(e) => setCommentText(e.target.value)}
-                    className="flex-grow px-8 py-6 text-base font-bold bg-slate-50 dark:bg-[#111] border border-slate-200 dark:border-white/5 rounded-[2.5rem] text-slate-900 dark:text-white focus:border-[#00BFFF]/50 outline-none transition-all shadow-inner"
-                    placeholder="Input encrypted node response..."
-                    onKeyDown={(e) => e.key === "Enter" && postComment()}
-                  />
-                  <button
-                    onClick={postComment}
-                    disabled={isSending || !commentText.trim()}
-                    className="w-20 h-20 bg-[#00BFFF] text-white rounded-[2.5rem] flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-xl shadow-[#00BFFF]/20 disabled:opacity-20"
-                  >
-                    {isSending ? (
-                      <Loader2 className="animate-spin" />
-                    ) : (
-                      <Send size={24} />
-                    )}
-                  </button>
-                </div>
-
-                <div className="space-y-8">
-                  {loadingComments ? (
-                    <div className="flex items-center gap-4 text-[#00BFFF]">
-                      <Loader2 className="animate-spin" size={18} />
-                      <span className="text-[10px] font-black uppercase tracking-widest">
-                        Decrypting Peer Responses...
-                      </span>
-                    </div>
-                  ) : comments.length === 0 ? (
-                    <p className="text-xs italic font-black tracking-widest uppercase text-slate-500 opacity-40">
-                      Zero peer analysis recorded for this shard.
-                    </p>
-                  ) : (
-                    comments.map((c) => (
-                      <div
-                        key={c.id}
-                        className="p-10 space-y-6 bg-slate-50 dark:bg-[#080808] rounded-[3rem] border border-slate-100 dark:border-white/5 group relative overflow-hidden"
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-4">
-                            <div className="w-12 h-12 rounded-2xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-white/5 flex items-center justify-center text-[#00BFFF] shadow-sm">
-                              <Fingerprint size={24} />
-                            </div>
-                            <div>
-                              <span className="text-sm font-black uppercase text-slate-900 dark:text-white">
-                                {c.user_name}
-                              </span>
-                              <p className="text-[8px] font-bold text-[#00BFFF] uppercase mt-1 tracking-[0.2em]">
-                                Verified_ALPHA_Node
-                              </p>
-                            </div>
-                          </div>
-                          <span className="text-[9px] font-black text-slate-400 uppercase">
-                            {new Date(c.created_at).toLocaleTimeString()}
-                          </span>
-                        </div>
-                        <p className="text-lg italic font-medium leading-relaxed text-slate-600 dark:text-slate-400">
-                          "{c.text}"
-                        </p>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
+          <button
+            onClick={() => toast.success("Asset Hash Copied")}
+            className="p-2 text-slate-400 hover:text-blue-500"
+          >
+            <Share2 size={20} />
+          </button>
+          <button className="p-2 text-slate-400">
+            <MoreHorizontal size={20} />
+          </button>
         </div>
       </div>
+
+      <article className="px-4 mt-6 space-y-6 md:px-8">
+        {/* Post Header (Author Info) */}
+        <header className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center justify-center w-10 h-10 overflow-hidden border rounded-full shadow-inner md:w-12 md:h-12 bg-slate-100 dark:bg-slate-900 border-slate-200 dark:border-white/10 shrink-0">
+              <Fingerprint size={24} className="text-slate-400" />
+            </div>
+            <div className="overflow-hidden">
+              <h3 className="text-xs font-black leading-none tracking-tight uppercase truncate md:text-sm text-slate-900 dark:text-white">
+                {article.author_name}
+              </h3>
+              <p className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase mt-1">
+                {article.author_serial} •{" "}
+                {new Date(article.created_at).toLocaleDateString()}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 px-2 py-1 bg-[#00BFFF]/5 rounded-md border border-[#00BFFF]/10 shrink-0">
+            <Target size={10} className="text-[#00BFFF]" />
+            <span className="text-[8px] font-black text-[#00BFFF] uppercase tracking-widest">
+              VERIFIED
+            </span>
+          </div>
+        </header>
+
+        {/* Content Section */}
+        <div className="space-y-4">
+          <h1
+            className={`text-xl md:text-3xl font-black text-slate-900 dark:text-white tracking-tighter leading-tight uppercase italic transition-all duration-700 ${
+              isDecrypted
+                ? "opacity-100 translate-y-0"
+                : "opacity-0 translate-y-4"
+            }`}
+          >
+            {article.title}
+          </h1>
+
+          <p
+            className={`text-sm md:text-lg font-medium text-slate-700 dark:text-slate-300 leading-relaxed italic transition-opacity duration-700 ${
+              isDecrypted ? "opacity-100" : "opacity-20"
+            }`}
+          >
+            "{article.content}"
+          </p>
+
+          {article.image_url && (
+            <div className="rounded-xl md:rounded-2xl overflow-hidden border border-slate-100 dark:border-white/5 shadow-lg bg-slate-50 dark:bg-[#111]">
+              <img
+                src={article.image_url}
+                className="object-cover w-full h-auto"
+                alt="Evidence Asset"
+              />
+            </div>
+          )}
+
+          <div className="flex flex-wrap gap-1.5 pt-2">
+            {article.hashtags?.map((t, i) => (
+              <span
+                key={i}
+                className="text-[10px] font-bold text-blue-600 hover:underline cursor-pointer"
+              >
+                #{t}
+              </span>
+            ))}
+          </div>
+        </div>
+
+        {/* Interaction Statistics */}
+        <div className="flex items-center justify-between py-2 border-b border-slate-50 dark:border-white/5">
+          <div className="flex items-center gap-1">
+            <div className="flex -space-x-1">
+              <div className="w-4 h-4 rounded-full bg-blue-500 flex items-center justify-center text-[6px] text-white ring-1 ring-white dark:ring-black">
+                <ThumbsUp size={8} />
+              </div>
+              <div className="w-4 h-4 rounded-full bg-red-500 flex items-center justify-center text-[6px] text-white ring-1 ring-white dark:ring-black">
+                <ThumbsDown size={8} />
+              </div>
+            </div>
+            <span className="text-[9px] font-bold text-slate-400">
+              {(article.likes_count || 0) + (article.dislikes_count || 0)}{" "}
+              signals
+            </span>
+          </div>
+          <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">
+            {article.comments_count || 0} analyses
+          </span>
+        </div>
+
+        {/* LinkedIn-style Interaction Row */}
+        <div className="flex items-center justify-between px-2 py-1 border-b border-slate-50 dark:border-white/5">
+          <button
+            onClick={() => onInteraction?.("like", article.id)}
+            className="flex flex-1 items-center justify-center gap-1.5 py-2 hover:bg-slate-50 dark:hover:bg-white/5 rounded-md transition-colors text-slate-500 hover:text-blue-500"
+          >
+            <ThumbsUp size={18} />
+            <span className="text-[10px] font-black uppercase tracking-tighter">
+              Like
+            </span>
+          </button>
+          <button
+            onClick={() => onInteraction?.("dislike", article.id)}
+            className="flex flex-1 items-center justify-center gap-1.5 py-2 hover:bg-slate-50 dark:hover:bg-white/5 rounded-md transition-colors text-slate-500 hover:text-red-500"
+          >
+            <ThumbsDown size={18} />
+            <span className="text-[10px] font-black uppercase tracking-tighter">
+              Dislike
+            </span>
+          </button>
+          <button className="flex flex-1 items-center justify-center gap-1.5 py-2 hover:bg-slate-50 dark:hover:bg-white/5 rounded-md transition-colors text-slate-500">
+            <MessageCircle size={18} />
+            <span className="text-[10px] font-black uppercase tracking-tighter">
+              Note
+            </span>
+          </button>
+          <button
+            onClick={() => toast.success("Signal Relayed")}
+            className="flex flex-1 items-center justify-center gap-1.5 py-2 hover:bg-slate-50 dark:hover:bg-white/5 rounded-md transition-colors text-slate-500"
+          >
+            <Share2 size={18} />
+            <span className="text-[10px] font-black uppercase tracking-tighter">
+              Relay
+            </span>
+          </button>
+        </div>
+
+        {/* Comment Input Section */}
+        <div className="pt-4 space-y-6">
+          <div className="flex gap-3">
+            <div className="flex items-center justify-center w-8 h-8 overflow-hidden border rounded-full md:w-10 md:h-10 bg-slate-100 dark:bg-slate-900 border-slate-200 dark:border-white/10 shrink-0">
+              <User size={18} className="text-slate-400" />
+            </div>
+            <div className="flex flex-col flex-grow gap-2">
+              <input
+                value={commentText}
+                onChange={(e) => setCommentText(e.target.value)}
+                className="w-full px-4 py-2.5 text-xs font-bold bg-white dark:bg-[#111] border border-slate-200 dark:border-white/5 rounded-full text-slate-900 dark:text-white focus:border-[#00BFFF]/50 outline-none transition-all shadow-sm"
+                placeholder="Add an intelligence note..."
+                onKeyDown={(e) => e.key === "Enter" && postComment()}
+              />
+              {commentText.trim() && (
+                <button
+                  onClick={postComment}
+                  disabled={isSending}
+                  className="w-fit px-4 py-1.5 bg-[#00BFFF] text-white rounded-full text-[9px] font-black uppercase tracking-widest shadow-md hover:brightness-110 active:scale-95 transition-all disabled:opacity-50"
+                >
+                  {isSending ? (
+                    <Loader2 className="animate-spin" size={12} />
+                  ) : (
+                    "Post Dispatch"
+                  )}
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            {loadingComments ? (
+              <div className="flex items-center gap-2 py-8 text-slate-400">
+                <Loader2 className="animate-spin" size={14} />
+                <span className="text-[8px] font-black uppercase tracking-[0.3em]">
+                  Decrypting Shards...
+                </span>
+              </div>
+            ) : comments.length === 0 ? (
+              <div className="py-12 text-center">
+                <p className="text-[9px] font-black text-slate-300 dark:text-white/10 uppercase tracking-[0.5em] italic">
+                  Buffer_Void
+                </p>
+              </div>
+            ) : (
+              comments.map((c) => (
+                <div
+                  key={c.id}
+                  className="flex gap-3 duration-300 animate-in fade-in slide-in-from-top-2"
+                >
+                  <div className="w-8 h-8 rounded-full bg-slate-50 dark:bg-slate-900 flex items-center justify-center text-[#00BFFF] shrink-0 border border-slate-100 dark:border-white/5">
+                    <Fingerprint size={14} />
+                  </div>
+                  <div className="flex-grow p-3 border bg-slate-50 dark:bg-white/5 rounded-2xl md:p-4 border-slate-100 dark:border-white/5">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-[10px] font-black uppercase text-slate-900 dark:text-white truncate">
+                        {c.user_name}
+                      </span>
+                      <span className="text-[7px] font-black text-slate-400 uppercase">
+                        {new Date(c.created_at).toLocaleTimeString([], {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </span>
+                    </div>
+                    <p className="text-xs italic font-medium leading-relaxed text-slate-600 dark:text-slate-400">
+                      "{c.text}"
+                    </p>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      </article>
     </div>
   );
 };

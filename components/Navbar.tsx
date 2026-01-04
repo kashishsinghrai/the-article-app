@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from "react";
 import {
   Shield,
@@ -15,12 +16,10 @@ import {
   LogOut,
   Menu,
   X,
-  Binary,
   FileText,
   Terminal,
   Lock,
   Zap,
-  // Fix: Added missing PenSquare import
   PenSquare,
 } from "lucide-react";
 import { ChatRequest, Profile } from "../types";
@@ -441,42 +440,6 @@ const Navbar: React.FC<NavbarProps> = ({
           </div>
         </div>
       </div>
-
-      {/* Bottom Nav */}
-      <nav className="fixed bottom-0 left-0 right-0 z-[140] lg:hidden bg-white/95 dark:bg-[#0a0a0a]/95 backdrop-blur-xl border-t border-slate-200 dark:border-white/10 flex items-center justify-around py-2.5 pb-6 px-4">
-        <BottomTab
-          icon={Globe}
-          label="Wire"
-          active={currentPage === "home"}
-          onClick={() => navTo("home")}
-        />
-        <BottomTab
-          icon={Users}
-          label="People"
-          active={currentPage === "network"}
-          onClick={() => navTo("network")}
-        />
-        <div className="relative -top-5">
-          <button
-            onClick={() => navTo("post")}
-            className="w-14 h-14 bg-[#00BFFF] text-white rounded-full flex items-center justify-center shadow-xl shadow-[#00BFFF]/30 active:scale-90 transition-all border-[6px] border-white dark:border-[#0a0a0a]"
-          >
-            {isLoggedIn ? <PenSquare size={24} /> : <Lock size={24} />}
-          </button>
-        </div>
-        <BottomTab
-          icon={LifeBuoy}
-          label="Help"
-          active={currentPage === "support"}
-          onClick={() => navTo("support")}
-        />
-        <BottomTab
-          icon={User}
-          label="Me"
-          active={currentPage === "profile"}
-          onClick={() => navTo("profile")}
-        />
-      </nav>
     </>
   );
 };
@@ -532,30 +495,6 @@ const SidebarItem = ({ icon: Icon, label, onClick, active, locked }: any) => (
   >
     {locked ? <Lock size={20} /> : <Icon size={20} />}
     <span className="text-xs font-bold tracking-widest uppercase">{label}</span>
-  </button>
-);
-
-const BottomTab = ({ icon: Icon, label, active, onClick, locked }: any) => (
-  <button
-    onClick={onClick}
-    className={`flex flex-col items-center gap-1 group w-14 ${
-      locked ? "opacity-30" : ""
-    }`}
-  >
-    <div
-      className={`p-1.5 rounded-xl transition-all ${
-        active ? "bg-[#00BFFF]/10 text-[#00BFFF]" : "text-slate-400"
-      }`}
-    >
-      {locked ? <Lock size={22} /> : <Icon size={22} />}
-    </div>
-    <span
-      className={`text-[8px] font-black uppercase tracking-widest ${
-        active ? "text-[#00BFFF]" : "text-slate-400"
-      }`}
-    >
-      {label}
-    </span>
   </button>
 );
 
