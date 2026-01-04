@@ -20,12 +20,13 @@ import {
   Binary,
   FileText,
   Terminal,
+  Lock,
 } from "lucide-react";
 import { ChatRequest, Profile } from "../types";
 import { useStore } from "../lib/store";
 
 interface NavbarProps {
-  onNavigate: (page: string) => void;
+  onNavigate: (page: string, id?: string) => void;
   onLogin: () => void;
   onLogout: () => void;
   currentPage: string;
@@ -60,8 +61,8 @@ const Navbar: React.FC<NavbarProps> = ({
   const [searchResults, setSearchResults] = useState<Profile[]>([]);
   const searchRef = useRef<HTMLDivElement>(null);
 
-  const navTo = (page: string) => {
-    onNavigate(page);
+  const navTo = (page: string, id?: string) => {
+    onNavigate(page, id);
     setIsNavDropdownOpen(false);
     setIsSidebarOpen(false);
   };
@@ -73,11 +74,7 @@ const Navbar: React.FC<NavbarProps> = ({
           (u) =>
             u.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
             u.username?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            u.serial_id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            (u as any).email
-              ?.toLowerCase()
-              .includes(searchTerm.toLowerCase()) ||
-            (u as any).phone?.includes(searchTerm)
+            u.serial_id?.toLowerCase().includes(searchTerm.toLowerCase())
         )
         .slice(0, 5);
       setSearchResults(filtered);
@@ -157,15 +154,13 @@ const Navbar: React.FC<NavbarProps> = ({
                         <p className="text-[8px] font-black uppercase text-slate-400 mb-3 px-3 tracking-[0.2em]">
                           Operations
                         </p>
-                        {isLoggedIn && (
-                          <DropdownItem
-                            icon={Radio}
-                            label="Broadcast dispatch"
-                            desc="Publish intelligence"
-                            active={currentPage === "post"}
-                            onClick={() => navTo("post")}
-                          />
-                        )}
+                        <DropdownItem
+                          icon={Radio}
+                          label="Broadcast dispatch"
+                          desc="Publish intelligence"
+                          active={currentPage === "post"}
+                          onClick={() => navTo("post")}
+                        />
                         <DropdownItem
                           icon={LifeBuoy}
                           label="Technical Support"
@@ -189,52 +184,57 @@ const Navbar: React.FC<NavbarProps> = ({
               )}
             </div>
 
-            {/* Functional Search */}
-            <div className="relative w-64 group xl:w-96" ref={searchRef}>
-              <Search
-                size={14}
-                className="absolute -translate-y-1/2 left-4 top-1/2 text-slate-400 group-focus-within:text-[#00BFFF]"
-              />
-              <input
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Search dossiers (Serial, Email, Phone)..."
-                className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/5 rounded-full py-2.5 pl-10 pr-4 text-xs outline-none focus:border-[#00BFFF]/50 transition-all dark:text-white"
-              />
-              {searchResults.length > 0 && (
-                <div className="absolute top-full left-0 right-0 mt-3 bg-white dark:bg-[#1e293b] border border-slate-200 dark:border-white/10 rounded-2xl shadow-2xl overflow-hidden py-2 animate-in fade-in slide-in-from-top-2">
-                  {searchResults.map((u) => (
-                    <div
-                      key={u.id}
-                      onClick={() => {
-                        setSearchTerm("");
-                        navTo("network");
-                      }}
-                      className="flex items-center gap-3 px-4 py-3 transition-colors cursor-pointer hover:bg-slate-50 dark:hover:bg-white/5"
-                    >
-                      <div className="flex items-center justify-center w-8 h-8 overflow-hidden rounded-lg bg-slate-200 dark:bg-slate-800">
-                        {u.avatar_url ? (
-                          <img
-                            src={u.avatar_url}
-                            className="object-cover w-full h-full"
-                          />
-                        ) : (
-                          <Terminal size={14} className="text-slate-400" />
-                        )}
+            {isLoggedIn ? (
+              <div className="relative w-64 group xl:w-96" ref={searchRef}>
+                <Search
+                  size={14}
+                  className="absolute -translate-y-1/2 left-4 top-1/2 text-slate-400 group-focus-within:text-[#00BFFF]"
+                />
+                <input
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  placeholder="Search dossiers (Serial, Email, Phone)..."
+                  className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/5 rounded-full py-2.5 pl-10 pr-4 text-xs outline-none focus:border-[#00BFFF]/50 transition-all dark:text-white"
+                />
+                {searchResults.length > 0 && (
+                  <div className="absolute top-full left-0 right-0 mt-3 bg-white dark:bg-[#1e293b] border border-slate-200 dark:border-white/10 rounded-2xl shadow-2xl overflow-hidden py-2 animate-in fade-in slide-in-from-top-2">
+                    {searchResults.map((u) => (
+                      <div
+                        key={u.id}
+                        onClick={() => {
+                          setSearchTerm("");
+                          navTo("profile", u.id);
+                        }}
+                        className="flex items-center gap-3 px-4 py-3 transition-colors cursor-pointer hover:bg-slate-50 dark:hover:bg-white/5"
+                      >
+                        <div className="flex items-center justify-center w-8 h-8 overflow-hidden rounded-lg bg-slate-200 dark:bg-slate-800">
+                          {u.avatar_url ? (
+                            <img
+                              src={u.avatar_url}
+                              className="object-cover w-full h-full"
+                            />
+                          ) : (
+                            <Terminal size={14} className="text-slate-400" />
+                          )}
+                        </div>
+                        <div className="overflow-hidden">
+                          <p className="text-[10px] font-black text-slate-900 dark:text-white uppercase truncate">
+                            {u.full_name}
+                          </p>
+                          <p className="text-[8px] font-bold text-slate-400 uppercase tracking-tight">
+                            {u.serial_id}
+                          </p>
+                        </div>
                       </div>
-                      <div className="overflow-hidden">
-                        <p className="text-[10px] font-black text-slate-900 dark:text-white uppercase truncate">
-                          {u.full_name}
-                        </p>
-                        <p className="text-[8px] font-bold text-slate-400 uppercase tracking-tight">
-                          {u.serial_id}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 text-slate-400 text-[10px] font-black uppercase tracking-widest opacity-50 px-6">
+                <Lock size={12} /> Registry Locked
+              </div>
+            )}
           </div>
 
           <div className="flex items-center gap-2">
@@ -319,7 +319,6 @@ const Navbar: React.FC<NavbarProps> = ({
               <X size={24} />
             </button>
           </div>
-
           <div className="flex-grow p-4 space-y-2 overflow-y-auto">
             <SidebarItem
               icon={Globe}
@@ -333,14 +332,12 @@ const Navbar: React.FC<NavbarProps> = ({
               onClick={() => navTo("network")}
               active={currentPage === "network"}
             />
-            {isLoggedIn && (
-              <SidebarItem
-                icon={Radio}
-                label="Broadcast Dispatch"
-                onClick={() => navTo("post")}
-                active={currentPage === "post"}
-              />
-            )}
+            <SidebarItem
+              icon={Radio}
+              label="Broadcast Dispatch"
+              onClick={() => navTo("post")}
+              active={currentPage === "post"}
+            />
             <SidebarItem
               icon={LifeBuoy}
               label="Technical Support"
@@ -353,30 +350,21 @@ const Navbar: React.FC<NavbarProps> = ({
               onClick={() => navTo("profile")}
               active={currentPage === "profile"}
             />
-            {userRole === "admin" && (
-              <SidebarItem
-                icon={Binary}
-                label="Root Access"
-                onClick={() => navTo("admin")}
-                active={currentPage === "admin"}
-              />
-            )}
           </div>
-
           <div className="p-6 border-t border-slate-200 dark:border-white/5">
             {isLoggedIn ? (
               <button
                 onClick={onLogout}
                 className="w-full flex items-center justify-center gap-3 py-4 bg-red-500/10 text-red-600 rounded-2xl font-black uppercase text-[10px] tracking-widest border border-red-500/20"
               >
-                <LogOut size={16} /> Disconnect Node
+                <LogOut size={16} /> Disconnect
               </button>
             ) : (
               <button
                 onClick={onLogin}
                 className="w-full py-4 bg-[#00BFFF] text-white rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-lg"
               >
-                Initialize Session
+                Login
               </button>
             )}
           </div>
@@ -389,47 +377,54 @@ const Navbar: React.FC<NavbarProps> = ({
           icon={Globe}
           label="Wire"
           active={currentPage === "home"}
-          onClick={() => onNavigate("home")}
+          onClick={() => navTo("home")}
         />
         <BottomTab
           icon={Users}
           label="People"
           active={currentPage === "network"}
-          onClick={() => onNavigate("network")}
+          onClick={() => navTo("network")}
         />
         <div className="relative -top-5">
           <button
-            onClick={() => onNavigate("post")}
+            onClick={() => navTo("post")}
             className="w-14 h-14 bg-[#00BFFF] text-white rounded-full flex items-center justify-center shadow-xl shadow-[#00BFFF]/30 active:scale-90 transition-all border-[6px] border-white dark:border-[#0a0a0a]"
           >
-            <PenSquare size={24} />
+            {isLoggedIn ? <PenSquare size={24} /> : <Lock size={24} />}
           </button>
         </div>
         <BottomTab
           icon={LifeBuoy}
           label="Help"
           active={currentPage === "support"}
-          onClick={() => onNavigate("support")}
+          onClick={() => navTo("support")}
         />
         <BottomTab
           icon={User}
           label="Me"
           active={currentPage === "profile"}
-          onClick={() => onNavigate("profile")}
+          onClick={() => navTo("profile")}
         />
       </nav>
     </>
   );
 };
 
-const DropdownItem = ({ icon: Icon, label, desc, onClick, active }: any) => (
+const DropdownItem = ({
+  icon: Icon,
+  label,
+  desc,
+  onClick,
+  active,
+  locked,
+}: any) => (
   <button
     onClick={onClick}
     className={`w-full flex items-center gap-4 p-3 rounded-2xl transition-all text-left group ${
       active
         ? "bg-[#00BFFF]/10 border border-[#00BFFF]/20"
         : "hover:bg-slate-50 dark:hover:bg-white/5"
-    }`}
+    } ${locked ? "opacity-40" : ""}`}
   >
     <div
       className={`p-2 rounded-xl transition-colors ${
@@ -438,7 +433,7 @@ const DropdownItem = ({ icon: Icon, label, desc, onClick, active }: any) => (
           : "bg-slate-100 dark:bg-white/10 text-slate-500 group-hover:text-[#00BFFF]"
       }`}
     >
-      <Icon size={16} />
+      {locked ? <Lock size={16} /> : <Icon size={16} />}
     </div>
     <div>
       <p
@@ -446,43 +441,45 @@ const DropdownItem = ({ icon: Icon, label, desc, onClick, active }: any) => (
           active ? "text-[#00BFFF]" : "text-slate-900 dark:text-white"
         }`}
       >
-        {label}
+        {label} {locked && "(LOCKED)"}
       </p>
       <p className="text-[8px] font-bold text-slate-400 dark:text-slate-500 mt-0.5">
-        {desc}
+        {locked ? "Credentials required" : desc}
       </p>
     </div>
   </button>
 );
 
-const SidebarItem = ({ icon: Icon, label, onClick, active }: any) => (
+const SidebarItem = ({ icon: Icon, label, onClick, active, locked }: any) => (
   <button
     onClick={onClick}
     className={`w-full flex items-center gap-4 p-4 rounded-2xl transition-all ${
       active
-        ? "bg-[#00BFFF]/10 text-[#00BFFF] border border-[#00BFFF]/20 shadow-sm"
+        ? "bg-[#00BFFF]/10 text-[#00BFFF] border border-[#00BFFF]/20"
         : "text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-white/5"
-    }`}
+    } ${locked ? "opacity-30" : ""}`}
   >
-    <Icon size={20} />
+    {locked ? <Lock size={20} /> : <Icon size={20} />}
     <span className="text-xs font-bold tracking-widest uppercase">{label}</span>
   </button>
 );
 
-const BottomTab = ({ icon: Icon, label, active, onClick }: any) => (
+const BottomTab = ({ icon: Icon, label, active, onClick, locked }: any) => (
   <button
     onClick={onClick}
-    className="flex flex-col items-center gap-1 group w-14"
+    className={`flex flex-col items-center gap-1 group w-14 ${
+      locked ? "opacity-30" : ""
+    }`}
   >
     <div
       className={`p-1.5 rounded-xl transition-all ${
         active ? "bg-[#00BFFF]/10 text-[#00BFFF]" : "text-slate-400"
       }`}
     >
-      <Icon size={22} strokeWidth={active ? 2.5 : 2} />
+      {locked ? <Lock size={22} /> : <Icon size={22} />}
     </div>
     <span
-      className={`text-[8px] font-black uppercase tracking-widest transition-colors ${
+      className={`text-[8px] font-black uppercase tracking-widest ${
         active ? "text-[#00BFFF]" : "text-slate-400"
       }`}
     >

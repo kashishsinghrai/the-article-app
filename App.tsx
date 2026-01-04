@@ -11,10 +11,12 @@ import PostPage from "./app/post/page.tsx";
 import LoginPage from "./app/auth/login.tsx";
 import RegisterPage from "./app/auth/register.tsx";
 import SetupProfilePage from "./app/setup-profile/page.tsx";
+import AdminPage from "./app/admin/page.tsx";
 import { Profile, ChatRequest, Article } from "./types.ts";
 import { Toaster, toast } from "react-hot-toast";
 import { supabase } from "./lib/supabase.ts";
 import { useStore } from "./lib/store.ts";
+import { Lock, ShieldAlert, Key } from "lucide-react";
 
 const App: React.FC = () => {
   const profile = useStore((s) => s.profile);
@@ -37,29 +39,58 @@ const App: React.FC = () => {
     profile: Profile;
     handshakeId: string;
   } | null>(null);
-
   const [isDarkMode, setIsDarkMode] = useState(true);
 
-  const personalArticles = useMemo(() => {
-    if (!profile) return [];
-    return articles.filter((a) => a.author_id === profile.id);
-  }, [articles, profile]);
+  // Parse Hash for Routing
+  const handleRouting = () => {
+    const hash = window.location.hash.replace("#/", "");
+    if (!hash || hash === "") {
+      setCurrentPage("home");
+      return;
+    }
+
+    const segments = hash.split("/");
+    const page = segments[0];
+    const id = segments[1];
+
+    setCurrentPage(page);
+
+    // Handle Profile Deep Linking
+    if (page === "profile" && id) {
+      const targetUser = users.find((u) => u.id === id || u.username === id);
+      if (targetUser) {
+        setViewingProfile(targetUser);
+      }
+    } else if (page === "profile" && !id) {
+      setViewingProfile(null); // Own profile
+    }
+  };
 
   useEffect(() => {
     hydrate();
     const unsub = initAuthListener();
+
+    // Initial Route
+    handleRouting();
+
+    // Listen for hash changes
+    window.addEventListener("hashchange", handleRouting);
+
     return () => {
       if (unsub) unsub();
+      window.removeEventListener("hashchange", handleRouting);
     };
-  }, []);
+  }, [users.length]); // Dependency on users to ensure profile lookup works on deep link
 
   useEffect(() => {
-    if (isDarkMode) {
-      document.documentElement.classList.add("dark");
-    } else {
-      document.documentElement.classList.remove("dark");
-    }
+    if (isDarkMode) document.documentElement.classList.add("dark");
+    else document.documentElement.classList.remove("dark");
   }, [isDarkMode]);
+
+  const navigate = (page: string, id?: string) => {
+    const target = id ? `#/${page}/${id}` : `#/${page}`;
+    window.location.hash = target;
+  };
 
   const handleUpdateProfile = async (data: Partial<Profile>) => {
     if (!profile) return;
@@ -75,14 +106,15 @@ const App: React.FC = () => {
 
   const handleLogout = async () => {
     await logout();
-    setCurrentPage("home");
+    navigate("home");
     setViewingProfile(null);
     toast.success("Disconnected");
   };
 
-  const handleAcceptRequest = (req: ChatRequest) => {
-    toast.success("Handshake established");
-  };
+  const personalArticles = useMemo(() => {
+    if (!profile) return [];
+    return articles.filter((a) => a.author_id === profile.id);
+  }, [articles, profile]);
 
   const handleInteraction = async (type: "like" | "dislike", id: string) => {
     if (!isLoggedIn) return setShowAuth("login");
@@ -91,19 +123,49 @@ const App: React.FC = () => {
       .from("articles")
       .select(field)
       .eq("id", id)
-      .single();
+      .maybeSingle();
     await supabase
       .from("articles")
       .update({ [field]: (data?.[field] || 0) + 1 })
       .eq("id", id);
     syncAll();
-    toast.success("Protocol Interaction Hashed");
+    toast.success("Signal Interacted", { id: "interact" });
   };
+
+  const AccessDenied = () => (
+    <div className="flex flex-col items-center justify-center min-h-[70vh] px-6 text-center space-y-8 animate-in fade-in zoom-in-95 duration-500">
+      <div className="relative">
+        <div className="absolute inset-0 bg-red-500/20 blur-[60px] rounded-full animate-pulse" />
+        <div className="relative p-10 bg-slate-900/50 rounded-[3rem] border border-red-500/30 shadow-2xl">
+          <ShieldAlert
+            size={80}
+            className="mx-auto text-red-500"
+            strokeWidth={1.5}
+          />
+        </div>
+      </div>
+      <div className="max-w-md space-y-4">
+        <h2 className="text-4xl italic font-black tracking-tighter uppercase text-slate-950 dark:text-white">
+          Access_Denied
+        </h2>
+        <p className="text-sm font-bold leading-relaxed tracking-widest uppercase text-slate-500 dark:text-slate-400">
+          The requested shard requires verified identity credentials. Initialize
+          your node session to continue.
+        </p>
+      </div>
+      <button
+        onClick={() => setShowAuth("login")}
+        className="px-12 py-5 bg-slate-900 dark:bg-white text-white dark:text-black rounded-[2rem] font-black uppercase text-xs tracking-[0.3em] hover:scale-105 active:scale-95 transition-all shadow-2xl flex items-center gap-4"
+      >
+        <Key size={18} /> Initialize Session
+      </button>
+    </div>
+  );
 
   if (!isInitialized) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-[#050505]">
-        <div className="w-8 h-8 border-2 border-[#00BFFF] border-t-transparent rounded-full animate-spin" />
+        <div className="w-12 h-12 border-4 border-[#00BFFF] border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
@@ -143,7 +205,7 @@ const App: React.FC = () => {
       {!showAuth && (
         <>
           <Navbar
-            onNavigate={setCurrentPage}
+            onNavigate={navigate}
             onLogin={() => setShowAuth("login")}
             onLogout={handleLogout}
             currentPage={currentPage}
@@ -152,7 +214,7 @@ const App: React.FC = () => {
             isDarkMode={isDarkMode}
             onToggleDarkMode={() => setIsDarkMode(!isDarkMode)}
             chatRequests={chatRequests}
-            onAcceptRequest={handleAcceptRequest}
+            onAcceptRequest={(req) => toast.success("Handshake Accepted")}
             profileAvatar={profile?.avatar_url}
           />
 
@@ -166,69 +228,89 @@ const App: React.FC = () => {
                 onRefresh={syncAll}
               />
             )}
-            {currentPage === "network" && (
-              <NetworkPage
-                onBack={() => setCurrentPage("home")}
-                users={users}
-                currentUserId={profile?.id}
-                onViewProfile={(u) => {
-                  setViewingProfile(u);
-                  setCurrentPage("profile");
-                }}
-                onChat={(u) => toast.success("Connecting...")}
-              />
-            )}
-            {currentPage === "post" && (
-              <PostPage
-                profile={profile}
-                personalArticles={personalArticles}
-                onBack={() => setCurrentPage("home")}
-                onPublish={async (data) => {
-                  const { error } = await supabase
-                    .from("articles")
-                    .insert([
-                      {
-                        ...data,
-                        author_id: profile?.id,
-                        author_serial: profile?.serial_id,
-                        author_name: profile?.full_name,
-                      },
-                    ]);
-                  if (!error) {
-                    toast.success("Dispatch Transmitted");
-                    syncAll();
-                    setCurrentPage("home");
-                  } else {
-                    toast.error("Transmission Failure");
-                  }
-                }}
-              />
-            )}
-            {currentPage === "profile" &&
-              (profile ? (
-                <ProfilePage
-                  profile={viewingProfile || profile}
-                  onLogout={handleLogout}
-                  isExternal={!!viewingProfile}
-                  onCloseExternal={() => {
-                    setViewingProfile(null);
-                    setCurrentPage("home");
-                  }}
-                  currentUserId={profile.id}
-                  onUpdateProfile={handleUpdateProfile}
-                  onChat={(u) => toast.success("Handshake Pending...")}
+
+            {currentPage === "network" &&
+              (isLoggedIn ? (
+                <NetworkPage
+                  onBack={() => window.history.back()}
+                  users={users}
+                  currentUserId={profile?.id}
+                  onViewProfile={(u) => navigate("profile", u.id)}
+                  onChat={(u) => toast.success("Handshake established")}
                 />
               ) : (
-                <SetupProfilePage
-                  onComplete={async () => {
-                    hydrate();
-                    setCurrentPage("home");
+                <AccessDenied />
+              ))}
+
+            {currentPage === "post" &&
+              (isLoggedIn ? (
+                <PostPage
+                  profile={profile}
+                  personalArticles={personalArticles}
+                  onBack={() => window.history.back()}
+                  onPublish={async (data) => {
+                    const { error } = await supabase
+                      .from("articles")
+                      .insert([
+                        {
+                          ...data,
+                          author_id: profile?.id,
+                          author_serial: profile?.serial_id,
+                          author_name: profile?.full_name,
+                        },
+                      ]);
+                    if (!error) {
+                      toast.success("Transmission Dispatched");
+                      syncAll();
+                      navigate("home");
+                    }
                   }}
                 />
+              ) : (
+                <AccessDenied />
               ))}
+
+            {currentPage === "profile" &&
+              (isLoggedIn ? (
+                profile ? (
+                  <ProfilePage
+                    profile={viewingProfile || profile}
+                    onLogout={handleLogout}
+                    isExternal={!!viewingProfile}
+                    onCloseExternal={() => window.history.back()}
+                    currentUserId={profile.id}
+                    onUpdateProfile={handleUpdateProfile}
+                    onChat={(u) => toast.success("Handshake established")}
+                  />
+                ) : (
+                  <SetupProfilePage
+                    onComplete={async () => {
+                      hydrate();
+                      navigate("home");
+                    }}
+                  />
+                )
+              ) : (
+                <AccessDenied />
+              ))}
+
             {currentPage === "support" && (
-              <SupportPage onBack={() => setCurrentPage("home")} />
+              <SupportPage onBack={() => window.history.back()} />
             )}
+
+            {currentPage === "admin" &&
+              (isLoggedIn && profile?.role === "admin" ? (
+                <AdminPage
+                  articles={articles}
+                  users={users}
+                  currentUserId={profile.id}
+                  onUpdateUsers={syncAll}
+                  onUpdateArticles={syncAll}
+                  onLogout={handleLogout}
+                />
+              ) : (
+                <AccessDenied />
+              ))}
           </main>
 
           {activeArticle && (
@@ -251,7 +333,7 @@ const App: React.FC = () => {
               onClose={() => setActiveChat(null)}
             />
           )}
-          <Footer onNavigate={setCurrentPage} />
+          <Footer onNavigate={navigate} />
         </>
       )}
     </div>
