@@ -9,6 +9,7 @@ import {
   Award,
   MapPin,
   Activity,
+  ArrowLeft,
 } from "lucide-react";
 import { Profile } from "../../types";
 import { toast } from "react-hot-toast";
@@ -27,6 +28,7 @@ const NetworkPage: React.FC<NetworkPageProps> = ({
   currentUserId,
   onViewProfile,
   onChat,
+  onBack,
   onRefresh,
 }) => {
   const [searchTerm, setSearchTerm] = useState("");
@@ -50,6 +52,18 @@ const NetworkPage: React.FC<NetworkPageProps> = ({
 
   return (
     <main className="max-w-6xl px-4 py-12 pt-16 pb-40 mx-auto space-y-12 transition-all duration-300 md:px-6 animate-in fade-in lg:pb-16">
+      {/* Back Button */}
+      <button
+        onClick={onBack}
+        className="flex items-center gap-3 text-slate-500 hover:text-slate-900 dark:hover:text-white font-black uppercase text-[10px] tracking-[0.4em] transition-all group mb-8"
+      >
+        <ArrowLeft
+          size={16}
+          className="transition-transform group-hover:-translate-x-1"
+        />
+        Exit Registry Shard
+      </button>
+
       <div className="flex flex-col items-start justify-between gap-8 md:flex-row md:items-center">
         <div className="space-y-3">
           <div className="flex items-center gap-3 text-[#00BFFF] mb-1">
