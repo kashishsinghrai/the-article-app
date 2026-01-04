@@ -8,6 +8,7 @@ import {
   ThumbsUp,
   ThumbsDown,
   UserPlus,
+  UserMinus,
   ShieldCheck,
   Zap,
   Network,
@@ -48,10 +49,10 @@ const HomePage: React.FC<HomePageProps> = ({
 
   const profile = useStore((s) => s.profile);
   const users = useStore((s) => s.users);
+  const followingIds = useStore((s) => s.followingIds);
   const syncAll = useStore((s) => s.syncAll);
-  const hydrate = useStore((s) => s.hydrate);
+  const toggleFollow = useStore((s) => s.toggleFollow);
 
-  // Replaced Gemini API with local Intelligence Archives
   useEffect(() => {
     const loadSystemSignals = () => {
       if (!isLoggedIn) return;
@@ -120,38 +121,10 @@ const HomePage: React.FC<HomePageProps> = ({
     }
   };
 
-  const handleFollow = async (e: React.MouseEvent, targetId: string) => {
+  const onFollowClick = (e: React.MouseEvent, targetId: string) => {
     e.stopPropagation();
-    if (!isLoggedIn || !profile) return onLogin();
-    if (targetId === profile.id)
-      return toast.error("Self-handshake restricted.");
-
-    const loadingToast = toast.loading("Establishing Handshake...");
-    try {
-      const targetUser = users.find((u) => u.id === targetId);
-      const targetFollowers = (targetUser?.followers_count || 0) + 1;
-      const selfFollowing = (profile.following_count || 0) + 1;
-
-      await Promise.all([
-        supabase
-          .from("profiles")
-          .update({ followers_count: targetFollowers })
-          .eq("id", targetId),
-        supabase
-          .from("profiles")
-          .update({ following_count: selfFollowing })
-          .eq("id", profile.id),
-      ]);
-
-      toast.success("Identity Signal Followed", {
-        id: loadingToast,
-        icon: "📡",
-      });
-      await hydrate();
-      await syncAll();
-    } catch (err) {
-      toast.error("Handshake Protocol Failed", { id: loadingToast });
-    }
+    if (!isLoggedIn) return onLogin();
+    toggleFollow(targetId);
   };
 
   const filtered = useMemo(
@@ -303,108 +276,132 @@ const HomePage: React.FC<HomePageProps> = ({
                 </p>
               </div>
             ) : (
-              filtered.map((article) => (
-                <div
-                  key={article.id}
-                  className="bg-white dark:bg-[#0a0a0a] rounded-[3.5rem] border border-slate-100 dark:border-white/5 overflow-hidden shadow-sm hover:shadow-2xl transition-all duration-500 cursor-pointer group"
-                  onClick={() => onReadArticle?.(article)}
-                >
-                  <div className="p-8 space-y-8 md:p-10">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-4">
-                        <div className="flex items-center justify-center w-12 h-12 overflow-hidden border shadow-inner rounded-2xl bg-slate-900 border-white/5">
-                          {users.find((u) => u.id === article.author_id)
-                            ?.avatar_url ? (
-                            <img
-                              src={
-                                users.find((u) => u.id === article.author_id)
-                                  ?.avatar_url
-                              }
-                              className="object-cover w-full h-full"
-                            />
-                          ) : (
-                            <Fingerprint size={22} className="text-slate-700" />
-                          )}
+              filtered.map((article) => {
+                const isFollowingAuthor = followingIds.includes(
+                  article.author_id
+                );
+                return (
+                  <div
+                    key={article.id}
+                    className="bg-white dark:bg-[#0a0a0a] rounded-[3.5rem] border border-slate-100 dark:border-white/5 overflow-hidden shadow-sm hover:shadow-2xl transition-all duration-500 cursor-pointer group"
+                    onClick={() => onReadArticle?.(article)}
+                  >
+                    <div className="p-8 space-y-8 md:p-10">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-4">
+                          <div className="flex items-center justify-center w-12 h-12 overflow-hidden border shadow-inner rounded-2xl bg-slate-900 border-white/5">
+                            {users.find((u) => u.id === article.author_id)
+                              ?.avatar_url ? (
+                              <img
+                                src={
+                                  users.find((u) => u.id === article.author_id)
+                                    ?.avatar_url
+                                }
+                                className="object-cover w-full h-full"
+                              />
+                            ) : (
+                              <Fingerprint
+                                size={22}
+                                className="text-slate-700"
+                              />
+                            )}
+                          </div>
+                          <div>
+                            <h4 className="text-[12px] font-black uppercase text-slate-900 dark:text-white tracking-tight">
+                              {article.author_name}
+                            </h4>
+                            {article.author_id !== profile?.id && (
+                              <button
+                                onClick={(e) =>
+                                  onFollowClick(e, article.author_id)
+                                }
+                                className={`text-[9px] font-black uppercase tracking-widest flex items-center gap-1.5 hover:underline mt-1.5 transition-colors ${
+                                  isFollowingAuthor
+                                    ? "text-red-500"
+                                    : "text-[#00BFFF]"
+                                }`}
+                              >
+                                {isFollowingAuthor ? (
+                                  <>
+                                    <UserMinus size={10} /> Disconnect
+                                  </>
+                                ) : (
+                                  <>
+                                    <UserPlus size={10} /> Handshake
+                                  </>
+                                )}
+                              </button>
+                            )}
+                          </div>
                         </div>
-                        <div>
-                          <h4 className="text-[12px] font-black uppercase text-slate-900 dark:text-white tracking-tight">
-                            {article.author_name}
-                          </h4>
+                        <span className="text-[10px] font-bold text-slate-400 dark:text-white/20 uppercase italic">
+                          {new Date(article.created_at).toLocaleDateString()}
+                        </span>
+                      </div>
+
+                      <div className="space-y-4">
+                        <h3 className="text-3xl md:text-4xl font-black italic uppercase leading-none tracking-tighter text-slate-950 dark:text-white group-hover:text-[#00BFFF] transition-colors">
+                          {article.title}
+                        </h3>
+                        <p className="text-lg italic font-medium leading-relaxed text-slate-500 dark:text-slate-400 line-clamp-3">
+                          "{article.content}"
+                        </p>
+                      </div>
+
+                      {article.image_url && (
+                        <div className="aspect-video rounded-[2.5rem] overflow-hidden bg-[#080808] border border-white/5 relative shadow-inner">
+                          <img
+                            src={article.image_url}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-[2s]"
+                          />
+                          <div className="absolute inset-0 flex items-end p-8 transition-opacity opacity-0 bg-gradient-to-t from-black/60 to-transparent group-hover:opacity-100">
+                            <span className="text-white text-[10px] font-black uppercase tracking-[0.4em]">
+                              Decrypt Full Asset{" "}
+                              <ArrowRight size={14} className="inline ml-2" />
+                            </span>
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="flex flex-wrap items-center justify-between gap-6 pt-8 border-t border-slate-100 dark:border-white/5">
+                        <div className="flex gap-8">
                           <button
-                            onClick={(e) => handleFollow(e, article.author_id)}
-                            className="text-[9px] font-black text-[#00BFFF] uppercase tracking-widest flex items-center gap-1.5 hover:underline mt-1.5"
+                            onClick={(e) =>
+                              handleInteraction(e, "likes_count", article.id)
+                            }
+                            className="flex items-center gap-2.5 text-[10px] font-black uppercase text-slate-400 hover:text-[#00BFFF] transition-colors"
                           >
-                            <UserPlus size={10} /> Handshake
+                            <ThumbsUp
+                              size={22}
+                              className="transition-transform group-active:scale-125"
+                            />{" "}
+                            {article.likes_count || 0}
                           </button>
+                          <button
+                            onClick={(e) =>
+                              handleInteraction(e, "dislikes_count", article.id)
+                            }
+                            className="flex items-center gap-2.5 text-[10px] font-black uppercase text-slate-400 hover:text-red-500 transition-colors"
+                          >
+                            <ThumbsDown
+                              size={22}
+                              className="transition-transform group-active:scale-125"
+                            />{" "}
+                            {article.dislikes_count || 0}
+                          </button>
+                          <div className="flex items-center gap-2.5 text-[10px] font-black uppercase text-slate-400">
+                            <MessageCircle size={22} />{" "}
+                            {article.comments_count || 0}
+                          </div>
                         </div>
-                      </div>
-                      <span className="text-[10px] font-bold text-slate-400 dark:text-white/20 uppercase italic">
-                        {new Date(article.created_at).toLocaleDateString()}
-                      </span>
-                    </div>
-
-                    <div className="space-y-4">
-                      <h3 className="text-3xl md:text-4xl font-black italic uppercase leading-none tracking-tighter text-slate-950 dark:text-white group-hover:text-[#00BFFF] transition-colors">
-                        {article.title}
-                      </h3>
-                      <p className="text-lg italic font-medium leading-relaxed text-slate-500 dark:text-slate-400 line-clamp-3">
-                        "{article.content}"
-                      </p>
-                    </div>
-
-                    {article.image_url && (
-                      <div className="aspect-video rounded-[2.5rem] overflow-hidden bg-[#080808] border border-white/5 relative shadow-inner">
-                        <img
-                          src={article.image_url}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-[2s]"
-                        />
-                        <div className="absolute inset-0 flex items-end p-8 transition-opacity opacity-0 bg-gradient-to-t from-black/60 to-transparent group-hover:opacity-100">
-                          <span className="text-white text-[10px] font-black uppercase tracking-[0.4em]">
-                            Decrypt Full Asset{" "}
-                            <ArrowRight size={14} className="inline ml-2" />
-                          </span>
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="flex flex-wrap items-center justify-between gap-6 pt-8 border-t border-slate-100 dark:border-white/5">
-                      <div className="flex gap-8">
-                        <button
-                          onClick={(e) =>
-                            handleInteraction(e, "likes_count", article.id)
-                          }
-                          className="flex items-center gap-2.5 text-[10px] font-black uppercase text-slate-400 hover:text-[#00BFFF] transition-colors"
-                        >
-                          <ThumbsUp
-                            size={22}
-                            className="transition-transform group-active:scale-125"
-                          />{" "}
-                          {article.likes_count || 0}
+                        <button className="flex items-center gap-2.5 text-[10px] font-black uppercase text-slate-400 hover:text-[#00BFFF]">
+                          <Share2 size={20} /> Share
                         </button>
-                        <button
-                          onClick={(e) =>
-                            handleInteraction(e, "dislikes_count", article.id)
-                          }
-                          className="flex items-center gap-2.5 text-[10px] font-black uppercase text-slate-400 hover:text-red-500 transition-colors"
-                        >
-                          <ThumbsDown
-                            size={22}
-                            className="transition-transform group-active:scale-125"
-                          />{" "}
-                          {article.dislikes_count || 0}
-                        </button>
-                        <div className="flex items-center gap-2.5 text-[10px] font-black uppercase text-slate-400">
-                          <MessageCircle size={22} />{" "}
-                          {article.comments_count || 0}
-                        </div>
                       </div>
-                      <button className="flex items-center gap-2.5 text-[10px] font-black uppercase text-slate-400 hover:text-[#00BFFF]">
-                        <Share2 size={20} /> Share
-                      </button>
                     </div>
                   </div>
-                </div>
-              ))
+                );
+              })
             )}
           </div>
         </main>
@@ -502,32 +499,5 @@ const HomePage: React.FC<HomePageProps> = ({
     </div>
   );
 };
-
-const InstructionStep = ({
-  num,
-  title,
-  desc,
-}: {
-  num: string;
-  title: string;
-  desc: string;
-}) => (
-  <div className="p-12 bg-white dark:bg-[#0a0a0a] rounded-[4rem] border border-slate-100 dark:border-white/5 shadow-sm hover:shadow-2xl hover:border-[#00BFFF]/30 transition-all duration-500 group relative overflow-hidden">
-    <div className="absolute -top-10 -right-10 w-40 h-40 bg-[#00BFFF]/5 blur-[60px] rounded-full" />
-    <div className="relative z-10 space-y-6">
-      <div className="flex items-end gap-4">
-        <span className="text-7xl italic font-black leading-none text-slate-100 dark:text-white/5 group-hover:text-[#00BFFF]/10 transition-colors">
-          {num}
-        </span>
-        <h3 className="pb-2 text-2xl italic font-black tracking-tighter uppercase border-b-2 border-[#00BFFF] text-slate-950 dark:text-white">
-          {title}
-        </h3>
-      </div>
-      <p className="text-sm italic font-bold leading-relaxed tracking-widest uppercase transition-colors text-slate-500 group-hover:text-slate-400">
-        "{desc}"
-      </p>
-    </div>
-  </div>
-);
 
 export default HomePage;

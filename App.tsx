@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect } from "react";
 import Navbar from "./components/Navbar.tsx";
 import Footer from "./components/Footer.tsx";
 import ChatOverlay from "./components/ChatOverlay.tsx";
@@ -16,23 +16,22 @@ import { Profile, ChatRequest, Article } from "./types.ts";
 import { Toaster, toast } from "react-hot-toast";
 import { supabase } from "./lib/supabase.ts";
 import { useStore } from "./lib/store.ts";
-import { Lock, ShieldAlert, Key } from "lucide-react";
+import { ShieldAlert } from "lucide-react";
 
 const App: React.FC = () => {
-  const profile = useStore((s) => s.profile);
-  const isLoggedIn = useStore((s) => s.isLoggedIn);
-  const users = useStore((s) => s.users);
-  const chatRequests = useStore((s) => s.chatRequests);
-  const activeHandshake = useStore((s) => s.activeHandshake);
-  const setActiveHandshake = useStore((s) => s.setActiveHandshake);
-  const setChatRequests = useStore((s) => s.setChatRequests);
-  const articles = useStore((s) => s.articles);
-  const isInitialized = useStore((s) => s.isInitialized);
-
-  const hydrate = useStore((s) => s.hydrate);
-  const logout = useStore((s) => s.logout);
-  const syncAll = useStore((s) => s.syncAll);
-  const initAuthListener = useStore((s) => s.initAuthListener);
+  const {
+    profile,
+    isLoggedIn,
+    users,
+    chatRequests,
+    activeHandshake,
+    isInitialized,
+    hydrate,
+    initAuthListener,
+    logout,
+    syncAll,
+    setActiveHandshake,
+  } = useStore();
 
   const [currentPage, setCurrentPage] = useState("home");
   const [showAuth, setShowAuth] = useState<"login" | "register" | null>(null);
@@ -40,103 +39,63 @@ const App: React.FC = () => {
   const [activeArticle, setActiveArticle] = useState<Article | null>(null);
   const [isDarkMode, setIsDarkMode] = useState(true);
 
-  const handleRouting = () => {
-    const hash = window.location.hash.replace("#/", "");
-    if (!hash || hash === "") {
-      setCurrentPage("home");
-      return;
-    }
-    const segments = hash.split("/");
-    const page = segments[0];
-    const id = segments[1];
-    setCurrentPage(page);
-    if (page === "profile" && id) {
-      const targetUser = users.find((u) => u.id === id || u.username === id);
-      if (targetUser) setViewingProfile(targetUser);
-    } else if (page === "profile" && !id) {
-      setViewingProfile(null);
-    }
-  };
-
   useEffect(() => {
     hydrate();
     const unsub = initAuthListener();
-    handleRouting();
-    window.addEventListener("hashchange", handleRouting);
-    return () => {
-      if (unsub) unsub();
-      window.removeEventListener("hashchange", handleRouting);
-    };
-  }, [users.length]);
+    return () => unsub?.();
+  }, []);
 
   useEffect(() => {
-    if (isDarkMode) document.documentElement.classList.add("dark");
-    else document.documentElement.classList.remove("dark");
+    document.documentElement.classList.toggle("dark", isDarkMode);
   }, [isDarkMode]);
 
-  const navigate = (page: string, id?: string) => {
-    const target = id ? `#/${page}/${id}` : `#/${page}`;
-    window.location.hash = target;
+  const handleNavigate = (page: string, id?: string) => {
+    if (id) {
+      const targetUser = users.find((u) => u.id === id || u.username === id);
+      if (targetUser) setViewingProfile(targetUser);
+    } else {
+      setViewingProfile(null);
+    }
+    setCurrentPage(page);
+    // Keep URL clean on Vercel: https://the-article-app.vercel.app/
   };
 
   const handleAcceptRequest = async (req: ChatRequest) => {
+    const t = toast.loading("Syncing Peer Shards...");
     const { error } = await supabase
       .from("chat_requests")
       .update({ status: "accepted" })
       .eq("id", req.id);
-
-    if (!error) {
-      toast.success("Handshake Established", { icon: "🤝" });
-      // Remove from notifications
-      setChatRequests(chatRequests.filter((r) => r.id !== req.id));
-    } else {
-      toast.error("Handshake Protocol Failure");
-    }
+    if (error) toast.error("Sync Failed", { id: t });
+    else toast.success("Connected", { id: t, icon: "🤝" });
   };
-
-  const handleInteraction = async (type: "like" | "dislike", id: string) => {
-    if (!isLoggedIn) return setShowAuth("login");
-    const field = type === "like" ? "likes_count" : "dislikes_count";
-    const { data } = await supabase
-      .from("articles")
-      .select(field)
-      .eq("id", id)
-      .maybeSingle();
-    await supabase
-      .from("articles")
-      .update({ [field]: (data?.[field] || 0) + 1 })
-      .eq("id", id);
-    syncAll();
-  };
-
-  const AccessDenied = () => (
-    <div className="flex flex-col items-center justify-center min-h-[70vh] px-6 text-center space-y-8">
-      <div className="relative p-10 bg-slate-900/50 rounded-[3rem] border border-red-500/30">
-        <ShieldAlert size={80} className="mx-auto text-red-500" />
-      </div>
-      <h2 className="text-4xl italic font-black text-white uppercase">
-        Access_Denied
-      </h2>
-      <button
-        onClick={() => setShowAuth("login")}
-        className="px-12 py-5 text-xs font-black tracking-widest text-black uppercase bg-white rounded-full"
-      >
-        Initialize Session
-      </button>
-    </div>
-  );
 
   if (!isInitialized) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-[#050505]">
-        <div className="w-12 h-12 border-4 border-[#00BFFF] border-t-transparent rounded-full animate-spin" />
+        <div className="flex flex-col items-center gap-6">
+          <div className="w-12 h-12 border-4 border-[#00BFFF] border-t-transparent rounded-full animate-spin" />
+          <p className="text-[10px] font-black uppercase text-slate-500 tracking-[0.4em]">
+            Initializing Core Protocol...
+          </p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-[#050505] text-slate-900 dark:text-[#e5e7eb] font-sans">
-      <Toaster position="top-right" />
+    <div className="min-h-screen bg-slate-50 dark:bg-[#050505] text-slate-900 dark:text-[#e5e7eb] font-sans selection:bg-[#00BFFF]/20">
+      <Toaster
+        position="top-right"
+        toastOptions={{
+          style: {
+            background: "#111",
+            color: "#fff",
+            fontSize: "10px",
+            textTransform: "uppercase",
+          },
+        }}
+      />
 
       {showAuth === "login" && (
         <LoginPage
@@ -156,11 +115,11 @@ const App: React.FC = () => {
       {!showAuth && (
         <>
           <Navbar
-            onNavigate={navigate}
+            onNavigate={handleNavigate}
             onLogin={() => setShowAuth("login")}
             onLogout={async () => {
               await logout();
-              navigate("home");
+              handleNavigate("home");
             }}
             currentPage={currentPage}
             isLoggedIn={isLoggedIn}
@@ -175,7 +134,7 @@ const App: React.FC = () => {
           <main className="pt-20">
             {currentPage === "home" && (
               <HomePage
-                articles={articles}
+                articles={useStore.getState().articles}
                 isLoggedIn={isLoggedIn}
                 onLogin={() => setShowAuth("login")}
                 onReadArticle={setActiveArticle}
@@ -186,11 +145,12 @@ const App: React.FC = () => {
             {currentPage === "network" &&
               (isLoggedIn ? (
                 <NetworkPage
-                  onBack={() => window.history.back()}
+                  onBack={() => handleNavigate("home")}
                   users={users}
                   currentUserId={profile?.id}
-                  onViewProfile={(u) => navigate("profile", u.id)}
+                  onViewProfile={(u) => handleNavigate("profile", u.id)}
                   onChat={async (u) => {
+                    if (u.id === profile?.id) return;
                     const { error } = await supabase
                       .from("chat_requests")
                       .insert([
@@ -201,105 +161,96 @@ const App: React.FC = () => {
                         },
                       ]);
                     if (!error)
-                      toast.success(
-                        "Handshake Dispatched. Waiting for node response...",
-                        { icon: "📡" }
-                      );
+                      toast.success("Signal Dispatched", { icon: "📡" });
                   }}
                 />
               ) : (
-                <AccessDenied />
+                <div className="flex flex-col items-center justify-center min-h-[70vh]">
+                  <ShieldAlert size={80} className="mb-6 text-red-500" />
+                  <h2 className="text-2xl font-black tracking-tighter uppercase">
+                    Access Denied
+                  </h2>
+                  <button
+                    onClick={() => setShowAuth("login")}
+                    className="mt-6 px-10 py-4 bg-white text-black rounded-full font-black uppercase text-[10px]"
+                  >
+                    Login
+                  </button>
+                </div>
               ))}
 
             {currentPage === "post" &&
               (isLoggedIn ? (
                 <PostPage
                   profile={profile}
-                  personalArticles={articles.filter(
-                    (a) => a.author_id === profile?.id
-                  )}
-                  onBack={() => window.history.back()}
-                  onPublish={async (data) => {
+                  personalArticles={[]}
+                  onBack={() => handleNavigate("home")}
+                  onPublish={async (d) => {
                     await supabase
                       .from("articles")
                       .insert([
                         {
-                          ...data,
+                          ...d,
                           author_id: profile?.id,
                           author_serial: profile?.serial_id,
                           author_name: profile?.full_name,
                         },
                       ]);
                     syncAll();
-                    navigate("home");
+                    handleNavigate("home");
                   }}
                 />
               ) : (
-                <AccessDenied />
+                <div className="flex flex-col items-center justify-center min-h-[70vh] font-black uppercase">
+                  Unauthorized
+                </div>
               ))}
 
             {currentPage === "profile" &&
-              (isLoggedIn ? (
-                profile ? (
-                  <ProfilePage
-                    profile={viewingProfile || profile}
-                    onLogout={async () => {
-                      await logout();
-                      navigate("home");
-                    }}
-                    isExternal={!!viewingProfile}
-                    onCloseExternal={() => window.history.back()}
-                    currentUserId={profile.id}
-                    onUpdateProfile={async (d) => {
-                      await supabase
-                        .from("profiles")
-                        .update(d)
-                        .eq("id", profile.id);
-                      hydrate();
-                    }}
-                    onChat={async (u) => {
-                      await supabase
-                        .from("chat_requests")
-                        .insert([
-                          {
-                            from_id: profile?.id,
-                            to_id: u.id,
-                            status: "pending",
-                          },
-                        ]);
-                      toast.success("Handshake Dispatched");
-                    }}
-                  />
-                ) : (
-                  <SetupProfilePage
-                    onComplete={async () => {
-                      hydrate();
-                      navigate("home");
-                    }}
-                  />
-                )
-              ) : (
-                <AccessDenied />
-              ))}
-
-            {currentPage === "support" && (
-              <SupportPage onBack={() => window.history.back()} />
-            )}
-            {currentPage === "admin" &&
-              (isLoggedIn && profile?.role === "admin" ? (
-                <AdminPage
-                  articles={articles}
-                  users={users}
+              (profile ? (
+                <ProfilePage
+                  profile={viewingProfile || profile}
+                  onLogout={logout}
+                  isExternal={!!viewingProfile}
+                  onCloseExternal={() => handleNavigate("home")}
                   currentUserId={profile.id}
-                  onUpdateUsers={syncAll}
-                  onUpdateArticles={syncAll}
-                  onLogout={async () => {
-                    await logout();
-                    navigate("home");
+                  onChat={(u) => {
+                    supabase
+                      .from("chat_requests")
+                      .insert([
+                        {
+                          from_id: profile?.id,
+                          to_id: u.id,
+                          status: "pending",
+                        },
+                      ]);
+                    toast.success("Handshake Sent");
                   }}
                 />
               ) : (
-                <AccessDenied />
+                <SetupProfilePage
+                  onComplete={async () => {
+                    await hydrate();
+                    handleNavigate("home");
+                  }}
+                />
+              ))}
+
+            {currentPage === "support" && (
+              <SupportPage onBack={() => handleNavigate("home")} />
+            )}
+            {currentPage === "admin" &&
+              (profile?.role === "admin" ? (
+                <AdminPage
+                  articles={useStore.getState().articles}
+                  users={users}
+                  currentUserId={profile?.id || ""}
+                  onLogout={logout}
+                />
+              ) : (
+                <div className="flex items-center justify-center min-h-screen italic font-black uppercase">
+                  Forbidden Shard
+                </div>
               ))}
           </main>
 
@@ -311,7 +262,6 @@ const App: React.FC = () => {
               currentUserId={profile?.id}
               currentUserProfile={profile}
               onUpdateArticles={syncAll}
-              onInteraction={handleInteraction}
             />
           )}
 
@@ -327,7 +277,7 @@ const App: React.FC = () => {
               onClose={() => setActiveHandshake(null)}
             />
           )}
-          <Footer onNavigate={navigate} />
+          <Footer onNavigate={handleNavigate} />
         </>
       )}
     </div>
