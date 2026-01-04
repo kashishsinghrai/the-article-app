@@ -5,6 +5,9 @@ import {
   Loader2,
   Star,
   ChevronDown,
+  Newspaper,
+  Globe,
+  Zap,
 } from "lucide-react";
 
 interface NewsItem {
@@ -12,18 +15,11 @@ interface NewsItem {
   source: string;
   link: string;
   og?: string;
+  category?: string;
 }
 
-const COUNTRIES = [
-  { id: "World", name: "Global Wire" },
-  { id: "India", name: "India Intelligence" },
-  { id: "US", name: "United States" },
-  { id: "Technology", name: "Tech / AI" },
-  { id: "Business", name: "Economy" },
-];
-
 const NewsTerminal: React.FC = () => {
-  const [news, setNews] = useState<any[]>([]);
+  const [news, setNews] = useState<NewsItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedRegion, setSelectedRegion] = useState("World");
 
@@ -33,9 +29,14 @@ const NewsTerminal: React.FC = () => {
       const response = await fetch("https://ok.surf/api/v1/cors/news-feed");
       const data = await response.json();
       const pool = data[region] || data["World"] || [];
-      setNews(pool.slice(0, 6));
+      const processed = pool.map((item: any) => ({
+        title: item.title,
+        source: item.source,
+        link: item.link,
+        category: region,
+      }));
+      setNews(processed);
     } catch (err) {
-      console.warn("News feed sync interrupted.");
       setNews([]);
     } finally {
       setLoading(false);
@@ -47,105 +48,70 @@ const NewsTerminal: React.FC = () => {
   }, [selectedRegion, fetchRealNews]);
 
   return (
-    <section className="duration-1000 animate-in fade-in">
-      <div className="flex flex-col items-center justify-between gap-8 mb-12 md:flex-row">
-        <div className="space-y-3 text-center md:text-left">
-          <div className="flex items-center justify-center gap-3 text-blue-600 md:justify-start">
-            <Star size={20} className="fill-current" />
-            <span className="text-[11px] font-black uppercase tracking-[0.4em]">
-              Live Intelligence Feed
-            </span>
-          </div>
-          <h2 className="text-4xl italic font-black leading-none tracking-tighter uppercase md:text-6xl text-slate-900 dark:text-white">
-            Global Dispatch
-          </h2>
-        </div>
-
-        <div className="flex flex-wrap items-center justify-center gap-4 p-2 border shadow-xl bg-slate-50 dark:bg-slate-900 rounded-3xl border-slate-100 dark:border-white/5">
-          <div className="relative group">
-            <select
-              value={selectedRegion}
-              onChange={(e) => setSelectedRegion(e.target.value)}
-              className="bg-white dark:bg-slate-800 border-none rounded-2xl px-6 py-3 text-[10px] font-black uppercase tracking-widest text-slate-900 dark:text-white cursor-pointer outline-none shadow-sm appearance-none pr-12 min-w-[180px]"
+    <section className="space-y-6 duration-1000 animate-in fade-in">
+      <div className="flex items-center justify-between gap-4 bg-slate-50 dark:bg-white/5 p-1.5 rounded-2xl border border-slate-100 dark:border-white/5 shadow-sm">
+        <select
+          value={selectedRegion}
+          onChange={(e) => setSelectedRegion(e.target.value)}
+          className="bg-transparent border-none text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-white outline-none p-2 cursor-pointer w-full"
+        >
+          {["World", "Technology", "Business", "Science"].map((r) => (
+            <option
+              key={r}
+              value={r}
+              className="bg-white dark:bg-[#0a0a0a] text-black dark:text-white"
             >
-              {COUNTRIES.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-            <ChevronDown
-              size={14}
-              className="absolute -translate-y-1/2 pointer-events-none right-4 top-1/2 text-slate-400"
-            />
-          </div>
-          <button
-            onClick={() => fetchRealNews(selectedRegion)}
-            disabled={loading}
-            className="p-3 text-white transition-all shadow-md bg-slate-950 dark:bg-white dark:text-slate-950 rounded-2xl hover:bg-blue-600 hover:text-white group disabled:opacity-50"
-          >
-            <RefreshCcw
-              size={18}
-              className={`${
-                loading
-                  ? "animate-spin"
-                  : "group-hover:rotate-180 transition-transform duration-500"
-              }`}
-            />
-          </button>
-        </div>
+              {r} WIRE
+            </option>
+          ))}
+        </select>
+        <button
+          onClick={() => fetchRealNews(selectedRegion)}
+          className="p-2 text-[#00BFFF] hover:rotate-180 transition-transform duration-500"
+        >
+          <RefreshCcw size={16} className={loading ? "animate-spin" : ""} />
+        </button>
       </div>
 
-      <div className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-3">
+      <div className="space-y-4">
         {loading
-          ? Array(6)
+          ? Array(8)
               .fill(0)
               .map((_, i) => (
                 <div
                   key={i}
-                  className="h-64 rounded-[2.5rem] bg-slate-50 dark:bg-slate-900 animate-pulse"
+                  className="h-24 border rounded-3xl bg-slate-50 dark:bg-white/5 animate-pulse border-slate-100 dark:border-white/5"
                 />
               ))
-          : news.map((item: any, i: number) => (
-              <div
+          : news.slice(0, 15).map((item, i) => (
+              <a
                 key={i}
-                className="group p-10 bg-white dark:bg-slate-900 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 hover:border-blue-500/30 transition-all duration-500 flex flex-col justify-between shadow-sm hover:shadow-2xl"
+                href={item.link}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="group block bg-white dark:bg-slate-900 p-6 rounded-[2rem] border border-slate-100 dark:border-white/10 hover:border-[#00BFFF]/40 transition-all duration-300 shadow-sm hover:shadow-lg"
               >
-                <div className="space-y-6">
+                <div className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <span className="px-4 py-1.5 bg-blue-50 dark:bg-blue-900/20 text-[9px] font-black text-blue-600 uppercase tracking-widest rounded-full">
-                      {selectedRegion}
-                    </span>
-                    <div className="flex items-center gap-1.5">
-                      <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
-                      <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">
-                        Verified
-                      </span>
-                    </div>
-                  </div>
-                  <h3 className="text-xl italic font-black leading-tight tracking-tight transition-colors md:text-2xl text-slate-900 dark:text-white group-hover:text-blue-600 line-clamp-3">
-                    {item.title}
-                  </h3>
-                </div>
-                <div className="flex items-center justify-between pt-6 mt-8 border-t border-slate-100 dark:border-white/5">
-                  <div className="space-y-1">
-                    <p className="text-[8px] font-black text-slate-300 uppercase tracking-widest">
-                      Bureau
-                    </p>
-                    <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-tight truncate max-w-[120px]">
+                    <span className="text-[8px] font-black text-[#00BFFF] uppercase tracking-[0.2em]">
                       {item.source}
-                    </p>
+                    </span>
+                    <ArrowUpRight
+                      size={14}
+                      className="text-slate-300 group-hover:text-[#00BFFF] transition-colors"
+                    />
                   </div>
-                  <a
-                    href={item.link}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center justify-center w-12 h-12 transition-all shadow-inner rounded-2xl bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white hover:bg-slate-950 hover:text-white dark:hover:bg-white dark:hover:text-slate-950"
-                  >
-                    <ArrowUpRight size={20} />
-                  </a>
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 leading-tight tracking-tight line-clamp-2 italic group-hover:text-[#00BFFF] transition-colors">
+                    "{item.title}"
+                  </h3>
+                  <div className="flex items-center gap-1.5 opacity-40">
+                    <div className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse" />
+                    <span className="text-[7px] font-black uppercase text-slate-500">
+                      Verified_Signal
+                    </span>
+                  </div>
                 </div>
-              </div>
+              </a>
             ))}
       </div>
     </section>

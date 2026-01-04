@@ -1,20 +1,31 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect, useCallback } from "react";
 import {
   Globe,
-  RefreshCcw,
-  WifiOff,
-  Zap,
+  Radio,
   Fingerprint,
-  Network,
+  Users,
+  User,
+  ThumbsUp,
+  ThumbsDown,
+  UserPlus,
   ShieldCheck,
-  ArrowRight,
-  Star,
-  Loader2,
+  Zap,
+  Network,
   Activity,
+  ArrowRight,
+  ShieldAlert,
+  Star,
+  MessageCircle,
+  ExternalLink,
+  Share2,
+  WifiOff,
+  Terminal,
+  TrendingUp,
 } from "lucide-react";
-import { Article, Category } from "../types";
-import TrendingTopics from "../components/TrendingTopics";
-import NewsTerminal from "../components/NewsTerminal";
+import { Article, Category, Profile } from "../types.ts";
+import { useStore } from "../lib/store.ts";
+import { toast } from "react-hot-toast";
+import { supabase } from "../lib/supabase.ts";
 
 interface HomePageProps {
   articles: Article[];
@@ -24,35 +35,6 @@ interface HomePageProps {
   onRefresh?: () => void;
 }
 
-const InstructionBlock = ({
-  num,
-  icon,
-  title,
-  desc,
-}: {
-  num: string;
-  icon: React.ReactNode;
-  title: string;
-  desc: string;
-}) => (
-  <div className="space-y-10 p-12 bg-slate-50 dark:bg-slate-900 rounded-[3.5rem] border border-white/5 transition-all hover:border-blue-500/50 group hover:shadow-2xl">
-    <div className="flex items-start justify-between">
-      <div className="text-blue-600 transition-transform duration-700 group-hover:scale-125">
-        {icon}
-      </div>
-      <span className="text-5xl italic font-black text-slate-800">{num}</span>
-    </div>
-    <div className="space-y-5">
-      <h4 className="text-3xl italic font-black tracking-tighter uppercase dark:text-white">
-        {title}
-      </h4>
-      <p className="text-sm font-bold leading-relaxed uppercase text-slate-400">
-        {desc}
-      </p>
-    </div>
-  </div>
-);
-
 const HomePage: React.FC<HomePageProps> = ({
   articles = [],
   isLoggedIn,
@@ -61,79 +43,156 @@ const HomePage: React.FC<HomePageProps> = ({
   onRefresh,
 }) => {
   const [activeCategory, setActiveCategory] = useState<Category>("All");
-  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [trendingNews, setTrendingNews] = useState<any[]>([]);
+  const [newsLoading, setNewsLoading] = useState(true);
 
-  const filteredArticles = useMemo(() => {
-    if (activeCategory === "All") return articles;
-    return articles.filter((a) => a.category === activeCategory);
-  }, [articles, activeCategory]);
+  const profile = useStore((s) => s.profile);
+  const users = useStore((s) => s.users);
+  const syncAll = useStore((s) => s.syncAll);
+  const hydrate = useStore((s) => s.hydrate);
 
-  const handleRefresh = async () => {
-    if (onRefresh) {
-      setIsRefreshing(true);
-      try {
-        await onRefresh();
-      } finally {
-        setTimeout(() => setIsRefreshing(false), 800);
+  // Replaced Gemini API with local Intelligence Archives
+  useEffect(() => {
+    const loadSystemSignals = () => {
+      if (!isLoggedIn) return;
+
+      const signals = [
+        {
+          title: "Sector A1: Node connectivity reached 99.8% stability.",
+          category: "Network",
+          url: "#",
+        },
+        {
+          title: "Investigation: Regional dispatch verify protocol updated.",
+          category: "Security",
+          url: "#",
+        },
+        {
+          title: "Economic: Global decentralized asset ledger synchronized.",
+          category: "Finance",
+          url: "#",
+        },
+        {
+          title: "Privacy: Personal shard encryption layer v4.2 active.",
+          category: "System",
+          url: "#",
+        },
+        {
+          title: "Signal: Incoming high-priority investigative dispatch.",
+          category: "Urgent",
+          url: "#",
+        },
+      ];
+
+      setTrendingNews(signals);
+      setNewsLoading(false);
+    };
+
+    const timer = setTimeout(loadSystemSignals, 1000);
+    return () => clearTimeout(timer);
+  }, [isLoggedIn]);
+
+  const handleInteraction = async (
+    e: React.MouseEvent,
+    type: "likes_count" | "dislikes_count",
+    articleId: string
+  ) => {
+    e.stopPropagation();
+    if (!isLoggedIn) return onLogin();
+
+    try {
+      const { data: current } = await supabase
+        .from("articles")
+        .select(type)
+        .eq("id", articleId)
+        .maybeSingle();
+      const newCount = (current?.[type] || 0) + 1;
+      const { error } = await supabase
+        .from("articles")
+        .update({ [type]: newCount })
+        .eq("id", articleId);
+      if (!error) {
+        syncAll();
+        toast.success("Signal Updated", { id: "interaction" });
       }
+    } catch (err) {
+      toast.error("Transmission Failed");
     }
   };
 
+  const handleFollow = async (e: React.MouseEvent, targetId: string) => {
+    e.stopPropagation();
+    if (!isLoggedIn || !profile) return onLogin();
+    if (targetId === profile.id)
+      return toast.error("Self-handshake restricted.");
+
+    const loadingToast = toast.loading("Establishing Handshake...");
+    try {
+      const targetUser = users.find((u) => u.id === targetId);
+      const targetFollowers = (targetUser?.followers_count || 0) + 1;
+      const selfFollowing = (profile.following_count || 0) + 1;
+
+      await Promise.all([
+        supabase
+          .from("profiles")
+          .update({ followers_count: targetFollowers })
+          .eq("id", targetId),
+        supabase
+          .from("profiles")
+          .update({ following_count: selfFollowing })
+          .eq("id", profile.id),
+      ]);
+
+      toast.success("Identity Signal Followed", {
+        id: loadingToast,
+        icon: "📡",
+      });
+      await hydrate();
+      await syncAll();
+    } catch (err) {
+      toast.error("Handshake Protocol Failed", { id: loadingToast });
+    }
+  };
+
+  const filtered = useMemo(
+    () =>
+      activeCategory === "All"
+        ? articles
+        : articles.filter((a) => a.category === activeCategory),
+    [articles, activeCategory]
+  );
+
   if (!isLoggedIn) {
     return (
-      <div className="px-8 pb-40 space-y-32 duration-1000 animate-in fade-in">
-        <div className="max-w-5xl pt-24 space-y-10">
-          <div className="flex items-center gap-3 bg-blue-50 dark:bg-blue-900/20 px-5 py-2.5 rounded-full w-fit">
-            <ShieldCheck size={16} className="text-blue-600" />
-            <span className="text-[10px] font-black uppercase tracking-[0.4em] text-blue-600">
-              Entry Protocol
+      <div className="max-w-[1400px] mx-auto px-6 py-20 space-y-40 animate-in fade-in duration-1000">
+        <section className="relative max-w-5xl py-20 mx-auto space-y-12 text-center">
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-[600px] bg-[#00BFFF]/10 blur-[120px] rounded-full -z-10" />
+          <div className="inline-flex items-center gap-3 px-6 py-3 border border-[#00BFFF]/20 rounded-full bg-[#00BFFF]/5 backdrop-blur-xl">
+            <ShieldCheck size={20} className="text-[#00BFFF]" />
+            <span className="text-[11px] font-black uppercase tracking-[0.4em] text-[#00BFFF]">
+              Root Network Access
             </span>
           </div>
-          <h1 className="text-6xl md:text-9xl font-black tracking-tighter leading-[0.85] dark:text-white uppercase italic">
+          <h1 className="text-5xl md:text-[9rem] font-black italic uppercase text-slate-950 dark:text-white tracking-tighter leading-[0.85]">
             ThE-ARTICLES <br />
-            <span className="text-slate-800">CITIZEN FRONT.</span>
+            <span className="text-slate-200 dark:text-slate-800">
+              CITIZEN_CORE
+            </span>
           </h1>
-          <p className="max-w-2xl text-xl italic font-bold text-slate-400 md:text-2xl">
-            The truth is decentralized. Join the global registry of verified
-            correspondents bypassing gatekeeper control.
+          <p className="max-w-2xl mx-auto text-xl italic font-bold leading-relaxed text-slate-500">
+            "Bypass the narrative. Connect directly to the global intelligence
+            wire."
           </p>
-          <div className="flex flex-col gap-5 pt-6 sm:flex-row">
+          <div className="flex flex-col items-center justify-center gap-6 pt-10 sm:flex-row">
             <button
               onClick={onLogin}
-              className="px-12 py-6 text-xs font-black tracking-widest transition-all bg-white text-slate-950 rounded-2xl hover:scale-105 active:scale-95"
+              className="w-full sm:w-auto px-16 py-7 bg-white text-black rounded-[2rem] font-black uppercase text-xs tracking-widest hover:scale-105 transition-all shadow-2xl"
             >
               Initialize Identity
             </button>
-            <button className="px-12 py-6 text-xs font-black tracking-widest uppercase bg-transparent border-2 border-white/10 text-slate-400 rounded-2xl">
+            <button className="w-full sm:w-auto px-12 py-7 bg-transparent border-2 border-slate-800 text-slate-400 rounded-[2rem] font-black uppercase text-xs tracking-widest hover:border-slate-500">
               Ethics Charter
             </button>
-          </div>
-        </div>
-        <section className="space-y-16">
-          <div className="pb-8 border-b-4 border-white">
-            <h2 className="text-4xl italic font-black uppercase md:text-6xl dark:text-white">
-              Briefing
-            </h2>
-          </div>
-          <div className="grid grid-cols-1 gap-10 md:grid-cols-3">
-            <InstructionBlock
-              num="01"
-              icon={<Fingerprint size={32} />}
-              title="Forge"
-              desc="Establish a Node Signature encrypted by the platform core."
-            />
-            <InstructionBlock
-              num="02"
-              icon={<Network size={32} />}
-              title="Transmit"
-              desc="Broadcast directly to the global wire, bypassing gatekeepers."
-            />
-            <InstructionBlock
-              num="03"
-              icon={<Zap size={32} />}
-              title="Validate"
-              desc="Earn reputation through factual peer-reviewed accuracy."
-            />
           </div>
         </section>
       </div>
@@ -141,135 +200,334 @@ const HomePage: React.FC<HomePageProps> = ({
   }
 
   return (
-    <div className="px-6 pb-40 space-y-24">
-      <header className="flex flex-col items-end justify-between gap-10 pt-12 md:flex-row">
-        <div className="space-y-4">
-          <h2 className="text-7xl md:text-8xl font-black italic uppercase dark:text-white leading-[0.85]">
-            Intelligence <br />
-            <span className="text-blue-600">Hub</span>
-          </h2>
-          <div className="flex items-center gap-5">
-            <Activity size={12} className="text-emerald-500" />
-            <span className="text-[10px] font-black text-emerald-500 uppercase">
-              Network Operational
-            </span>
-          </div>
-        </div>
-        <button
-          onClick={handleRefresh}
-          disabled={isRefreshing}
-          className={`flex items-center gap-3 px-10 py-5 bg-slate-900 border border-white/5 rounded-2xl transition-all shadow-sm hover:shadow-xl ${
-            isRefreshing ? "opacity-50" : ""
-          }`}
-        >
-          <span className="text-[10px] font-black uppercase text-slate-400">
-            Sync Shards
-          </span>
-          {isRefreshing ? (
-            <Loader2 size={18} className="text-blue-600 animate-spin" />
-          ) : (
-            <RefreshCcw
-              size={18}
-              className="transition-transform text-slate-400"
-            />
-          )}
-        </button>
-      </header>
-      <TrendingTopics />
-      <NewsTerminal />
-      <section className="space-y-20">
-        <div className="flex flex-col justify-between gap-10 pb-12 border-b-4 border-white md:flex-row">
-          <div className="space-y-3">
-            <h3 className="text-5xl italic font-black uppercase dark:text-white">
-              Field Reports
-            </h3>
-            <p className="text-[10px] font-bold text-slate-500 uppercase">
-              Peer-verified internal documentation
-            </p>
-          </div>
-          <div className="flex gap-2 pb-2 overflow-x-auto no-scrollbar">
-            {(
-              ["All", "Investigative", "Economic", "Regional"] as Category[]
-            ).map((cat) => (
-              <button
-                key={cat}
-                onClick={() => setActiveCategory(cat)}
-                className={`px-8 py-3 rounded-xl text-[10px] font-black uppercase border transition-all ${
-                  activeCategory === cat
-                    ? "bg-white text-slate-950 shadow-2xl"
-                    : "text-slate-400 border-white/10"
-                }`}
-              >
-                {cat}
-              </button>
-            ))}
-          </div>
-        </div>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-20 gap-y-32">
-          {filteredArticles.length === 0 ? (
-            <div className="py-40 text-center col-span-full opacity-20">
-              <WifiOff size={64} className="mx-auto" />
-              <p className="text-sm font-black uppercase">Local Shard Empty</p>
+    <div className="max-w-[1600px] mx-auto px-4 md:px-8 py-8 md:py-12 animate-in fade-in duration-500">
+      <div className="grid grid-cols-1 gap-8 lg:grid-cols-12">
+        {/* LEFT SIDEBAR: Personal Metrics */}
+        <aside className="sticky hidden space-y-8 lg:block lg:col-span-3 top-32 h-fit">
+          <div className="bg-white dark:bg-[#0a0a0a] rounded-[3rem] border border-slate-100 dark:border-white/5 overflow-hidden shadow-2xl">
+            <div className="h-28 bg-gradient-to-br from-[#00BFFF] to-blue-800 relative">
+              {profile?.cover_url && (
+                <img
+                  src={profile.cover_url}
+                  className="object-cover w-full h-full opacity-50"
+                />
+              )}
             </div>
-          ) : (
-            filteredArticles.map((article) => (
-              <div
-                key={article.id}
-                className="space-y-8 cursor-pointer group"
-                onClick={() => onReadArticle?.(article)}
-              >
-                <div className="relative aspect-[16/10] rounded-[3.5rem] overflow-hidden border border-white/5 bg-slate-900 shadow-sm transition-all duration-700">
-                  {article.image_url ? (
-                    <img
-                      src={article.image_url}
-                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-[2s]"
-                      alt=""
-                    />
-                  ) : (
-                    <div className="flex items-center justify-center w-full h-full">
-                      <Globe size={64} className="text-slate-800" />
-                    </div>
-                  )}
-                  <div className="absolute top-10 left-10">
-                    <span className="px-6 py-2 bg-slate-950/95 backdrop-blur-xl rounded-full text-[10px] font-black text-blue-600 uppercase border border-white/20">
-                      {article.category}
-                    </span>
-                  </div>
-                </div>
-                <div className="px-4 space-y-6">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-black text-slate-400 uppercase">
-                      NODE: {article.author_serial}
-                    </span>
-                    <span className="text-[10px] font-bold text-slate-500 uppercase italic">
-                      {new Date(article.created_at).toLocaleDateString()}
-                    </span>
-                  </div>
-                  <h3 className="text-4xl italic font-black leading-tight uppercase transition-colors md:text-5xl dark:text-white group-hover:text-blue-600">
-                    {article.title}
-                  </h3>
-                  <p className="pl-8 text-xl italic font-medium border-l-4 text-slate-400 line-clamp-2 border-slate-800">
-                    "{article.content}"
+            <div className="relative z-10 px-8 pb-10 text-center -mt-14">
+              <div className="w-24 h-24 rounded-[2.5rem] bg-white dark:bg-[#050505] border-[8px] border-white dark:border-[#0a0a0a] mx-auto overflow-hidden shadow-xl flex items-center justify-center">
+                {profile?.avatar_url ? (
+                  <img
+                    src={profile.avatar_url}
+                    className="object-cover w-full h-full"
+                  />
+                ) : (
+                  <Fingerprint
+                    size={40}
+                    className="text-slate-200 dark:text-slate-800"
+                  />
+                )}
+              </div>
+              <h3 className="mt-4 text-2xl italic font-black leading-none tracking-tighter uppercase text-slate-900 dark:text-white">
+                @{profile?.username}
+              </h3>
+              <p className="text-[9px] font-black text-[#00BFFF] uppercase tracking-[0.3em] mt-2 italic">
+                Node Integrity: {profile?.budget || 0}%
+              </p>
+
+              <div className="grid grid-cols-2 gap-4 pt-8 mt-8 border-t border-slate-50 dark:border-white/5">
+                <div>
+                  <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">
+                    Followers
                   </p>
-                  <div className="flex items-center justify-between pt-6">
-                    <div className="flex items-center gap-2.5">
-                      <Star size={16} className="fill-current text-amber-500" />
-                      <span className="text-[10px] font-black uppercase text-slate-400">
-                        Verified Dispatch
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-3 text-blue-600 font-black text-[11px] uppercase opacity-0 group-hover:opacity-100 transition-all">
-                      Packet <ArrowRight size={16} />
-                    </div>
-                  </div>
+                  <p className="text-xl font-black dark:text-white animate-pulse">
+                    {profile?.followers_count || 0}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">
+                    Following
+                  </p>
+                  <p className="text-xl font-black dark:text-white">
+                    {profile?.following_count || 0}
+                  </p>
                 </div>
               </div>
-            ))
-          )}
-        </div>
-      </section>
+            </div>
+          </div>
+
+          <div className="bg-white dark:bg-[#0a0a0a] rounded-[2.5rem] p-8 border border-slate-100 dark:border-white/5 shadow-sm border-l-4 border-l-[#00BFFF]">
+            <div className="flex items-center gap-3 text-[#00BFFF] mb-4">
+              <Terminal size={16} />
+              <span className="text-[10px] font-black uppercase tracking-widest">
+                Dispatch Summary
+              </span>
+            </div>
+            <p className="text-[11px] font-bold text-slate-500 leading-relaxed italic">
+              "Access to the root wire is established. All signals verified by
+              P2P consensus."
+            </p>
+          </div>
+        </aside>
+
+        {/* CENTER FEED: Reports */}
+        <main className="space-y-8 lg:col-span-6">
+          <header className="flex items-center justify-between sticky top-24 z-30 bg-white/90 dark:bg-[#050505]/95 backdrop-blur-xl py-4 px-6 border border-slate-100 dark:border-white/5 rounded-[2rem] shadow-xl">
+            <h2 className="flex items-center gap-3 text-2xl italic font-black tracking-tighter uppercase dark:text-white">
+              <Radio className="text-[#00BFFF] animate-pulse" /> Dispatch
+            </h2>
+            <div className="flex gap-2 overflow-x-auto no-scrollbar">
+              {(
+                ["All", "Investigative", "Economic", "Regional"] as Category[]
+              ).map((cat) => (
+                <button
+                  key={cat}
+                  onClick={() => setActiveCategory(cat)}
+                  className={`px-6 py-2.5 rounded-full text-[9px] font-black uppercase transition-all shadow-sm ${
+                    activeCategory === cat
+                      ? "bg-[#00BFFF] text-white"
+                      : "bg-slate-50 dark:bg-white/5 text-slate-400 hover:text-white"
+                  }`}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
+          </header>
+
+          <div className="pb-40 space-y-10 lg:pb-0">
+            {filtered.length === 0 ? (
+              <div className="py-40 text-center opacity-20">
+                <WifiOff size={64} className="mx-auto" />
+                <p className="mt-4 text-xs font-black tracking-widest uppercase">
+                  Zero Signals Detected
+                </p>
+              </div>
+            ) : (
+              filtered.map((article) => (
+                <div
+                  key={article.id}
+                  className="bg-white dark:bg-[#0a0a0a] rounded-[3.5rem] border border-slate-100 dark:border-white/5 overflow-hidden shadow-sm hover:shadow-2xl transition-all duration-500 cursor-pointer group"
+                  onClick={() => onReadArticle?.(article)}
+                >
+                  <div className="p-8 space-y-8 md:p-10">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        <div className="flex items-center justify-center w-12 h-12 overflow-hidden border shadow-inner rounded-2xl bg-slate-900 border-white/5">
+                          {users.find((u) => u.id === article.author_id)
+                            ?.avatar_url ? (
+                            <img
+                              src={
+                                users.find((u) => u.id === article.author_id)
+                                  ?.avatar_url
+                              }
+                              className="object-cover w-full h-full"
+                            />
+                          ) : (
+                            <Fingerprint size={22} className="text-slate-700" />
+                          )}
+                        </div>
+                        <div>
+                          <h4 className="text-[12px] font-black uppercase text-slate-900 dark:text-white tracking-tight">
+                            {article.author_name}
+                          </h4>
+                          <button
+                            onClick={(e) => handleFollow(e, article.author_id)}
+                            className="text-[9px] font-black text-[#00BFFF] uppercase tracking-widest flex items-center gap-1.5 hover:underline mt-1.5"
+                          >
+                            <UserPlus size={10} /> Handshake
+                          </button>
+                        </div>
+                      </div>
+                      <span className="text-[10px] font-bold text-slate-400 dark:text-white/20 uppercase italic">
+                        {new Date(article.created_at).toLocaleDateString()}
+                      </span>
+                    </div>
+
+                    <div className="space-y-4">
+                      <h3 className="text-3xl md:text-4xl font-black italic uppercase leading-none tracking-tighter text-slate-950 dark:text-white group-hover:text-[#00BFFF] transition-colors">
+                        {article.title}
+                      </h3>
+                      <p className="text-lg italic font-medium leading-relaxed text-slate-500 dark:text-slate-400 line-clamp-3">
+                        "{article.content}"
+                      </p>
+                    </div>
+
+                    {article.image_url && (
+                      <div className="aspect-video rounded-[2.5rem] overflow-hidden bg-[#080808] border border-white/5 relative shadow-inner">
+                        <img
+                          src={article.image_url}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-[2s]"
+                        />
+                        <div className="absolute inset-0 flex items-end p-8 transition-opacity opacity-0 bg-gradient-to-t from-black/60 to-transparent group-hover:opacity-100">
+                          <span className="text-white text-[10px] font-black uppercase tracking-[0.4em]">
+                            Decrypt Full Asset{" "}
+                            <ArrowRight size={14} className="inline ml-2" />
+                          </span>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="flex flex-wrap items-center justify-between gap-6 pt-8 border-t border-slate-100 dark:border-white/5">
+                      <div className="flex gap-8">
+                        <button
+                          onClick={(e) =>
+                            handleInteraction(e, "likes_count", article.id)
+                          }
+                          className="flex items-center gap-2.5 text-[10px] font-black uppercase text-slate-400 hover:text-[#00BFFF] transition-colors"
+                        >
+                          <ThumbsUp
+                            size={22}
+                            className="transition-transform group-active:scale-125"
+                          />{" "}
+                          {article.likes_count || 0}
+                        </button>
+                        <button
+                          onClick={(e) =>
+                            handleInteraction(e, "dislikes_count", article.id)
+                          }
+                          className="flex items-center gap-2.5 text-[10px] font-black uppercase text-slate-400 hover:text-red-500 transition-colors"
+                        >
+                          <ThumbsDown
+                            size={22}
+                            className="transition-transform group-active:scale-125"
+                          />{" "}
+                          {article.dislikes_count || 0}
+                        </button>
+                        <div className="flex items-center gap-2.5 text-[10px] font-black uppercase text-slate-400">
+                          <MessageCircle size={22} />{" "}
+                          {article.comments_count || 0}
+                        </div>
+                      </div>
+                      <button className="flex items-center gap-2.5 text-[10px] font-black uppercase text-slate-400 hover:text-[#00BFFF]">
+                        <Share2 size={20} /> Share
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </main>
+
+        {/* RIGHT SIDEBAR: Global Stats & Registry */}
+        <aside className="sticky hidden space-y-8 lg:block lg:col-span-3 top-32 h-fit">
+          <div className="bg-white dark:bg-[#0a0a0a] rounded-[3rem] border border-slate-100 dark:border-white/5 overflow-hidden shadow-sm flex flex-col max-h-[600px]">
+            <div className="flex items-center justify-between p-8 border-b border-slate-100 dark:border-white/5 bg-slate-50/50 dark:bg-white/5">
+              <h4 className="text-[11px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-3">
+                <Globe size={18} className="text-[#00BFFF]" /> Global Wire
+              </h4>
+              <TrendingUp size={14} className="text-[#00BFFF] animate-pulse" />
+            </div>
+            <div className="flex-grow p-6 space-y-6 overflow-y-auto no-scrollbar">
+              {newsLoading
+                ? Array(5)
+                    .fill(0)
+                    .map((_, i) => (
+                      <div
+                        key={i}
+                        className="h-20 bg-slate-50 dark:bg-white/5 rounded-3xl animate-pulse"
+                      />
+                    ))
+                : trendingNews.map((n, i) => (
+                    <a
+                      key={i}
+                      href={n.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block p-5 rounded-[2rem] hover:bg-slate-100 dark:hover:bg-white/5 border border-transparent hover:border-slate-200 dark:hover:border-white/10 transition-all group"
+                    >
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="text-[8px] font-black uppercase text-[#00BFFF] bg-[#00BFFF]/5 px-2 py-0.5 rounded">
+                          {n.category}
+                        </span>
+                        <ExternalLink
+                          size={14}
+                          className="text-slate-300 group-hover:text-[#00BFFF] transition-colors"
+                        />
+                      </div>
+                      <p className="text-[13px] font-bold dark:text-white leading-snug italic group-hover:text-[#00BFFF]">
+                        "{n.title}"
+                      </p>
+                    </a>
+                  ))}
+            </div>
+          </div>
+
+          <div className="bg-white dark:bg-[#0a0a0a] rounded-[3rem] p-10 border border-slate-100 dark:border-white/5 space-y-8 shadow-sm">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-50 dark:border-white/5">
+              <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-3">
+                <Users size={16} /> Correspondents
+              </h4>
+              <span className="text-[9px] font-black text-emerald-500 uppercase italic">
+                Online
+              </span>
+            </div>
+            <div className="space-y-6">
+              {users.slice(0, 5).map((u) => (
+                <div
+                  key={u.id}
+                  onClick={() => (window.location.hash = `/profile/${u.id}`)}
+                  className="flex items-center gap-4 cursor-pointer group"
+                >
+                  <div className="w-10 h-10 rounded-xl overflow-hidden border border-slate-100 dark:border-white/5 group-hover:border-[#00BFFF] transition-all">
+                    {u.avatar_url ? (
+                      <img
+                        src={u.avatar_url}
+                        className="object-cover w-full h-full"
+                      />
+                    ) : (
+                      <Fingerprint size={16} className="m-3 text-slate-800" />
+                    )}
+                  </div>
+                  <div className="overflow-hidden">
+                    <p className="text-[11px] font-black dark:text-white truncate uppercase group-hover:text-[#00BFFF] transition-colors">
+                      {u.full_name}
+                    </p>
+                    <p className="text-[8px] font-bold text-slate-400 uppercase">
+                      {u.serial_id}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <button
+              onClick={() => (window.location.hash = "/network")}
+              className="w-full py-4 bg-slate-900 dark:bg-white text-white dark:text-black rounded-2xl font-black text-[9px] uppercase tracking-[0.3em] hover:brightness-110 active:scale-95 transition-all shadow-xl"
+            >
+              Audit Database
+            </button>
+          </div>
+        </aside>
+      </div>
     </div>
   );
 };
+
+const InstructionStep = ({
+  num,
+  title,
+  desc,
+}: {
+  num: string;
+  title: string;
+  desc: string;
+}) => (
+  <div className="p-12 bg-white dark:bg-[#0a0a0a] rounded-[4rem] border border-slate-100 dark:border-white/5 shadow-sm hover:shadow-2xl hover:border-[#00BFFF]/30 transition-all duration-500 group relative overflow-hidden">
+    <div className="absolute -top-10 -right-10 w-40 h-40 bg-[#00BFFF]/5 blur-[60px] rounded-full" />
+    <div className="relative z-10 space-y-6">
+      <div className="flex items-end gap-4">
+        <span className="text-7xl italic font-black leading-none text-slate-100 dark:text-white/5 group-hover:text-[#00BFFF]/10 transition-colors">
+          {num}
+        </span>
+        <h3 className="pb-2 text-2xl italic font-black tracking-tighter uppercase border-b-2 border-[#00BFFF] text-slate-950 dark:text-white">
+          {title}
+        </h3>
+      </div>
+      <p className="text-sm italic font-bold leading-relaxed tracking-widest uppercase transition-colors text-slate-500 group-hover:text-slate-400">
+        "{desc}"
+      </p>
+    </div>
+  </div>
+);
 
 export default HomePage;

@@ -416,13 +416,13 @@ const AdminPage: React.FC<AdminPageProps> = ({
         </div>
       )}
 
+      {/* Fix: Removed non-existent isAdminMode prop which caused a TypeScript error */}
       {interceptChat && (
         <ChatOverlay
           recipient={interceptChat.profile}
           currentUserId="admin-surveillance"
           handshakeId={interceptChat.handshakeId}
           onClose={() => setInterceptChat(null)}
-          isAdminMode={true}
         />
       )}
     </main>

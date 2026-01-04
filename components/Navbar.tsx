@@ -1,21 +1,28 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   Shield,
   User,
+  Globe,
+  PenSquare,
+  Users,
+  LifeBuoy,
+  Bell,
   Sun,
   Moon,
-  MessageSquare,
+  Search,
+  ChevronDown,
+  LayoutGrid,
+  Radio,
+  Settings,
   LogOut,
   Menu,
   X,
+  Binary,
+  FileText,
   Terminal,
-  Globe,
-  PenSquare,
-  LifeBuoy,
-  Zap,
-  Fingerprint,
 } from "lucide-react";
-import { ChatRequest } from "../types";
+import { ChatRequest, Profile } from "../types";
+import { useStore } from "../lib/store";
 
 interface NavbarProps {
   onNavigate: (page: string) => void;
@@ -27,33 +34,10 @@ interface NavbarProps {
   isDarkMode: boolean;
   onToggleDarkMode: () => void;
   chatRequests: ChatRequest[];
-  onAcceptRequest: (req: ChatRequest) => Promise<void>;
+  onAcceptRequest: (req: ChatRequest) => void;
   profileAvatar?: string;
+  userName?: string;
 }
-
-const NavItem = ({
-  label,
-  active,
-  onClick,
-  icon: Icon,
-}: {
-  label: string;
-  active: boolean;
-  onClick: () => void;
-  icon: React.ElementType;
-}) => (
-  <button
-    onClick={onClick}
-    className={`flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] transition-all py-2 px-1 border-b-2 ${
-      active
-        ? "text-blue-600 border-blue-600"
-        : "text-slate-400 border-transparent hover:text-slate-900 dark:hover:text-white"
-    }`}
-  >
-    <Icon size={14} className={active ? "animate-pulse" : ""} />
-    <span className="hidden xl:inline">{label}</span>
-  </button>
-);
 
 const Navbar: React.FC<NavbarProps> = ({
   onNavigate,
@@ -67,265 +51,444 @@ const Navbar: React.FC<NavbarProps> = ({
   chatRequests,
   onAcceptRequest,
   profileAvatar,
+  userName,
 }) => {
-  const [isInboxOpen, setIsInboxOpen] = useState(false);
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isNavDropdownOpen, setIsNavDropdownOpen] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const users = useStore((s) => s.users);
+  const [searchResults, setSearchResults] = useState<Profile[]>([]);
+  const searchRef = useRef<HTMLDivElement>(null);
 
   const navTo = (page: string) => {
     onNavigate(page);
-    setIsInboxOpen(false);
-    setIsMobileMenuOpen(false);
+    setIsNavDropdownOpen(false);
+    setIsSidebarOpen(false);
   };
+
+  useEffect(() => {
+    if (searchTerm.trim().length > 1) {
+      const filtered = users
+        .filter(
+          (u) =>
+            u.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            u.username?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            u.serial_id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            (u as any).email
+              ?.toLowerCase()
+              .includes(searchTerm.toLowerCase()) ||
+            (u as any).phone?.includes(searchTerm)
+        )
+        .slice(0, 5);
+      setSearchResults(filtered);
+    } else {
+      setSearchResults([]);
+    }
+  }, [searchTerm, users]);
 
   return (
     <>
-      <nav className="fixed top-0 left-0 right-0 z-[150] p-4 md:p-6">
-        <div className="mx-auto max-w-7xl">
-          <div className="flex items-center justify-between bg-white/95 dark:bg-slate-950/95 backdrop-blur-3xl border border-slate-100 dark:border-white/5 px-4 md:px-8 py-3.5 rounded-[1.5rem] shadow-2xl">
-            {/* Logo */}
+      <nav className="fixed top-0 left-0 right-0 z-[150] px-4 py-3 md:px-8 bg-white/80 dark:bg-[#0a0a0a]/90 backdrop-blur-xl border-b border-slate-200 dark:border-white/5 transition-colors duration-300">
+        <div className="flex items-center justify-between mx-auto max-w-7xl">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setIsSidebarOpen(true)}
+              className="p-2 -ml-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-white/5 rounded-xl lg:hidden"
+            >
+              <Menu size={24} />
+            </button>
             <div
-              className="flex items-center gap-4 cursor-pointer group"
+              className="flex items-center gap-3 cursor-pointer group"
               onClick={() => navTo("home")}
             >
-              <div className="p-2 transition-transform bg-blue-600 shadow-lg rounded-xl group-hover:rotate-12 shadow-blue-600/20">
+              <div className="p-2 bg-[#00BFFF] rounded-xl shadow-lg shadow-[#00BFFF]/20">
                 <Shield size={18} className="text-white" />
               </div>
-              <span className="text-[11px] font-black uppercase tracking-[0.2em] dark:text-white italic">
+              <span className="hidden text-xs font-black tracking-widest uppercase sm:block text-slate-900 dark:text-white">
                 ThE-ARTICLES
               </span>
             </div>
+          </div>
 
-            {/* Desktop Navigation */}
-            <div className="items-center hidden gap-8 lg:flex">
-              <NavItem
-                icon={Globe}
-                label="Explore"
-                active={currentPage === "home"}
-                onClick={() => navTo("home")}
-              />
-              <NavItem
-                icon={Zap}
-                label="Network"
-                active={currentPage === "network"}
-                onClick={() => navTo("network")}
-              />
-              {isLoggedIn && (
-                <NavItem
-                  icon={PenSquare}
-                  label="Broadcast"
-                  active={currentPage === "post"}
-                  onClick={() => navTo("post")}
+          <div className="items-center hidden gap-6 lg:flex">
+            <div className="relative">
+              <button
+                onClick={() => setIsNavDropdownOpen(!isNavDropdownOpen)}
+                className="flex items-center gap-2 px-5 py-2.5 bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 rounded-full text-[10px] font-black uppercase tracking-widest transition-all text-slate-700 dark:text-white"
+              >
+                <LayoutGrid size={14} className="text-[#00BFFF]" />
+                Explore
+                <ChevronDown
+                  size={14}
+                  className={`transition-transform ${
+                    isNavDropdownOpen ? "rotate-180" : ""
+                  }`}
                 />
-              )}
-              <NavItem
-                icon={LifeBuoy}
-                label="Support"
-                active={currentPage === "support"}
-                onClick={() => navTo("support")}
-              />
-              {isLoggedIn && userRole === "admin" && (
-                <NavItem
-                  icon={Terminal}
-                  label="Root"
-                  active={currentPage === "admin"}
-                  onClick={() => navTo("admin")}
-                />
+              </button>
+
+              {isNavDropdownOpen && (
+                <>
+                  <div
+                    className="fixed inset-0 z-[-1]"
+                    onClick={() => setIsNavDropdownOpen(false)}
+                  />
+                  <div className="absolute top-full left-0 mt-3 w-[280px] bg-white dark:bg-[#1e293b] border border-slate-200 dark:border-white/10 rounded-[2rem] shadow-2xl p-4 animate-in fade-in slide-in-from-top-2 duration-200">
+                    <div className="space-y-6">
+                      <div>
+                        <p className="text-[8px] font-black uppercase text-slate-400 mb-3 px-3 tracking-[0.2em]">
+                          Discovery
+                        </p>
+                        <DropdownItem
+                          icon={Globe}
+                          label="Discovery Wire"
+                          desc="Global news dispatches"
+                          active={currentPage === "home"}
+                          onClick={() => navTo("home")}
+                        />
+                        <DropdownItem
+                          icon={Users}
+                          label="Node Registry"
+                          desc="Find correspondents"
+                          active={currentPage === "network"}
+                          onClick={() => navTo("network")}
+                        />
+                      </div>
+                      <div>
+                        <p className="text-[8px] font-black uppercase text-slate-400 mb-3 px-3 tracking-[0.2em]">
+                          Operations
+                        </p>
+                        {isLoggedIn && (
+                          <DropdownItem
+                            icon={Radio}
+                            label="Broadcast dispatch"
+                            desc="Publish intelligence"
+                            active={currentPage === "post"}
+                            onClick={() => navTo("post")}
+                          />
+                        )}
+                        <DropdownItem
+                          icon={LifeBuoy}
+                          label="Technical Support"
+                          desc="Protocol assistance"
+                          active={currentPage === "support"}
+                          onClick={() => navTo("support")}
+                        />
+                        {userRole === "admin" && (
+                          <DropdownItem
+                            icon={Terminal}
+                            label="Root Access"
+                            desc="System core control"
+                            active={currentPage === "admin"}
+                            onClick={() => navTo("admin")}
+                          />
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </>
               )}
             </div>
 
-            {/* Actions */}
-            <div className="flex items-center gap-2 md:gap-4">
-              {isLoggedIn && (
-                <div className="relative">
-                  <button
-                    onClick={() => setIsInboxOpen(!isInboxOpen)}
-                    className={`relative p-2 transition-colors ${
-                      chatRequests.length > 0
-                        ? "text-blue-600"
-                        : "text-slate-400 hover:text-blue-600"
-                    }`}
-                  >
-                    <MessageSquare size={18} />
-                    {chatRequests.length > 0 && (
-                      <span className="absolute w-2 h-2 bg-red-500 rounded-full top-1 right-1 animate-pulse" />
-                    )}
-                  </button>
-                  {isInboxOpen && (
-                    <div className="absolute right-0 p-4 mt-4 space-y-4 duration-200 bg-white border shadow-2xl dark:bg-slate-900 w-72 border-slate-100 dark:border-white/10 rounded-2xl animate-in zoom-in-95">
-                      <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest border-b border-slate-100 dark:border-white/5 pb-2">
-                        Incoming Signals
-                      </p>
-                      {chatRequests.length === 0 ? (
-                        <div className="py-4 text-center">
-                          <p className="text-[10px] text-slate-400 italic">
-                            No handshake requests detected.
-                          </p>
-                        </div>
-                      ) : (
-                        <div className="space-y-2 overflow-y-auto max-h-60 custom-scrollbar">
-                          {chatRequests.map((req) => (
-                            <div
-                              key={req.id}
-                              className="p-3 space-y-3 border bg-slate-50 dark:bg-white/5 rounded-xl border-slate-100 dark:border-white/5"
-                            >
-                              <div className="flex items-center gap-3">
-                                <div className="p-1.5 bg-blue-600/10 rounded-lg text-blue-600">
-                                  <Fingerprint size={16} />
-                                </div>
-                                <div className="overflow-hidden">
-                                  <p className="text-[10px] font-black text-slate-900 dark:text-white uppercase truncate">
-                                    Handshake Protocol
-                                  </p>
-                                  <p className="text-[8px] font-bold text-slate-400 uppercase tracking-tighter">
-                                    Validation Required
-                                  </p>
-                                </div>
-                              </div>
-                              <button
-                                onClick={() => {
-                                  onAcceptRequest(req);
-                                  setIsInboxOpen(false);
-                                }}
-                                className="w-full py-2 bg-blue-600 text-white text-[9px] font-black rounded-lg hover:bg-blue-700 transition-all uppercase tracking-widest shadow-lg shadow-blue-600/20"
-                              >
-                                Accept Signal
-                              </button>
-                            </div>
-                          ))}
-                        </div>
-                      )}
+            {/* Functional Search */}
+            <div className="relative w-64 group xl:w-96" ref={searchRef}>
+              <Search
+                size={14}
+                className="absolute -translate-y-1/2 left-4 top-1/2 text-slate-400 group-focus-within:text-[#00BFFF]"
+              />
+              <input
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Search dossiers (Serial, Email, Phone)..."
+                className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/5 rounded-full py-2.5 pl-10 pr-4 text-xs outline-none focus:border-[#00BFFF]/50 transition-all dark:text-white"
+              />
+              {searchResults.length > 0 && (
+                <div className="absolute top-full left-0 right-0 mt-3 bg-white dark:bg-[#1e293b] border border-slate-200 dark:border-white/10 rounded-2xl shadow-2xl overflow-hidden py-2 animate-in fade-in slide-in-from-top-2">
+                  {searchResults.map((u) => (
+                    <div
+                      key={u.id}
+                      onClick={() => {
+                        setSearchTerm("");
+                        navTo("network");
+                      }}
+                      className="flex items-center gap-3 px-4 py-3 transition-colors cursor-pointer hover:bg-slate-50 dark:hover:bg-white/5"
+                    >
+                      <div className="flex items-center justify-center w-8 h-8 overflow-hidden rounded-lg bg-slate-200 dark:bg-slate-800">
+                        {u.avatar_url ? (
+                          <img
+                            src={u.avatar_url}
+                            className="object-cover w-full h-full"
+                          />
+                        ) : (
+                          <Terminal size={14} className="text-slate-400" />
+                        )}
+                      </div>
+                      <div className="overflow-hidden">
+                        <p className="text-[10px] font-black text-slate-900 dark:text-white uppercase truncate">
+                          {u.full_name}
+                        </p>
+                        <p className="text-[8px] font-bold text-slate-400 uppercase tracking-tight">
+                          {u.serial_id}
+                        </p>
+                      </div>
                     </div>
-                  )}
+                  ))}
                 </div>
               )}
-
-              <button
-                onClick={onToggleDarkMode}
-                className="p-2 transition-colors text-slate-400 hover:text-blue-600"
-              >
-                {isDarkMode ? <Sun size={18} /> : <Moon size={18} />}
-              </button>
-
-              {isLoggedIn ? (
-                <div className="flex items-center gap-2 pl-4 ml-2 border-l border-slate-100 dark:border-white/10">
-                  <button
-                    onClick={() => navTo("profile")}
-                    className="w-10 h-10 overflow-hidden transition-all border-2 shadow-sm rounded-2xl border-slate-200 dark:border-white/10 hover:border-blue-600"
-                  >
-                    {profileAvatar ? (
-                      <img
-                        src={profileAvatar}
-                        className="object-cover w-full h-full"
-                        alt="Avatar"
-                      />
-                    ) : (
-                      <User size={18} className="m-auto text-slate-400" />
-                    )}
-                  </button>
-                  <button
-                    onClick={onLogout}
-                    className="hidden p-2 text-red-500 transition-colors hover:text-red-700 sm:block"
-                  >
-                    <LogOut size={18} />
-                  </button>
-                </div>
-              ) : (
-                <button
-                  onClick={onLogin}
-                  className="bg-slate-950 dark:bg-white text-white dark:text-slate-950 px-6 py-2.5 text-[10px] font-bold uppercase rounded-xl hover:scale-105 transition-all shadow-xl"
-                >
-                  Initialize
-                </button>
-              )}
-
-              {/* Mobile Menu Toggle */}
-              <button
-                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                className="p-2 lg:hidden text-slate-400 hover:text-blue-600"
-              >
-                {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
-              </button>
             </div>
           </div>
-        </div>
-      </nav>
 
-      {/* Mobile Menu Overlay */}
-      {isMobileMenuOpen && (
-        <div className="fixed inset-0 z-[140] bg-white/95 dark:bg-slate-950/95 backdrop-blur-xl lg:hidden flex flex-col p-8 pt-32 gap-6 animate-in slide-in-from-top duration-300">
-          <button
-            onClick={() => navTo("home")}
-            className={`text-2xl font-black uppercase italic ${
-              currentPage === "home" ? "text-blue-600" : "text-slate-400"
-            }`}
-          >
-            Explore
-          </button>
-          <button
-            onClick={() => navTo("network")}
-            className={`text-2xl font-black uppercase italic ${
-              currentPage === "network" ? "text-blue-600" : "text-slate-400"
-            }`}
-          >
-            Registry
-          </button>
-          {isLoggedIn && (
+          <div className="flex items-center gap-2">
             <button
-              onClick={() => navTo("post")}
-              className={`text-2xl font-black uppercase italic ${
-                currentPage === "post" ? "text-blue-600" : "text-slate-400"
-              }`}
+              onClick={onToggleDarkMode}
+              className="p-2.5 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5 rounded-xl transition-all"
             >
-              Broadcast
+              {isDarkMode ? (
+                <Sun size={20} className="text-[#00BFFF]" />
+              ) : (
+                <Moon size={20} />
+              )}
             </button>
-          )}
-          <button
-            onClick={() => navTo("support")}
-            className={`text-2xl font-black uppercase italic ${
-              currentPage === "support" ? "text-blue-600" : "text-slate-400"
-            }`}
-          >
-            Support
-          </button>
-          {isLoggedIn && userRole === "admin" && (
-            <button
-              onClick={() => navTo("admin")}
-              className={`text-2xl font-black uppercase italic ${
-                currentPage === "admin" ? "text-blue-600" : "text-slate-400"
-              }`}
-            >
-              Root Terminal
-            </button>
-          )}
-          {isLoggedIn && (
-            <button
-              onClick={() => navTo("profile")}
-              className="text-2xl italic font-black uppercase text-slate-400"
-            >
-              My Identity
-            </button>
-          )}
-          <div className="flex flex-col gap-4 mt-auto">
+
+            {isLoggedIn && (
+              <div className="relative">
+                <button className="p-2.5 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5 rounded-xl transition-all relative">
+                  <Bell size={20} />
+                  {chatRequests.length > 0 && (
+                    <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full animate-pulse border-2 border-white dark:border-[#0a0a0a]" />
+                  )}
+                </button>
+              </div>
+            )}
+
             {isLoggedIn ? (
-              <button
-                onClick={onLogout}
-                className="flex items-center justify-center w-full gap-3 py-5 text-sm font-black tracking-widest text-red-500 uppercase bg-red-500/10 rounded-2xl"
-              >
-                <LogOut size={20} /> Terminate Protocol
-              </button>
+              <div className="flex items-center gap-2 md:gap-3">
+                <button
+                  onClick={() => navTo("profile")}
+                  className="w-9 h-9 rounded-full overflow-hidden border-2 border-slate-200 dark:border-white/10 hover:border-[#00BFFF] transition-all"
+                >
+                  {profileAvatar ? (
+                    <img
+                      src={profileAvatar}
+                      className="object-cover w-full h-full"
+                    />
+                  ) : (
+                    <User size={18} className="m-auto text-slate-500" />
+                  )}
+                </button>
+              </div>
             ) : (
               <button
                 onClick={onLogin}
-                className="w-full py-5 text-sm font-black tracking-widest text-white uppercase bg-blue-600 rounded-2xl"
+                className="bg-[#00BFFF] text-white px-5 py-2 text-[10px] font-black uppercase rounded-full shadow-lg hover:brightness-110 active:scale-95 transition-all"
               >
-                Initialize Node
+                Log In
               </button>
             )}
           </div>
         </div>
-      )}
+      </nav>
+
+      {/* Mobile Sidebar */}
+      <div
+        className={`fixed inset-0 z-[300] lg:hidden transition-all duration-500 ${
+          isSidebarOpen ? "visible" : "invisible pointer-events-none"
+        }`}
+      >
+        <div
+          className={`absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity duration-500 ${
+            isSidebarOpen ? "opacity-100" : "opacity-0"
+          }`}
+          onClick={() => setIsSidebarOpen(false)}
+        />
+        <div
+          className={`absolute top-0 left-0 h-full w-[280px] bg-white dark:bg-[#0a0a0a] border-r border-slate-200 dark:border-white/5 shadow-2xl transition-transform duration-500 flex flex-col ${
+            isSidebarOpen ? "translate-x-0" : "-translate-x-full"
+          }`}
+        >
+          <div className="flex items-center justify-between p-6 border-b border-slate-200 dark:border-white/5">
+            <div className="flex items-center gap-3">
+              <Shield size={20} className="text-[#00BFFF]" />
+              <span className="text-xs font-black tracking-widest uppercase text-slate-900 dark:text-white">
+                Navigation
+              </span>
+            </div>
+            <button
+              onClick={() => setIsSidebarOpen(false)}
+              className="p-2 transition-colors text-slate-400 hover:text-slate-900 dark:hover:text-white"
+            >
+              <X size={24} />
+            </button>
+          </div>
+
+          <div className="flex-grow p-4 space-y-2 overflow-y-auto">
+            <SidebarItem
+              icon={Globe}
+              label="Discovery Wire"
+              onClick={() => navTo("home")}
+              active={currentPage === "home"}
+            />
+            <SidebarItem
+              icon={Users}
+              label="Node Registry"
+              onClick={() => navTo("network")}
+              active={currentPage === "network"}
+            />
+            {isLoggedIn && (
+              <SidebarItem
+                icon={Radio}
+                label="Broadcast Dispatch"
+                onClick={() => navTo("post")}
+                active={currentPage === "post"}
+              />
+            )}
+            <SidebarItem
+              icon={LifeBuoy}
+              label="Technical Support"
+              onClick={() => navTo("support")}
+              active={currentPage === "support"}
+            />
+            <SidebarItem
+              icon={FileText}
+              label="Identity Dossier"
+              onClick={() => navTo("profile")}
+              active={currentPage === "profile"}
+            />
+            {userRole === "admin" && (
+              <SidebarItem
+                icon={Binary}
+                label="Root Access"
+                onClick={() => navTo("admin")}
+                active={currentPage === "admin"}
+              />
+            )}
+          </div>
+
+          <div className="p-6 border-t border-slate-200 dark:border-white/5">
+            {isLoggedIn ? (
+              <button
+                onClick={onLogout}
+                className="w-full flex items-center justify-center gap-3 py-4 bg-red-500/10 text-red-600 rounded-2xl font-black uppercase text-[10px] tracking-widest border border-red-500/20"
+              >
+                <LogOut size={16} /> Disconnect Node
+              </button>
+            ) : (
+              <button
+                onClick={onLogin}
+                className="w-full py-4 bg-[#00BFFF] text-white rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-lg"
+              >
+                Initialize Session
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Bottom Nav */}
+      <nav className="fixed bottom-0 left-0 right-0 z-[140] lg:hidden bg-white/95 dark:bg-[#0a0a0a]/95 backdrop-blur-xl border-t border-slate-200 dark:border-white/10 flex items-center justify-around py-2.5 pb-6 px-4">
+        <BottomTab
+          icon={Globe}
+          label="Wire"
+          active={currentPage === "home"}
+          onClick={() => onNavigate("home")}
+        />
+        <BottomTab
+          icon={Users}
+          label="People"
+          active={currentPage === "network"}
+          onClick={() => onNavigate("network")}
+        />
+        <div className="relative -top-5">
+          <button
+            onClick={() => onNavigate("post")}
+            className="w-14 h-14 bg-[#00BFFF] text-white rounded-full flex items-center justify-center shadow-xl shadow-[#00BFFF]/30 active:scale-90 transition-all border-[6px] border-white dark:border-[#0a0a0a]"
+          >
+            <PenSquare size={24} />
+          </button>
+        </div>
+        <BottomTab
+          icon={LifeBuoy}
+          label="Help"
+          active={currentPage === "support"}
+          onClick={() => onNavigate("support")}
+        />
+        <BottomTab
+          icon={User}
+          label="Me"
+          active={currentPage === "profile"}
+          onClick={() => onNavigate("profile")}
+        />
+      </nav>
     </>
   );
 };
+
+const DropdownItem = ({ icon: Icon, label, desc, onClick, active }: any) => (
+  <button
+    onClick={onClick}
+    className={`w-full flex items-center gap-4 p-3 rounded-2xl transition-all text-left group ${
+      active
+        ? "bg-[#00BFFF]/10 border border-[#00BFFF]/20"
+        : "hover:bg-slate-50 dark:hover:bg-white/5"
+    }`}
+  >
+    <div
+      className={`p-2 rounded-xl transition-colors ${
+        active
+          ? "bg-[#00BFFF] text-white shadow-md"
+          : "bg-slate-100 dark:bg-white/10 text-slate-500 group-hover:text-[#00BFFF]"
+      }`}
+    >
+      <Icon size={16} />
+    </div>
+    <div>
+      <p
+        className={`text-[10px] font-black uppercase tracking-tight ${
+          active ? "text-[#00BFFF]" : "text-slate-900 dark:text-white"
+        }`}
+      >
+        {label}
+      </p>
+      <p className="text-[8px] font-bold text-slate-400 dark:text-slate-500 mt-0.5">
+        {desc}
+      </p>
+    </div>
+  </button>
+);
+
+const SidebarItem = ({ icon: Icon, label, onClick, active }: any) => (
+  <button
+    onClick={onClick}
+    className={`w-full flex items-center gap-4 p-4 rounded-2xl transition-all ${
+      active
+        ? "bg-[#00BFFF]/10 text-[#00BFFF] border border-[#00BFFF]/20 shadow-sm"
+        : "text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-white/5"
+    }`}
+  >
+    <Icon size={20} />
+    <span className="text-xs font-bold tracking-widest uppercase">{label}</span>
+  </button>
+);
+
+const BottomTab = ({ icon: Icon, label, active, onClick }: any) => (
+  <button
+    onClick={onClick}
+    className="flex flex-col items-center gap-1 group w-14"
+  >
+    <div
+      className={`p-1.5 rounded-xl transition-all ${
+        active ? "bg-[#00BFFF]/10 text-[#00BFFF]" : "text-slate-400"
+      }`}
+    >
+      <Icon size={22} strokeWidth={active ? 2.5 : 2} />
+    </div>
+    <span
+      className={`text-[8px] font-black uppercase tracking-widest transition-colors ${
+        active ? "text-[#00BFFF]" : "text-slate-400"
+      }`}
+    >
+      {label}
+    </span>
+  </button>
+);
 
 export default Navbar;

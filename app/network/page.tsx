@@ -3,13 +3,15 @@ import {
   Search,
   MessageSquare,
   Fingerprint,
-  ArrowLeft,
-  Globe,
   ShieldCheck,
-  User,
   Zap,
+  UserCheck,
+  Award,
+  MapPin,
+  Activity,
 } from "lucide-react";
 import { Profile } from "../../types";
+import { toast } from "react-hot-toast";
 
 interface NetworkPageProps {
   users: Profile[];
@@ -25,7 +27,6 @@ const NetworkPage: React.FC<NetworkPageProps> = ({
   currentUserId,
   onViewProfile,
   onChat,
-  onBack,
   onRefresh,
 }) => {
   const [searchTerm, setSearchTerm] = useState("");
@@ -48,53 +49,43 @@ const NetworkPage: React.FC<NetworkPageProps> = ({
   );
 
   return (
-    <main className="px-6 py-16 mx-auto space-y-12 duration-500 max-w-7xl animate-in fade-in">
-      <section className="space-y-10">
-        <button
-          onClick={onBack}
-          className="flex items-center gap-2 text-slate-400 hover:text-slate-950 dark:hover:text-white font-black uppercase text-[10px] tracking-widest group transition-all"
-        >
-          <ArrowLeft
-            size={16}
-            className="transition-transform group-hover:-translate-x-1"
-          />{" "}
-          Exit Registry Shard
-        </button>
-
-        <div className="flex flex-col items-start justify-between gap-10 lg:flex-row lg:items-end">
-          <div className="space-y-3">
-            <div className="flex items-center gap-3 text-blue-600">
-              <Globe size={24} />
-              <span className="text-[11px] font-black uppercase tracking-[0.4em]">
-                Global Node Registry
-              </span>
-            </div>
-            <h1 className="text-5xl italic font-black tracking-tighter uppercase md:text-8xl text-slate-900 dark:text-white">
-              Registry
-            </h1>
-            <p className="text-slate-500 dark:text-slate-400 font-bold uppercase tracking-[0.2em] text-[10px] max-w-md">
-              Index of verified correspondent nodes active within the network.
-            </p>
+    <main className="max-w-6xl px-4 py-12 pt-16 pb-40 mx-auto space-y-12 transition-all duration-300 md:px-6 animate-in fade-in lg:pb-16">
+      <div className="flex flex-col items-start justify-between gap-8 md:flex-row md:items-center">
+        <div className="space-y-3">
+          <div className="flex items-center gap-3 text-[#00BFFF] mb-1">
+            <ShieldCheck size={20} />
+            <span className="text-[10px] font-black uppercase tracking-[0.4em]">
+              Global Node Registry
+            </span>
           </div>
-
-          <div className="flex items-center gap-4 px-6 py-4 bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-200 dark:border-white/5 w-full lg:w-96 shadow-sm focus-within:ring-2 focus-within:ring-blue-600/20 transition-all">
-            <Search size={18} className="text-slate-400" />
-            <input
-              placeholder="LOCATE IDENTITY..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="bg-transparent border-none text-[11px] font-black uppercase text-slate-900 dark:text-white outline-none w-full"
-            />
-          </div>
+          <h1 className="text-4xl italic font-black tracking-tighter uppercase md:text-5xl text-slate-900 dark:text-white">
+            Directory <span className="text-[#00BFFF]">Archive</span>
+          </h1>
+          <p className="text-xs font-bold leading-loose tracking-widest uppercase text-slate-400 dark:text-slate-500">
+            Verified correspondent directory across the intelligence sector.
+          </p>
         </div>
-      </section>
 
-      <section className="grid grid-cols-1 gap-8 pb-32 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="relative w-full group md:w-80">
+          <Search
+            size={16}
+            className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#00BFFF] transition-colors"
+          />
+          <input
+            placeholder="Search by alias or serial..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full bg-slate-50 dark:bg-[#121212] border border-slate-200 dark:border-white/5 rounded-2xl py-4 pl-12 pr-6 text-xs text-slate-900 dark:text-white outline-none focus:border-[#00BFFF]/30 transition-all shadow-xl dark:shadow-none"
+          />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
         {filtered.length === 0 ? (
-          <div className="py-40 text-center col-span-full opacity-20">
-            <Fingerprint size={64} className="mx-auto" />
-            <p className="mt-4 text-sm font-black uppercase">
-              No Nodes Detected
+          <div className="py-20 text-center col-span-full opacity-20">
+            <Zap size={48} className="mx-auto text-[#00BFFF]" />
+            <p className="text-xs font-black uppercase mt-4 tracking-[0.3em]">
+              No Active Signals Found
             </p>
           </div>
         ) : (
@@ -103,95 +94,103 @@ const NetworkPage: React.FC<NetworkPageProps> = ({
             return (
               <div
                 key={user.id}
-                className="group bg-white dark:bg-slate-950 p-8 rounded-[3rem] border border-slate-200 dark:border-white/5 hover:border-blue-600 transition-all shadow-sm relative overflow-hidden flex flex-col justify-between"
+                className="group bg-white dark:bg-[#1A1A1A] rounded-[2.5rem] border border-slate-100 dark:border-white/5 hover:border-[#00BFFF]/40 transition-all cursor-pointer overflow-hidden shadow-sm hover:shadow-2xl flex flex-col"
+                onClick={() => onViewProfile(user)}
               >
-                <div className="absolute top-0 right-0 p-6 opacity-[0.03] group-hover:opacity-[0.08] transition-opacity">
-                  <ShieldCheck size={120} className="dark:text-white" />
-                </div>
-
-                <div className="relative z-10 space-y-8">
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center justify-center w-20 h-20 overflow-hidden border shadow-inner rounded-3xl bg-slate-50 dark:bg-slate-900 border-slate-100 dark:border-white/5">
+                {/* Profile Cover Asset */}
+                <div className="h-24 bg-gradient-to-r from-[#00BFFF]/20 to-slate-200 dark:to-slate-800 relative">
+                  <div className="absolute -bottom-10 left-6">
+                    <div className="w-20 h-20 rounded-3xl bg-white dark:bg-[#0a0a0a] overflow-hidden border-4 border-white dark:border-[#1A1A1A] flex items-center justify-center shadow-xl">
                       {user.avatar_url ? (
                         <img
                           src={user.avatar_url}
                           className="object-cover w-full h-full"
-                          alt=""
                         />
                       ) : (
-                        <Fingerprint size={32} className="text-slate-300" />
+                        <Fingerprint
+                          size={32}
+                          className="text-slate-200 dark:text-slate-800"
+                        />
                       )}
                     </div>
-                    <div className="flex flex-col items-end gap-1">
-                      <span className="px-3 py-1 bg-emerald-500/10 text-emerald-500 rounded-lg text-[8px] font-black uppercase tracking-widest italic border border-emerald-500/20">
-                        Online
-                      </span>
-                      <span className="text-[8px] font-black text-slate-400 uppercase tracking-[0.2em]">
-                        {user.role}
-                      </span>
-                    </div>
+                    {user.is_online && (
+                      <div className="absolute bottom-0 right-0 w-5 h-5 bg-emerald-500 rounded-full border-4 border-white dark:border-[#1A1A1A] animate-pulse" />
+                    )}
                   </div>
-
-                  <div className="space-y-1">
-                    <h3 className="text-2xl italic font-black tracking-tight uppercase truncate text-slate-900 dark:text-white">
-                      {user.full_name}{" "}
-                      {isMe && (
-                        <span className="ml-1 text-blue-600">(SELF)</span>
-                      )}
-                    </h3>
-                    <p className="text-[9px] font-black text-blue-600 uppercase tracking-widest">
-                      {user.serial_id}
-                    </p>
+                  <div className="absolute top-4 right-6">
+                    <span className="px-3 py-1 bg-black/10 dark:bg-black/40 backdrop-blur-md rounded-full text-[7px] font-black text-slate-600 dark:text-slate-300 uppercase tracking-[0.2em] border border-white/10">
+                      Sector_A1
+                    </span>
                   </div>
-
-                  <div className="grid grid-cols-2 gap-4 py-6 border-y border-slate-100 dark:border-white/5">
-                    <div className="space-y-1">
-                      <p className="text-[8px] text-slate-400 font-black uppercase tracking-widest">
-                        Reputation
-                      </p>
-                      <p className="text-xl font-black tracking-tighter text-slate-900 dark:text-white">
-                        {user.budget || 0}
-                      </p>
-                    </div>
-                    <div className="space-y-1 text-right">
-                      <p className="text-[8px] text-slate-400 font-black uppercase tracking-widest">
-                        Dossier Access
-                      </p>
-                      <p className="text-[10px] font-black text-slate-900 dark:text-white uppercase italic">
-                        {user.is_private ? "Encrypted" : "Public"}
-                      </p>
-                    </div>
-                  </div>
-
-                  <p className="text-xs italic text-slate-500 line-clamp-2 leading-relaxed min-h-[40px]">
-                    "
-                    {user.bio ||
-                      "No professional manifesto recorded for this node."}
-                    "
-                  </p>
                 </div>
 
-                <div className="relative z-10 flex gap-3 pt-8">
-                  <button
-                    onClick={() => onViewProfile(user)}
-                    className="flex-1 py-4 rounded-2xl bg-slate-50 dark:bg-slate-900 text-[10px] font-black uppercase text-slate-600 dark:text-white hover:bg-slate-900 hover:text-white dark:hover:bg-white dark:hover:text-slate-900 transition-all border border-slate-100 dark:border-white/5 shadow-sm"
-                  >
-                    Audit Dossier
-                  </button>
-                  {!isMe && (
+                <div className="pt-12 space-y-6 p-7">
+                  <div className="flex items-start justify-between">
+                    <div className="overflow-hidden">
+                      <h4 className="text-lg font-black leading-tight tracking-tight uppercase truncate text-slate-900 dark:text-white">
+                        {user.full_name}
+                      </h4>
+                      <div className="flex items-center gap-1.5 mt-1">
+                        <Award size={10} className="text-[#00BFFF]" />
+                        <p className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">
+                          Verified Correspondent
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <p className="text-xs italic font-medium leading-relaxed text-slate-500 dark:text-slate-400 line-clamp-2">
+                      "
+                      {user.bio ||
+                        "Observing network integrity and factual dispatches across the local shard."}
+                      "
+                    </p>
+
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 dark:bg-black/30 rounded-xl border border-slate-100 dark:border-white/5">
+                        <Activity size={10} className="text-emerald-500" />
+                        <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">
+                          Trust_{user.budget || 0}%
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 dark:bg-black/30 rounded-xl border border-slate-100 dark:border-white/5">
+                        <MapPin size={10} className="text-[#00BFFF]" />
+                        <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">
+                          {user.serial_id}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-2 pt-5 border-t border-slate-50 dark:border-white/5">
                     <button
-                      onClick={() => onChat(user)}
-                      className="flex-1 py-4 rounded-2xl bg-blue-600 text-white text-[10px] font-black uppercase flex items-center justify-center gap-2 hover:bg-blue-700 transition-all shadow-lg shadow-blue-600/20"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onViewProfile(user);
+                      }}
+                      className="flex-1 py-3 bg-slate-50 dark:bg-white/5 text-slate-600 dark:text-slate-300 rounded-xl font-black uppercase text-[9px] tracking-widest hover:bg-slate-100 dark:hover:bg-white/10 transition-all"
                     >
-                      <MessageSquare size={16} /> Handshake
+                      Audit
                     </button>
-                  )}
+                    {!isMe && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onChat(user);
+                        }}
+                        className="flex-1 py-3 bg-[#00BFFF] text-white rounded-xl font-black uppercase text-[9px] tracking-widest hover:brightness-110 active:scale-95 transition-all shadow-lg shadow-[#00BFFF]/20 flex items-center justify-center gap-2"
+                      >
+                        <MessageSquare size={14} /> Connect
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             );
           })
         )}
-      </section>
+      </div>
     </main>
   );
 };

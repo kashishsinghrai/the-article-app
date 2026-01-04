@@ -1,30 +1,27 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import Navbar from "./components/Navbar.tsx";
 import Footer from "./components/Footer.tsx";
-import TrendingTicker from "./components/TrendingTicker.tsx";
 import ChatOverlay from "./components/ChatOverlay.tsx";
 import ArticleDetail from "./components/ArticleDetail.tsx";
 import HomePage from "./app/page.tsx";
-import PostPage from "./app/post/page.tsx";
 import ProfilePage from "./app/profile/page.tsx";
-import AdminPage from "./app/admin/page.tsx";
-import SupportPage from "./app/support/page.tsx";
 import NetworkPage from "./app/network/page.tsx";
+import SupportPage from "./app/support/page.tsx";
+import PostPage from "./app/post/page.tsx";
 import LoginPage from "./app/auth/login.tsx";
 import RegisterPage from "./app/auth/register.tsx";
 import SetupProfilePage from "./app/setup-profile/page.tsx";
-import { Profile, Article, ChatRequest } from "./types.ts";
+import { Profile, ChatRequest, Article } from "./types.ts";
 import { Toaster, toast } from "react-hot-toast";
 import { supabase } from "./lib/supabase.ts";
 import { useStore } from "./lib/store.ts";
-import { Loader2 } from "lucide-react";
 
 const App: React.FC = () => {
   const profile = useStore((s) => s.profile);
   const isLoggedIn = useStore((s) => s.isLoggedIn);
-  const articles = useStore((s) => s.articles);
   const users = useStore((s) => s.users);
   const chatRequests = useStore((s) => s.chatRequests);
+  const articles = useStore((s) => s.articles);
   const isInitialized = useStore((s) => s.isInitialized);
 
   const hydrate = useStore((s) => s.hydrate);
@@ -35,14 +32,18 @@ const App: React.FC = () => {
   const [currentPage, setCurrentPage] = useState("home");
   const [showAuth, setShowAuth] = useState<"login" | "register" | null>(null);
   const [viewingProfile, setViewingProfile] = useState<Profile | null>(null);
-  const [isDarkMode, setIsDarkMode] = useState(false);
   const [activeArticle, setActiveArticle] = useState<Article | null>(null);
-
-  // Chat specific state
   const [activeChat, setActiveChat] = useState<{
     profile: Profile;
     handshakeId: string;
   } | null>(null);
+
+  const [isDarkMode, setIsDarkMode] = useState(true);
+
+  const personalArticles = useMemo(() => {
+    if (!profile) return [];
+    return articles.filter((a) => a.author_id === profile.id);
+  }, [articles, profile]);
 
   useEffect(() => {
     hydrate();
@@ -50,296 +51,101 @@ const App: React.FC = () => {
     return () => {
       if (unsub) unsub();
     };
-  }, [hydrate, initAuthListener]);
-
-  // Global Signal Monitor for Handshake Acceptance
-  useEffect(() => {
-    if (!profile) return;
-
-    const channel = supabase
-      .channel("handshake_sync")
-      .on(
-        "postgres_changes",
-        {
-          event: "UPDATE",
-          schema: "public",
-          table: "chat_requests",
-          filter: `from_id=eq.${profile.id}`,
-        },
-        (payload) => {
-          const updatedReq = payload.new as ChatRequest;
-          if (updatedReq.status === "accepted") {
-            const targetNode = users.find((u) => u.id === updatedReq.to_id);
-            if (targetNode) {
-              toast.success(`Node ${targetNode.serial_id} Handshake Accepted`, {
-                duration: 4000,
-              });
-              setActiveChat({
-                profile: targetNode,
-                handshakeId: updatedReq.id,
-              });
-            }
-          }
-        }
-      )
-      .subscribe();
-
-    return () => {
-      channel.unsubscribe();
-    };
-  }, [profile, users]);
+  }, []);
 
   useEffect(() => {
-    if (isDarkMode) document.documentElement.classList.add("dark");
-    else document.documentElement.classList.remove("dark");
+    if (isDarkMode) {
+      document.documentElement.classList.add("dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+    }
   }, [isDarkMode]);
 
-  const handleAcceptRequest = async (req: ChatRequest) => {
+  const handleUpdateProfile = async (data: Partial<Profile>) => {
+    if (!profile) return;
     const { error } = await supabase
-      .from("chat_requests")
-      .update({ status: "accepted" })
-      .eq("id", req.id);
-
+      .from("profiles")
+      .update(data)
+      .eq("id", profile.id);
     if (!error) {
-      toast.success("Signal Established.");
-      const senderProfile = users.find((u) => u.id === req.from_id);
-      if (senderProfile)
-        setActiveChat({ profile: senderProfile, handshakeId: req.id });
+      toast.success("Identity Updated");
       hydrate();
-    } else {
-      toast.error("Handshake failure.");
     }
   };
 
-  const handleInitiateHandshake = async (targetProfile: Profile) => {
-    if (!profile) return toast.error("Identity required.");
-
-    const { data: existing } = await supabase
-      .from("chat_requests")
-      .select("*")
-      .or(
-        `and(from_id.eq.${profile.id},to_id.eq.${targetProfile.id}),and(from_id.eq.${targetProfile.id},to_id.eq.${profile.id})`
-      )
-      .maybeSingle();
-
-    if (existing) {
-      if (existing.status === "accepted") {
-        setActiveChat({ profile: targetProfile, handshakeId: existing.id });
-      } else {
-        toast.error("Handshake pending node validation.");
-      }
-      return;
-    }
-
-    const { error } = await supabase.from("chat_requests").insert({
-      from_id: profile.id,
-      to_id: targetProfile.id,
-      status: "pending",
-    });
-
-    if (!error) toast.success("Handshake dispatched.");
-    else toast.error("Transmission blocked.");
-  };
-
-  const handleLogoutProtocol = async () => {
+  const handleLogout = async () => {
     await logout();
     setCurrentPage("home");
     setViewingProfile(null);
-    setActiveChat(null);
-    toast.success("Identity Disconnected.");
+    toast.success("Disconnected");
+  };
+
+  const handleAcceptRequest = (req: ChatRequest) => {
+    toast.success("Handshake established");
+  };
+
+  const handleInteraction = async (type: "like" | "dislike", id: string) => {
+    if (!isLoggedIn) return setShowAuth("login");
+    const field = type === "like" ? "likes_count" : "dislikes_count";
+    const { data } = await supabase
+      .from("articles")
+      .select(field)
+      .eq("id", id)
+      .single();
+    await supabase
+      .from("articles")
+      .update({ [field]: (data?.[field] || 0) + 1 })
+      .eq("id", id);
+    syncAll();
+    toast.success("Protocol Interaction Hashed");
   };
 
   if (!isInitialized) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-slate-50 dark:bg-slate-950">
-        <div className="flex flex-col items-center gap-6">
-          <Loader2 className="w-10 h-10 text-blue-600 animate-spin" />
-          <p className="text-[10px] font-black uppercase tracking-[0.5em] text-slate-400">
-            Syncing Global Core...
-          </p>
-        </div>
+      <div className="flex items-center justify-center min-h-screen bg-[#050505]">
+        <div className="w-8 h-8 border-2 border-[#00BFFF] border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
 
-  const renderPage = () => {
-    if (currentPage === "support")
-      return <SupportPage onBack={() => setCurrentPage("home")} />;
-    if (
-      isLoggedIn &&
-      (!profile || !profile.full_name) &&
-      currentPage !== "support"
-    ) {
-      return (
-        <SetupProfilePage
-          onComplete={async () => {
-            await hydrate();
-            setCurrentPage("home");
-          }}
-        />
-      );
-    }
-
-    switch (currentPage) {
-      case "home":
-        return (
-          <HomePage
-            articles={articles}
-            isLoggedIn={isLoggedIn}
-            onLogin={() => setShowAuth("login")}
-            onReadArticle={setActiveArticle}
-            onRefresh={syncAll}
-          />
-        );
-      case "network":
-        return (
-          <NetworkPage
-            onBack={() => setCurrentPage("home")}
-            users={users}
-            currentUserId={profile?.id}
-            onViewProfile={(u) => {
-              setViewingProfile(u);
-              setCurrentPage("profile");
-            }}
-            onChat={handleInitiateHandshake}
-            onRefresh={syncAll}
-          />
-        );
-      case "post":
-        return isLoggedIn ? (
-          <PostPage
-            profile={profile}
-            onBack={() => setCurrentPage("home")}
-            onPublish={async (d) => {
-              if (!profile) return;
-              const { error } = await supabase
-                .from("articles")
-                .insert({
-                  ...d,
-                  author_id: profile.id,
-                  author_name: profile.full_name,
-                  author_serial: profile.serial_id,
-                });
-              if (error) {
-                toast.error("Transmission failed.");
-                return;
-              }
-              await syncAll();
-              setCurrentPage("home");
-              toast.success("Intelligence Transmitted.");
-            }}
-          />
-        ) : (
-          <HomePage
-            articles={articles}
-            isLoggedIn={isLoggedIn}
-            onLogin={() => setShowAuth("login")}
-            onReadArticle={setActiveArticle}
-            onRefresh={syncAll}
-          />
-        );
-      case "profile":
-        const profileToDisplay = viewingProfile || profile;
-        if (!profileToDisplay && isLoggedIn)
-          return (
-            <div className="flex items-center justify-center py-40">
-              <Loader2 className="text-blue-600 animate-spin" size={32} />
-            </div>
-          );
-        return profileToDisplay ? (
-          <ProfilePage
-            profile={profileToDisplay}
-            onLogout={handleLogoutProtocol}
-            isExternal={!!viewingProfile}
-            onCloseExternal={() => {
-              const prev = viewingProfile ? "network" : "home";
-              setViewingProfile(null);
-              setCurrentPage(prev);
-            }}
-            isLoggedIn={isLoggedIn}
-            currentUserId={profile?.id}
-            onUpdateProfile={async (d) => {
-              if (!profile) return;
-              const { error } = await supabase
-                .from("profiles")
-                .update(d)
-                .eq("id", profile.id);
-              if (!error) {
-                toast.success("Identity Synced.");
-                await hydrate();
-              }
-            }}
-            onChat={handleInitiateHandshake}
-          />
-        ) : null;
-      case "admin":
-        return profile?.role === "admin" ? (
-          <AdminPage
-            articles={articles}
-            users={users}
-            currentUserId={profile.id}
-            onUpdateArticles={syncAll}
-            onUpdateUsers={syncAll}
-            onLogout={handleLogoutProtocol}
-          />
-        ) : (
-          <HomePage
-            articles={articles}
-            isLoggedIn={isLoggedIn}
-            onLogin={() => setShowAuth("login")}
-            onReadArticle={setActiveArticle}
-            onRefresh={syncAll}
-          />
-        );
-      default:
-        return (
-          <HomePage
-            articles={articles}
-            isLoggedIn={isLoggedIn}
-            onLogin={() => setShowAuth("login")}
-            onReadArticle={setActiveArticle}
-            onRefresh={syncAll}
-          />
-        );
-    }
-  };
-
   return (
-    <div
-      className={`min-h-screen selection:bg-blue-600 selection:text-white ${
-        isDarkMode ? "dark bg-slate-950" : "bg-slate-50 text-slate-900"
-      }`}
-    >
-      <Toaster position="bottom-center" />
+    <div className="min-h-screen bg-slate-50 dark:bg-[#050505] text-slate-900 dark:text-[#e5e7eb] font-sans selection:bg-[#00BFFF]/30">
+      <Toaster
+        position="top-right"
+        toastOptions={{
+          style: {
+            background: "#111",
+            color: "#fff",
+            borderRadius: "1.5rem",
+            border: "1px solid rgba(255,255,255,0.1)",
+            fontSize: "10px",
+            textTransform: "uppercase",
+            fontWeight: "900",
+          },
+        }}
+      />
+
       {showAuth === "login" && (
         <LoginPage
           onBack={() => setShowAuth(null)}
-          onSuccess={() => {
-            setShowAuth(null);
-            hydrate();
-          }}
+          onSuccess={() => setShowAuth(null)}
           onGoToRegister={() => setShowAuth("register")}
         />
       )}
       {showAuth === "register" && (
         <RegisterPage
           onBack={() => setShowAuth(null)}
-          onSuccess={() => {
-            setShowAuth(null);
-            hydrate();
-          }}
+          onSuccess={() => setShowAuth(null)}
           onGoToLogin={() => setShowAuth("login")}
         />
       )}
+
       {!showAuth && (
         <>
           <Navbar
-            onNavigate={(p) => {
-              if (p !== "profile") setViewingProfile(null);
-              setCurrentPage(p);
-            }}
+            onNavigate={setCurrentPage}
             onLogin={() => setShowAuth("login")}
-            onLogout={handleLogoutProtocol}
+            onLogout={handleLogout}
             currentPage={currentPage}
             isLoggedIn={isLoggedIn}
             userRole={profile?.role || "user"}
@@ -349,7 +155,82 @@ const App: React.FC = () => {
             onAcceptRequest={handleAcceptRequest}
             profileAvatar={profile?.avatar_url}
           />
-          <div className="min-h-screen pt-12 md:pt-24">{renderPage()}</div>
+
+          <main className="pt-20">
+            {currentPage === "home" && (
+              <HomePage
+                articles={articles}
+                isLoggedIn={isLoggedIn}
+                onLogin={() => setShowAuth("login")}
+                onReadArticle={setActiveArticle}
+                onRefresh={syncAll}
+              />
+            )}
+            {currentPage === "network" && (
+              <NetworkPage
+                onBack={() => setCurrentPage("home")}
+                users={users}
+                currentUserId={profile?.id}
+                onViewProfile={(u) => {
+                  setViewingProfile(u);
+                  setCurrentPage("profile");
+                }}
+                onChat={(u) => toast.success("Connecting...")}
+              />
+            )}
+            {currentPage === "post" && (
+              <PostPage
+                profile={profile}
+                personalArticles={personalArticles}
+                onBack={() => setCurrentPage("home")}
+                onPublish={async (data) => {
+                  const { error } = await supabase
+                    .from("articles")
+                    .insert([
+                      {
+                        ...data,
+                        author_id: profile?.id,
+                        author_serial: profile?.serial_id,
+                        author_name: profile?.full_name,
+                      },
+                    ]);
+                  if (!error) {
+                    toast.success("Dispatch Transmitted");
+                    syncAll();
+                    setCurrentPage("home");
+                  } else {
+                    toast.error("Transmission Failure");
+                  }
+                }}
+              />
+            )}
+            {currentPage === "profile" &&
+              (profile ? (
+                <ProfilePage
+                  profile={viewingProfile || profile}
+                  onLogout={handleLogout}
+                  isExternal={!!viewingProfile}
+                  onCloseExternal={() => {
+                    setViewingProfile(null);
+                    setCurrentPage("home");
+                  }}
+                  currentUserId={profile.id}
+                  onUpdateProfile={handleUpdateProfile}
+                  onChat={(u) => toast.success("Handshake Pending...")}
+                />
+              ) : (
+                <SetupProfilePage
+                  onComplete={async () => {
+                    hydrate();
+                    setCurrentPage("home");
+                  }}
+                />
+              ))}
+            {currentPage === "support" && (
+              <SupportPage onBack={() => setCurrentPage("home")} />
+            )}
+          </main>
+
           {activeArticle && (
             <ArticleDetail
               article={activeArticle}
@@ -358,8 +239,10 @@ const App: React.FC = () => {
               currentUserId={profile?.id}
               currentUserProfile={profile}
               onUpdateArticles={syncAll}
+              onInteraction={handleInteraction}
             />
           )}
+
           {activeChat && (
             <ChatOverlay
               recipient={activeChat.profile}
@@ -368,7 +251,6 @@ const App: React.FC = () => {
               onClose={() => setActiveChat(null)}
             />
           )}
-          <TrendingTicker />
           <Footer onNavigate={setCurrentPage} />
         </>
       )}

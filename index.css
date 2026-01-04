@@ -3,23 +3,62 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --bg-dark: #050505;
+  --accent: #00BFFF;
+  --terminal-green: #10b981;
+}
+
 @layer base {
   body {
-    @apply antialiased;
+    @apply antialiased transition-colors duration-500 overflow-x-hidden font-sans;
+    background-color: var(--bg-dark);
+    color: #e5e7eb;
   }
 }
 
+.glass-card {
+  @apply bg-white/5 backdrop-blur-xl border border-white/10 rounded-[2.5rem] shadow-2xl;
+}
+
+.terminal-input {
+  @apply bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-sm text-white outline-none focus:border-[#00BFFF]/50 transition-all;
+}
+
+/* Custom Scrollbar for Terminal aesthetics */
 .custom-scrollbar::-webkit-scrollbar {
   width: 4px;
 }
 .custom-scrollbar::-webkit-scrollbar-track {
-  background: transparent;
+  @apply bg-transparent;
 }
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  @apply bg-blue-600 rounded-full;
+  @apply bg-[#00BFFF]/20 rounded-full hover:bg-[#00BFFF]/40 transition-colors;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
 
 @keyframes ticker {
   0% { transform: translateX(0); }
   100% { transform: translateX(-50%); }
+}
+
+.animate-ticker {
+  display: flex;
+  width: fit-content;
+  animation: ticker 30s linear infinite;
+}
+
+.news-scroll-container {
+  @apply flex gap-6 overflow-x-auto pb-4 no-scrollbar cursor-grab active:cursor-grabbing;
+}
+
+.post-field-label {
+  @apply text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] mb-2 block;
 }

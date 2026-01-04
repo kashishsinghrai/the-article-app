@@ -33,11 +33,12 @@ const Footer: React.FC<{ onNavigate: (p: string) => void }> = ({
 }) => {
   const handleLinkClick = (l: string) => {
     const low = l.toLowerCase();
-    if (low === "explore") onNavigate("home");
-    else if (low === "mission") onNavigate("network");
-    else if (low === "reporting") onNavigate("post");
-    else if (low === "credentialing") onNavigate("profile");
-    else if (low === "support") onNavigate("support");
+    if (low === "discovery wire") onNavigate("home");
+    else if (low === "node registry") onNavigate("network");
+    else if (low === "broadcast dispatch") onNavigate("post");
+    else if (low === "identity dossier") onNavigate("profile");
+    else if (low === "technical assistance") onNavigate("support");
+    else if (low === "root terminal") onNavigate("admin");
   };
 
   return (
@@ -69,23 +70,43 @@ const Footer: React.FC<{ onNavigate: (p: string) => void }> = ({
             </div>
           </div>
           <FooterSection
-            title="Network"
-            links={["Explore", "Mission", "Global Ops", "Transparency"]}
+            title="Navigation"
+            links={[
+              "Discovery Wire",
+              "Node Registry",
+              "Broadcast Dispatch",
+              "Technical Assistance",
+            ]}
             onLinkClick={handleLinkClick}
           />
           <FooterSection
             title="Protocol"
-            links={["Ethics", "Verification", "Budget", "Security"]}
+            links={[
+              "Ethics Charter",
+              "Verification",
+              "Node Budget",
+              "Root Terminal",
+            ]}
             onLinkClick={handleLinkClick}
           />
           <FooterSection
-            title="Operational"
-            links={["Reporting", "Credentialing", "Terminal", "Support"]}
+            title="Organization"
+            links={[
+              "Press Kit",
+              "Privacy Policy",
+              "Terms of Use",
+              "Global Ops",
+            ]}
             onLinkClick={handleLinkClick}
           />
           <FooterSection
-            title="Legal"
-            links={["Privacy", "Press Kit", "Terms", "Contact"]}
+            title="Contact"
+            links={[
+              "Signal Headquarters",
+              "Press Inquiries",
+              "Security Disclosure",
+              "Sector Support",
+            ]}
             onLinkClick={handleLinkClick}
           />
         </div>

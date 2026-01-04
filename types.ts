@@ -35,11 +35,14 @@ export interface Profile {
   is_private: boolean;
   bio: string;
   avatar_url?: string;
+  cover_url?: string;
   email?: string;
   phone?: string;
   is_online?: boolean; 
   last_seen?: string;
-  settings?: UserSettings; 
+  settings?: UserSettings;
+  followers_count?: number;
+  following_count?: number;
 }
 
 export interface ChatRequest {
@@ -74,4 +77,6 @@ export interface Article {
   likes_count?: number;
   dislikes_count?: number;
   comments_count?: number;
+  is_liked?: boolean;
+  is_disliked?: boolean;
 }
